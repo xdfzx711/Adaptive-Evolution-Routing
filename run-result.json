@@ -1,0 +1,573 @@
+{
+  "status": "task_finished",
+  "run_root": "D:\\pythonproject\\adaptive-evolution-routing\\runs\\run-ce0a87ad13674db98c38c819c52b2a12",
+  "stable_scope_id": "orchestrator/episode-f007a1507c5644c8aa2ade3b81b9a631",
+  "record_ref": {
+    "artifact_id": "sha256-f631192a072f5c34bcc719773a8c41556d1d49766f4469d5633b8d11a2725584",
+    "kind": "run_result",
+    "version": "38d8cd6066d2833dd472c534a56fa763a1e0614ea6659933af3b566e4381c0cc",
+    "uri": "artifacts/sha256-f631192a072f5c34bcc719773a8c41556d1d49766f4469d5633b8d11a2725584.bin",
+    "digest": "38d8cd6066d2833dd472c534a56fa763a1e0614ea6659933af3b566e4381c0cc"
+  },
+  "record": {
+    "run_id": "run-ce0a87ad13674db98c38c819c52b2a12",
+    "episode_id": "episode-f007a1507c5644c8aa2ade3b81b9a631",
+    "task_id": "dev-001",
+    "initial_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+    "final_stable_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+    "status": "completed",
+    "final_evaluation_status": "evaluated",
+    "final_execution": {
+      "task_id": "dev-001",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06",
+      "output": {
+        "answer": 75
+      },
+      "trajectory": [
+        {
+          "seq": 0,
+          "kind": "model_request",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/1",
+            "request": {
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Complete the task using tools when useful. Return only a JSON object matching the public output_format, without Markdown or explanation.",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "user",
+                  "content": "{\"task_id\":\"dev-001\",\"benchmark_id\":\"toy_tasks\",\"input\":{\"instruction\":\"Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.\",\"data\":{\"expression\":\"(17 + 8) * 3\"},\"output_format\":{\"fields\":[{\"name\":\"answer\",\"type\":\"integer\"}],\"allow_extra_fields\":false},\"numeric_tolerance\":0.0},\"public_metadata\":{\"source_id\":\"toy-source-dev-001\",\"split\":\"dev\",\"category\":\"arithmetic\"}}",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                }
+              ],
+              "tools": [
+                {
+                  "name": "calculator",
+                  "description": "Evaluate arithmetic with +, -, *, / and parentheses.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "seed": 42,
+              "max_output_tokens": 2048
+            }
+          },
+          "timestamp": "2026-10-15T05:51:43.812355Z"
+        },
+        {
+          "seq": 1,
+          "kind": "model_response",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/1",
+            "content": "",
+            "tool_calls": [
+              {
+                "call_id": "call_807fb1999a62453eb4c77c5f",
+                "name": "calculator",
+                "arguments": {
+                  "expression": "(17 + 8) * 3"
+                }
+              }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": {
+              "input_tokens": 410,
+              "output_tokens": 34,
+              "model_calls": 1,
+              "tool_calls": 0,
+              "elapsed_seconds": 3.4392946000007214,
+              "usage_source": "provider_reported"
+            },
+            "metadata": {
+              "id": "chatcmpl-d405d393-cc03-9339-8714-13b21c6d3c5f",
+              "model": "qwen3.8-max-0902",
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "text_tokens": 410
+              }
+            }
+          },
+          "timestamp": "2026-10-15T05:51:47.252558Z"
+        },
+        {
+          "seq": 2,
+          "kind": "tool_call",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/tool/1",
+            "call_id": "call_807fb1999a62453eb4c77c5f",
+            "name": "calculator",
+            "arguments": {
+              "expression": "(17 + 8) * 3"
+            }
+          },
+          "timestamp": "2026-10-15T05:51:47.252650Z"
+        },
+        {
+          "seq": 3,
+          "kind": "tool_result",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/tool/1",
+            "call_id": "call_807fb1999a62453eb4c77c5f",
+            "name": "calculator",
+            "output": {
+              "value": 75
+            },
+            "status": "completed",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "model_calls": 0,
+              "tool_calls": 1,
+              "elapsed_seconds": 7.090000144671649e-05,
+              "usage_source": "provider_reported"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-15T05:51:47.252757Z"
+        },
+        {
+          "seq": 4,
+          "kind": "model_request",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/2",
+            "request": {
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Complete the task using tools when useful. Return only a JSON object matching the public output_format, without Markdown or explanation.",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "user",
+                  "content": "{\"task_id\":\"dev-001\",\"benchmark_id\":\"toy_tasks\",\"input\":{\"instruction\":\"Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.\",\"data\":{\"expression\":\"(17 + 8) * 3\"},\"output_format\":{\"fields\":[{\"name\":\"answer\",\"type\":\"integer\"}],\"allow_extra_fields\":false},\"numeric_tolerance\":0.0},\"public_metadata\":{\"source_id\":\"toy-source-dev-001\",\"split\":\"dev\",\"category\":\"arithmetic\"}}",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "assistant",
+                  "content": "",
+                  "tool_calls": [
+                    {
+                      "call_id": "call_807fb1999a62453eb4c77c5f",
+                      "name": "calculator",
+                      "arguments": {
+                        "expression": "(17 + 8) * 3"
+                      }
+                    }
+                  ],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "tool",
+                  "content": "{\"call_id\":\"call_807fb1999a62453eb4c77c5f\",\"name\":\"calculator\",\"output\":{\"value\":75},\"status\":\"completed\",\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"model_calls\":0,\"tool_calls\":1,\"elapsed_seconds\":0.00007090000144671649,\"usage_source\":\"provider_reported\"},\"error\":null}",
+                  "tool_calls": [],
+                  "tool_call_id": "call_807fb1999a62453eb4c77c5f"
+                }
+              ],
+              "tools": [
+                {
+                  "name": "calculator",
+                  "description": "Evaluate arithmetic with +, -, *, / and parentheses.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "seed": 42,
+              "max_output_tokens": 2048
+            }
+          },
+          "timestamp": "2026-10-15T05:51:47.252842Z"
+        },
+        {
+          "seq": 5,
+          "kind": "model_response",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/2",
+            "content": "{\"answer\": 75}",
+            "tool_calls": [],
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": 565,
+              "output_tokens": 7,
+              "model_calls": 1,
+              "tool_calls": 0,
+              "elapsed_seconds": 4.044165799990878,
+              "usage_source": "provider_reported"
+            },
+            "metadata": {
+              "id": "chatcmpl-85048b42-caa9-98eb-bffc-7c2f4228488c",
+              "model": "qwen3.8-max-0902",
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "text_tokens": 565
+              }
+            }
+          },
+          "timestamp": "2026-10-15T05:51:51.298686Z"
+        },
+        {
+          "seq": 6,
+          "kind": "finish",
+          "payload": {
+            "output": {
+              "answer": 75
+            },
+            "termination_reason": "finish"
+          },
+          "timestamp": "2026-10-15T05:51:51.300616Z"
+        }
+      ],
+      "state_summary": {
+        "agent_plugin": "react_agent",
+        "model_steps": 2,
+        "termination_reason": "finish",
+        "fresh_session": true
+      },
+      "usage": {
+        "input_tokens": 975,
+        "output_tokens": 41,
+        "total_tokens": 1016,
+        "model_calls": 2,
+        "tool_calls": 1,
+        "elapsed_seconds": 7.488717200001702,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      },
+      "status": "completed",
+      "artifact_refs": [],
+      "error": null
+    },
+    "final_evaluation": {
+      "evaluation_id": "evaluation-52e1f577-9270-5e50-b187-656094efd2d6",
+      "task_id": "dev-001",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "execution_operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06",
+      "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/evaluation",
+      "score": 1.0,
+      "success": true,
+      "metrics": {
+        "format_valid": 1.0,
+        "answer_correct": 1.0
+      },
+      "feedback": "Output format and answer are correct.",
+      "reason_code": "correct",
+      "evidence_refs": []
+    },
+    "last_evaluated_execution": {
+      "task_id": "dev-001",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06",
+      "output": {
+        "answer": 75
+      },
+      "trajectory": [
+        {
+          "seq": 0,
+          "kind": "model_request",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/1",
+            "request": {
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Complete the task using tools when useful. Return only a JSON object matching the public output_format, without Markdown or explanation.",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "user",
+                  "content": "{\"task_id\":\"dev-001\",\"benchmark_id\":\"toy_tasks\",\"input\":{\"instruction\":\"Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.\",\"data\":{\"expression\":\"(17 + 8) * 3\"},\"output_format\":{\"fields\":[{\"name\":\"answer\",\"type\":\"integer\"}],\"allow_extra_fields\":false},\"numeric_tolerance\":0.0},\"public_metadata\":{\"source_id\":\"toy-source-dev-001\",\"split\":\"dev\",\"category\":\"arithmetic\"}}",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                }
+              ],
+              "tools": [
+                {
+                  "name": "calculator",
+                  "description": "Evaluate arithmetic with +, -, *, / and parentheses.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "seed": 42,
+              "max_output_tokens": 2048
+            }
+          },
+          "timestamp": "2026-10-15T05:51:43.812355Z"
+        },
+        {
+          "seq": 1,
+          "kind": "model_response",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/1",
+            "content": "",
+            "tool_calls": [
+              {
+                "call_id": "call_807fb1999a62453eb4c77c5f",
+                "name": "calculator",
+                "arguments": {
+                  "expression": "(17 + 8) * 3"
+                }
+              }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": {
+              "input_tokens": 410,
+              "output_tokens": 34,
+              "model_calls": 1,
+              "tool_calls": 0,
+              "elapsed_seconds": 3.4392946000007214,
+              "usage_source": "provider_reported"
+            },
+            "metadata": {
+              "id": "chatcmpl-d405d393-cc03-9339-8714-13b21c6d3c5f",
+              "model": "qwen3.8-max-0902",
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "text_tokens": 410
+              }
+            }
+          },
+          "timestamp": "2026-10-15T05:51:47.252558Z"
+        },
+        {
+          "seq": 2,
+          "kind": "tool_call",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/tool/1",
+            "call_id": "call_807fb1999a62453eb4c77c5f",
+            "name": "calculator",
+            "arguments": {
+              "expression": "(17 + 8) * 3"
+            }
+          },
+          "timestamp": "2026-10-15T05:51:47.252650Z"
+        },
+        {
+          "seq": 3,
+          "kind": "tool_result",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/tool/1",
+            "call_id": "call_807fb1999a62453eb4c77c5f",
+            "name": "calculator",
+            "output": {
+              "value": 75
+            },
+            "status": "completed",
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "model_calls": 0,
+              "tool_calls": 1,
+              "elapsed_seconds": 7.090000144671649e-05,
+              "usage_source": "provider_reported"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-15T05:51:47.252757Z"
+        },
+        {
+          "seq": 4,
+          "kind": "model_request",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/2",
+            "request": {
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Complete the task using tools when useful. Return only a JSON object matching the public output_format, without Markdown or explanation.",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "user",
+                  "content": "{\"task_id\":\"dev-001\",\"benchmark_id\":\"toy_tasks\",\"input\":{\"instruction\":\"Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.\",\"data\":{\"expression\":\"(17 + 8) * 3\"},\"output_format\":{\"fields\":[{\"name\":\"answer\",\"type\":\"integer\"}],\"allow_extra_fields\":false},\"numeric_tolerance\":0.0},\"public_metadata\":{\"source_id\":\"toy-source-dev-001\",\"split\":\"dev\",\"category\":\"arithmetic\"}}",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "assistant",
+                  "content": "",
+                  "tool_calls": [
+                    {
+                      "call_id": "call_807fb1999a62453eb4c77c5f",
+                      "name": "calculator",
+                      "arguments": {
+                        "expression": "(17 + 8) * 3"
+                      }
+                    }
+                  ],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "tool",
+                  "content": "{\"call_id\":\"call_807fb1999a62453eb4c77c5f\",\"name\":\"calculator\",\"output\":{\"value\":75},\"status\":\"completed\",\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"model_calls\":0,\"tool_calls\":1,\"elapsed_seconds\":0.00007090000144671649,\"usage_source\":\"provider_reported\"},\"error\":null}",
+                  "tool_calls": [],
+                  "tool_call_id": "call_807fb1999a62453eb4c77c5f"
+                }
+              ],
+              "tools": [
+                {
+                  "name": "calculator",
+                  "description": "Evaluate arithmetic with +, -, *, / and parentheses.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "seed": 42,
+              "max_output_tokens": 2048
+            }
+          },
+          "timestamp": "2026-10-15T05:51:47.252842Z"
+        },
+        {
+          "seq": 5,
+          "kind": "model_response",
+          "payload": {
+            "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/model/2",
+            "content": "{\"answer\": 75}",
+            "tool_calls": [],
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": 565,
+              "output_tokens": 7,
+              "model_calls": 1,
+              "tool_calls": 0,
+              "elapsed_seconds": 4.044165799990878,
+              "usage_source": "provider_reported"
+            },
+            "metadata": {
+              "id": "chatcmpl-85048b42-caa9-98eb-bffc-7c2f4228488c",
+              "model": "qwen3.8-max-0902",
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "text_tokens": 565
+              }
+            }
+          },
+          "timestamp": "2026-10-15T05:51:51.298686Z"
+        },
+        {
+          "seq": 6,
+          "kind": "finish",
+          "payload": {
+            "output": {
+              "answer": 75
+            },
+            "termination_reason": "finish"
+          },
+          "timestamp": "2026-10-15T05:51:51.300616Z"
+        }
+      ],
+      "state_summary": {
+        "agent_plugin": "react_agent",
+        "model_steps": 2,
+        "termination_reason": "finish",
+        "fresh_session": true
+      },
+      "usage": {
+        "input_tokens": 975,
+        "output_tokens": 41,
+        "total_tokens": 1016,
+        "model_calls": 2,
+        "tool_calls": 1,
+        "elapsed_seconds": 7.488717200001702,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      },
+      "status": "completed",
+      "artifact_refs": [],
+      "error": null
+    },
+    "last_evaluated_evaluation": {
+      "evaluation_id": "evaluation-52e1f577-9270-5e50-b187-656094efd2d6",
+      "task_id": "dev-001",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "execution_operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06",
+      "operation_id": "episode-f007a1507c5644c8aa2ade3b81b9a631/initial_execution/e2bb288dc4704c6abead3c6fefb76b06/evaluation",
+      "score": 1.0,
+      "success": true,
+      "metrics": {
+        "format_valid": 1.0,
+        "answer_correct": 1.0
+      },
+      "feedback": "Output format and answer are correct.",
+      "reason_code": "correct",
+      "evidence_refs": []
+    },
+    "evolution_rounds_used": 0,
+    "stop_reason": "task_succeeded",
+    "stop_stage": "initial_execution",
+    "experience_refs": [],
+    "usage": {
+      "input_tokens": 975,
+      "output_tokens": 41,
+      "total_tokens": 1016,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "elapsed_seconds": 7.492787499999395,
+      "usage_complete": true,
+      "usage_sources": [
+        "provider_reported"
+      ],
+      "pending_reservations": []
+    },
+    "error": null
+  },
+  "notes": [
+    "One complete task evolution episode, including actual commit and post-commit execution.",
+    "Resource hard limits and consecutive-no-commit stopping remain deferred."
+  ]
+}

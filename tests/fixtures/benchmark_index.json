@@ -1,0 +1,15 @@
+{
+  "benchmark_id": "toy_tasks",
+  "splits": {
+    "dev": [
+      {"task_id": "dev-001", "source_id": "source-dev-001", "metadata": {}}
+    ],
+    "validation": [
+      {"task_id": "validation-001", "source_id": "source-validation-001", "metadata": {"validation_group": "similar"}},
+      {"task_id": "validation-002", "source_id": "source-validation-002", "metadata": {"validation_group": "regression"}}
+    ],
+    "test": [
+      {"task_id": "test-001", "source_id": "source-test-001", "metadata": {}}
+    ]
+  }
+}

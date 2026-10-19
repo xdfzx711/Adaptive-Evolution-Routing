@@ -1,0 +1,307 @@
+{
+  "status": "task_finished",
+  "run_root": "D:\\pythonproject\\adaptive-evolution-routing\\runs\\run-01bcb0371ac046beaa567e44bf08527d",
+  "stable_scope_id": "orchestrator/episode-c3ba1100151e4520abf43e58bdb766c5",
+  "record_ref": {
+    "artifact_id": "sha256-6420258c5d4f0e7aaf7bee9db648c517c039a93f6dfb66ee549bf3939106b764",
+    "kind": "run_result",
+    "version": "d14bb4883663f3cf6cf7d9d96e3265b62592ed5148e0c93652bc9bacaeb2b074",
+    "uri": "artifacts/sha256-6420258c5d4f0e7aaf7bee9db648c517c039a93f6dfb66ee549bf3939106b764.bin",
+    "digest": "d14bb4883663f3cf6cf7d9d96e3265b62592ed5148e0c93652bc9bacaeb2b074"
+  },
+  "record": {
+    "run_id": "run-01bcb0371ac046beaa567e44bf08527d",
+    "episode_id": "episode-c3ba1100151e4520abf43e58bdb766c5",
+    "task_id": "dev-003",
+    "initial_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+    "final_stable_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+    "status": "completed",
+    "final_evaluation_status": "evaluated",
+    "final_execution": {
+      "task_id": "dev-003",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5",
+      "output": {
+        "name": "Mira",
+        "count": 6
+      },
+      "trajectory": [
+        {
+          "seq": 0,
+          "kind": "model_request",
+          "payload": {
+            "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5/model/1",
+            "request": {
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Complete the task using tools when useful. Return only a JSON object matching the public output_format, without Markdown or explanation.",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "user",
+                  "content": "{\"task_id\":\"dev-003\",\"benchmark_id\":\"toy_tasks\",\"input\":{\"instruction\":\"Extract name and count from the text. Return only the final JSON object; follow output_format.\",\"data\":{\"text\":\"Name: Mira. Count: 6.\"},\"output_format\":{\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"count\",\"type\":\"integer\"}],\"allow_extra_fields\":false}},\"public_metadata\":{\"source_id\":\"toy-source-dev-003\",\"split\":\"dev\",\"category\":\"extraction\"}}",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                }
+              ],
+              "tools": [
+                {
+                  "name": "calculator",
+                  "description": "Evaluate arithmetic with +, -, *, / and parentheses.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "seed": 42,
+              "max_output_tokens": 2048
+            }
+          },
+          "timestamp": "2026-10-15T05:54:53.053105Z"
+        },
+        {
+          "seq": 1,
+          "kind": "model_response",
+          "payload": {
+            "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5/model/1",
+            "content": "{\"name\": \"Mira\", \"count\": 6}",
+            "tool_calls": [],
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": 408,
+              "output_tokens": 13,
+              "model_calls": 1,
+              "tool_calls": 0,
+              "elapsed_seconds": 3.046727099994314,
+              "usage_source": "provider_reported"
+            },
+            "metadata": {
+              "id": "chatcmpl-6054d6e2-f087-9936-9551-3b4ed65c30ff",
+              "model": "qwen3.8-max-0902",
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "text_tokens": 408
+              }
+            }
+          },
+          "timestamp": "2026-10-15T05:54:56.100972Z"
+        },
+        {
+          "seq": 2,
+          "kind": "finish",
+          "payload": {
+            "output": {
+              "name": "Mira",
+              "count": 6
+            },
+            "termination_reason": "finish"
+          },
+          "timestamp": "2026-10-15T05:54:56.102191Z"
+        }
+      ],
+      "state_summary": {
+        "agent_plugin": "react_agent",
+        "model_steps": 1,
+        "termination_reason": "finish",
+        "fresh_session": true
+      },
+      "usage": {
+        "input_tokens": 408,
+        "output_tokens": 13,
+        "total_tokens": 421,
+        "model_calls": 1,
+        "tool_calls": 0,
+        "elapsed_seconds": 3.049538000006578,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      },
+      "status": "completed",
+      "artifact_refs": [],
+      "error": null
+    },
+    "final_evaluation": {
+      "evaluation_id": "evaluation-ef39cd94-bbbc-51cf-8c53-e7b1b823296e",
+      "task_id": "dev-003",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "execution_operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5",
+      "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5/evaluation",
+      "score": 1.0,
+      "success": true,
+      "metrics": {
+        "format_valid": 1.0,
+        "answer_correct": 1.0
+      },
+      "feedback": "Output format and answer are correct.",
+      "reason_code": "correct",
+      "evidence_refs": []
+    },
+    "last_evaluated_execution": {
+      "task_id": "dev-003",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5",
+      "output": {
+        "name": "Mira",
+        "count": 6
+      },
+      "trajectory": [
+        {
+          "seq": 0,
+          "kind": "model_request",
+          "payload": {
+            "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5/model/1",
+            "request": {
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Complete the task using tools when useful. Return only a JSON object matching the public output_format, without Markdown or explanation.",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                },
+                {
+                  "role": "user",
+                  "content": "{\"task_id\":\"dev-003\",\"benchmark_id\":\"toy_tasks\",\"input\":{\"instruction\":\"Extract name and count from the text. Return only the final JSON object; follow output_format.\",\"data\":{\"text\":\"Name: Mira. Count: 6.\"},\"output_format\":{\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"count\",\"type\":\"integer\"}],\"allow_extra_fields\":false}},\"public_metadata\":{\"source_id\":\"toy-source-dev-003\",\"split\":\"dev\",\"category\":\"extraction\"}}",
+                  "tool_calls": [],
+                  "tool_call_id": null
+                }
+              ],
+              "tools": [
+                {
+                  "name": "calculator",
+                  "description": "Evaluate arithmetic with +, -, *, / and parentheses.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "seed": 42,
+              "max_output_tokens": 2048
+            }
+          },
+          "timestamp": "2026-10-15T05:54:53.053105Z"
+        },
+        {
+          "seq": 1,
+          "kind": "model_response",
+          "payload": {
+            "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5/model/1",
+            "content": "{\"name\": \"Mira\", \"count\": 6}",
+            "tool_calls": [],
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": 408,
+              "output_tokens": 13,
+              "model_calls": 1,
+              "tool_calls": 0,
+              "elapsed_seconds": 3.046727099994314,
+              "usage_source": "provider_reported"
+            },
+            "metadata": {
+              "id": "chatcmpl-6054d6e2-f087-9936-9551-3b4ed65c30ff",
+              "model": "qwen3.8-max-0902",
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "text_tokens": 408
+              }
+            }
+          },
+          "timestamp": "2026-10-15T05:54:56.100972Z"
+        },
+        {
+          "seq": 2,
+          "kind": "finish",
+          "payload": {
+            "output": {
+              "name": "Mira",
+              "count": 6
+            },
+            "termination_reason": "finish"
+          },
+          "timestamp": "2026-10-15T05:54:56.102191Z"
+        }
+      ],
+      "state_summary": {
+        "agent_plugin": "react_agent",
+        "model_steps": 1,
+        "termination_reason": "finish",
+        "fresh_session": true
+      },
+      "usage": {
+        "input_tokens": 408,
+        "output_tokens": 13,
+        "total_tokens": 421,
+        "model_calls": 1,
+        "tool_calls": 0,
+        "elapsed_seconds": 3.049538000006578,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      },
+      "status": "completed",
+      "artifact_refs": [],
+      "error": null
+    },
+    "last_evaluated_evaluation": {
+      "evaluation_id": "evaluation-ef39cd94-bbbc-51cf-8c53-e7b1b823296e",
+      "task_id": "dev-003",
+      "agent_version_id": "initial-8040042bd1393d25768935ac05565da6a10423a7bce28c8a49865777806aef72",
+      "execution_operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5",
+      "operation_id": "episode-c3ba1100151e4520abf43e58bdb766c5/initial_execution/0ef2000db4fb46c9b63e8acbbe5ef7a5/evaluation",
+      "score": 1.0,
+      "success": true,
+      "metrics": {
+        "format_valid": 1.0,
+        "answer_correct": 1.0
+      },
+      "feedback": "Output format and answer are correct.",
+      "reason_code": "correct",
+      "evidence_refs": []
+    },
+    "evolution_rounds_used": 0,
+    "stop_reason": "task_succeeded",
+    "stop_stage": "initial_execution",
+    "experience_refs": [],
+    "usage": {
+      "input_tokens": 408,
+      "output_tokens": 13,
+      "total_tokens": 421,
+      "model_calls": 1,
+      "tool_calls": 0,
+      "elapsed_seconds": 3.0527627999981632,
+      "usage_complete": true,
+      "usage_sources": [
+        "provider_reported"
+      ],
+      "pending_reservations": []
+    },
+    "error": null
+  },
+  "notes": [
+    "One complete task evolution episode, including actual commit and post-commit execution.",
+    "Resource hard limits and consecutive-no-commit stopping remain deferred."
+  ]
+}

@@ -1,0 +1,78 @@
+# v0.1 无进化配置；支持 execute-task 执行与评分，完整 Runner 后续实现。
+schema_version: aer.v0.1
+
+experiment:
+  id: aer-v0.1-no-evolution
+  seed: 42
+  runner: aer
+
+benchmark:
+  plugin: toy_tasks
+  execution_split: dev
+  task_ids: null
+
+state:
+  task_mode: independent
+
+agent:
+  plugin: react_agent
+  initial_prompt: "Complete the task using the available tools when needed, then return the final answer."
+  initial_snapshot_ref: null
+  max_steps: 8
+
+providers:
+  model:
+    plugin: scripted_model
+    model_id: scripted-v0.1
+    config:
+      scenario_id: mvp_v0_1_contract
+  tools:
+    plugin: deterministic_tools
+    enabled: [calculator]
+
+assessment:
+  evaluator: deterministic_evaluator
+  diagnoser: lightweight_diagnoser
+
+evolution:
+  mode: disabled
+  max_candidates_per_round: 1
+
+routing:
+  plugin: null
+  fixed_target: null
+  manual_decisions: []
+
+targets:
+  allowed: []
+  default_operators: {}
+
+validation:
+  plugin: paired_validation
+  split: validation
+  group_field: validation_group
+  similar_group: similar
+  regression_group: regression
+  acceptance_policy: improvement_with_regression_guard
+  policy_version: v0.1
+  min_improvement: 0.01
+  max_regression_drop: 0.0
+
+feedback:
+  policy: dev_feedback_and_validation_summary
+
+limits:
+  max_evolution_rounds: 0
+  max_tokens: 80000
+  max_tool_calls: 100
+  max_elapsed_seconds: 600.0
+  model_call_timeout_seconds: 30.0
+  tool_call_timeout_seconds: 5.0
+  max_output_tokens_per_call: 2048
+  max_consecutive_no_commit_rounds: null
+
+storage:
+  root: ../../runs
+  experience: jsonl
+  artifacts: local_files
+  versions: local_manifest

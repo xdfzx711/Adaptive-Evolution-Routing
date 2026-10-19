@@ -1,0 +1,397 @@
+{
+  "benchmark_id": "toy_tasks",
+  "dataset_version": "toy.v0.1.0",
+  "tasks": [
+    {
+      "task_id": "dev-001",
+      "source_id": "toy-source-dev-001",
+      "split": "dev",
+      "category": "arithmetic",
+      "validation_group": null,
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "(17 + 8) * 3"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "dev-002",
+      "source_id": "toy-source-dev-002",
+      "split": "dev",
+      "category": "arithmetic",
+      "validation_group": null,
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "84 / 7 - 5"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "dev-003",
+      "source_id": "toy-source-dev-003",
+      "split": "dev",
+      "category": "extraction",
+      "validation_group": null,
+      "input": {
+        "instruction": "Extract name and count from the text. Return only the final JSON object; follow output_format.",
+        "data": {
+          "text": "Name: Mira. Count: 6."
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "dev-004",
+      "source_id": "toy-source-dev-004",
+      "split": "dev",
+      "category": "formatting",
+      "validation_group": null,
+      "input": {
+        "instruction": "Sort the lowercase ASCII words in ascending alphabetical order, convert them to uppercase, and join them with a single comma and no spaces. Return the joined string as answer in the final JSON object.",
+        "data": {
+          "words": [
+            "pear",
+            "apple",
+            "plum"
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "string"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "validation-001",
+      "source_id": "toy-source-validation-001",
+      "split": "validation",
+      "category": "arithmetic",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "(12 + 9) * 4"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "validation-002",
+      "source_id": "toy-source-validation-002",
+      "split": "validation",
+      "category": "arithmetic",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "7 / 4"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "number"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0.000001
+      }
+    },
+    {
+      "task_id": "validation-003",
+      "source_id": "toy-source-validation-003",
+      "split": "validation",
+      "category": "extraction",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Extract name and count from the text. Return only the final JSON object; follow output_format.",
+        "data": {
+          "text": "Count: 11. Name: Owen."
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "validation-004",
+      "source_id": "toy-source-validation-004",
+      "split": "validation",
+      "category": "formatting",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Sort the lowercase ASCII words in ascending alphabetical order, convert them to uppercase, and join them with a single comma and no spaces. Return the joined string as answer in the final JSON object.",
+        "data": {
+          "words": [
+            "birch",
+            "ash",
+            "cedar"
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "string"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "validation-005",
+      "source_id": "toy-source-validation-005",
+      "split": "validation",
+      "category": "arithmetic",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "9 + 4"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "validation-006",
+      "source_id": "toy-source-validation-006",
+      "split": "validation",
+      "category": "arithmetic",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "20 - 7"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "validation-007",
+      "source_id": "toy-source-validation-007",
+      "split": "validation",
+      "category": "extraction",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Extract name and count from the text. Return only the final JSON object; follow output_format.",
+        "data": {
+          "text": "Name: Tess. Count: 3."
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "validation-008",
+      "source_id": "toy-source-validation-008",
+      "split": "validation",
+      "category": "formatting",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Sort the lowercase ASCII words in ascending alphabetical order, convert them to uppercase, and join them with a single comma and no spaces. Return the joined string as answer in the final JSON object.",
+        "data": {
+          "words": [
+            "blue",
+            "amber"
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "string"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "test-001",
+      "source_id": "toy-source-test-001",
+      "split": "test",
+      "category": "arithmetic",
+      "validation_group": null,
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "(23 - 5) * 4"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "test-002",
+      "source_id": "toy-source-test-002",
+      "split": "test",
+      "category": "arithmetic",
+      "validation_group": null,
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "99 / 9 + 6"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "test-003",
+      "source_id": "toy-source-test-003",
+      "split": "test",
+      "category": "extraction",
+      "validation_group": null,
+      "input": {
+        "instruction": "Extract name and count from the text. Return only the final JSON object; follow output_format.",
+        "data": {
+          "text": "Count: 8. Name: Lena."
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "test-004",
+      "source_id": "toy-source-test-004",
+      "split": "test",
+      "category": "formatting",
+      "validation_group": null,
+      "input": {
+        "instruction": "Sort the lowercase ASCII words in ascending alphabetical order, convert them to uppercase, and join them with a single comma and no spaces. Return the joined string as answer in the final JSON object.",
+        "data": {
+          "words": [
+            "kiwi",
+            "fig",
+            "grape"
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "string"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    }
+  ]
+}

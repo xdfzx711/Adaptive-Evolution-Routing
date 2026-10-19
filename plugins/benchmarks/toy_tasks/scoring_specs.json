@@ -1,0 +1,147 @@
+{
+  "benchmark_id": "toy_tasks",
+  "dataset_version": "toy.v0.1.0",
+  "scorer_version": "toy.scoring.v1",
+  "specs": [
+    {
+      "task_id": "dev-001",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 75,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "dev-002",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 7,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "dev-003",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "name": "Mira",
+          "count": 6
+        }
+      }
+    },
+    {
+      "task_id": "dev-004",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "answer": "APPLE,PEAR,PLUM"
+        }
+      }
+    },
+    {
+      "task_id": "validation-001",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 84,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "validation-002",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 1.75,
+        "absolute_tolerance": 0.000001
+      }
+    },
+    {
+      "task_id": "validation-003",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "name": "Owen",
+          "count": 11
+        }
+      }
+    },
+    {
+      "task_id": "validation-004",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "answer": "ASH,BIRCH,CEDAR"
+        }
+      }
+    },
+    {
+      "task_id": "validation-005",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 13,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "validation-006",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 13,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "validation-007",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "name": "Tess",
+          "count": 3
+        }
+      }
+    },
+    {
+      "task_id": "validation-008",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "answer": "AMBER,BLUE"
+        }
+      }
+    },
+    {
+      "task_id": "test-001",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 72,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "test-002",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 17,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "test-003",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "name": "Lena",
+          "count": 8
+        }
+      }
+    },
+    {
+      "task_id": "test-004",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "answer": "FIG,GRAPE,KIWI"
+        }
+      }
+    }
+  ]
+}

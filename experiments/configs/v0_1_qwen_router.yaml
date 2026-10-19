@@ -1,0 +1,90 @@
+# Qwen Router selects Prompt or execution-limit evolution. Credentials and model remain in .env.
+schema_version: aer.v0.1
+
+experiment:
+  id: aer-v0.1-qwen-router
+  seed: 42
+  runner: aer
+
+benchmark:
+  plugin: hard_local
+  execution_split: dev
+  task_ids: null
+
+state:
+  task_mode: independent
+
+agent:
+  plugin: react_agent
+  initial_prompt: "Complete the task using tools when useful. Return only a JSON object matching the public output_format, without Markdown or explanation."
+  initial_snapshot_ref: null
+  max_steps: 8
+
+providers:
+  model:
+    plugin: qwen_model
+    model_id: "${QWEN_MODEL}"
+    config:
+      dotenv_path: ../../.env
+      api_key_env: QWEN_API_KEY
+      base_url_env: QWEN_BASE_URL
+      temperature: 0.0
+      enable_thinking: false
+      send_seed: false
+      response_format: null
+  tools:
+    plugin: deterministic_tools
+    enabled: [calculator]
+
+assessment:
+  evaluator: deterministic_evaluator
+  diagnoser: llm_diagnoser
+
+evolution:
+  mode: llm
+  max_candidates_per_round: 1
+
+routing:
+  plugin: llm_router
+  fixed_target: null
+  manual_decisions: []
+
+targets:
+  allowed: [prompt, execution_limits]
+  default_operators:
+    prompt: simple_prompt_evolver
+    execution_limits: step_limit_evolver
+  operator_configs:
+    execution_limits:
+      step_increment: 2
+      max_steps: 16
+
+validation:
+  plugin: paired_validation
+  split: validation
+  group_field: validation_group
+  similar_group: similar
+  regression_group: regression
+  acceptance_policy: improvement_with_regression_guard
+  policy_version: v0.1
+  min_improvement: 0.01
+  max_regression_drop: 0.0
+
+feedback:
+  policy: dev_feedback_and_validation_summary
+
+limits:
+  max_evolution_rounds: 3
+  max_tokens: 80000
+  max_tool_calls: 100
+  max_elapsed_seconds: 600.0
+  model_call_timeout_seconds: 30.0
+  tool_call_timeout_seconds: 5.0
+  max_output_tokens_per_call: 2048
+  max_consecutive_no_commit_rounds: null
+
+storage:
+  root: ../../runs
+  experience: jsonl
+  artifacts: local_files
+  versions: local_manifest

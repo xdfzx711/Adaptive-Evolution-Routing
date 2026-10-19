@@ -1,0 +1,1584 @@
+{
+  "benchmark_id": "hard_local",
+  "dataset_version": "hard-local.v0.1.0",
+  "tasks": [
+    {
+      "task_id": "hard-dev-001",
+      "source_id": "hard-local-source-hard-dev-001",
+      "split": "dev",
+      "category": "arithmetic",
+      "family": "invoice",
+      "validation_group": null,
+      "input": {
+        "instruction": "Settle the order in integer cents. Ignore cancelled lines entirely. For every other line, billed quantity is quantity minus returned. Sum billed quantity times unit_cents to obtain subtotal_cents. If subtotal_cents is at least discount_threshold_cents, discount_cents is floor(subtotal_cents * discount_bps / 10000); otherwise it is zero. Subtract the discount before checking free shipping: shipping_cents is zero when that net amount is at least free_shipping_threshold_cents, otherwise charge data.shipping_cents. Tax the net amount plus shipping only if shipping_taxable is true. tax_cents is that taxable amount times tax_bps / 10000 rounded to the nearest integer cent, with exact halves rounded UP. Do not round at any earlier stage except the stated discount floor. total_cents is net plus shipping plus tax. Return only the JSON object with exactly the declared fields and integer types.",
+        "data": {
+          "lines": [
+            {
+              "unit_cents": 1999,
+              "quantity": 4,
+              "returned": 1,
+              "cancelled": false
+            },
+            {
+              "unit_cents": 2496,
+              "quantity": 3,
+              "returned": 0,
+              "cancelled": false
+            },
+            {
+              "unit_cents": 9999,
+              "quantity": 1,
+              "returned": 0,
+              "cancelled": true
+            },
+            {
+              "unit_cents": 899,
+              "quantity": 2,
+              "returned": 2,
+              "cancelled": false
+            }
+          ],
+          "discount_threshold_cents": 10000,
+          "discount_bps": 1250,
+          "free_shipping_threshold_cents": 12000,
+          "shipping_cents": 499,
+          "shipping_taxable": false,
+          "tax_bps": 825
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "subtotal_cents",
+              "type": "integer"
+            },
+            {
+              "name": "discount_cents",
+              "type": "integer"
+            },
+            {
+              "name": "shipping_cents",
+              "type": "integer"
+            },
+            {
+              "name": "tax_cents",
+              "type": "integer"
+            },
+            {
+              "name": "total_cents",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-002",
+      "source_id": "hard-local-source-hard-dev-002",
+      "split": "dev",
+      "category": "arithmetic",
+      "family": "allocation",
+      "validation_group": null,
+      "input": {
+        "instruction": "Allocate the integer budget among enabled recipients with positive caps in proportion to their positive integer weights, without exceeding any cap. Disabled or zero-cap recipients receive zero. First set the allocatable amount to min(budget, sum of eligible caps); the excess is unallocated. Compute exact proportional shares of the currently remaining amount over the currently remaining recipients. If any shares STRICTLY exceed their caps, assign each such recipient its cap simultaneously, subtract those assigned amounts, remove those recipients, and recompute. Once no share exceeds a cap, assign each remaining recipient the floor of its exact share; distribute the leftover units one per recipient by descending fractional remainder, breaking ties by ascending ASCII id. Return allocations for ALL original recipients as id=amount joined by semicolons with no spaces, in ascending ASCII id order, and return the integer unallocated. Use exact arithmetic for comparisons and remainders. Return only the declared JSON object.",
+        "data": {
+          "budget": 317,
+          "recipients": [
+            {
+              "id": "A",
+              "weight": 5,
+              "cap": 80,
+              "enabled": true
+            },
+            {
+              "id": "B",
+              "weight": 3,
+              "cap": 100,
+              "enabled": true
+            },
+            {
+              "id": "C",
+              "weight": 2,
+              "cap": 300,
+              "enabled": true
+            },
+            {
+              "id": "D",
+              "weight": 100,
+              "cap": 999,
+              "enabled": false
+            },
+            {
+              "id": "E",
+              "weight": 1,
+              "cap": 90,
+              "enabled": true
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "allocations",
+              "type": "string"
+            },
+            {
+              "name": "unallocated",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-003",
+      "source_id": "hard-local-source-hard-dev-003",
+      "split": "dev",
+      "category": "extraction",
+      "family": "revisions",
+      "validation_group": null,
+      "input": {
+        "instruction": "Resolve events BEFORE filtering. For each id retain the event with greatest revision; equal revisions are resolved by the LAST occurrence in the input array. The input array is not chronological. Discard a retained deleted event entirely; never fall back to an older event. Keep remaining records whose region equals data.region and whose score is at least minimum_score. Sort them by score descending, then updated ascending, then id ascending ASCII. Traverse that order and keep only the first record for each owner. Return ids in this selected order joined by commas without spaces, count of selected records, and their score_total. Empty selection uses empty ids and zero counts. All text comparisons are case-sensitive. Return only the declared JSON object.",
+        "data": {
+          "region": "north",
+          "minimum_score": 85,
+          "events": [
+            {
+              "id": "A",
+              "revision": 2,
+              "owner": "M",
+              "score": 91,
+              "updated": 8,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "B",
+              "revision": 1,
+              "owner": "M",
+              "score": 95,
+              "updated": 9,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "C",
+              "revision": 3,
+              "owner": "N",
+              "score": 88,
+              "updated": 7,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "A",
+              "revision": 1,
+              "owner": "Z",
+              "score": 99,
+              "updated": 1,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "D",
+              "revision": 1,
+              "owner": "P",
+              "score": 100,
+              "updated": 1,
+              "region": "south",
+              "deleted": false
+            },
+            {
+              "id": "E",
+              "revision": 2,
+              "owner": "",
+              "score": 0,
+              "updated": 0,
+              "region": "north",
+              "deleted": true
+            },
+            {
+              "id": "E",
+              "revision": 1,
+              "owner": "Q",
+              "score": 100,
+              "updated": 1,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "F",
+              "revision": 1,
+              "owner": "R",
+              "score": 90,
+              "updated": 6,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "F",
+              "revision": 1,
+              "owner": "R",
+              "score": 94,
+              "updated": 10,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "G",
+              "revision": 1,
+              "owner": "N",
+              "score": 88,
+              "updated": 6,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "H",
+              "revision": 1,
+              "owner": "S",
+              "score": 84,
+              "updated": 1,
+              "region": "north",
+              "deleted": false
+            },
+            {
+              "id": "I",
+              "revision": 1,
+              "owner": "T",
+              "score": 95,
+              "updated": 9,
+              "region": "north",
+              "deleted": false
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "ids",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            },
+            {
+              "name": "score_total",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-004",
+      "source_id": "hard-local-source-hard-dev-004",
+      "split": "dev",
+      "category": "extraction",
+      "family": "scheduling",
+      "validation_group": null,
+      "input": {
+        "instruction": "Find the earliest common meeting. All times are integer UTC minutes from midnight on one day; no time zone conversion is needed. A start must be at least earliest, an absolute multiple of grid (not relative to earliest), and its end must be at most latest. Duration is data.duration. For EACH person the entire meeting must fit inside ONE of that person's available intervals and must not overlap ANY of their busy intervals. Intervals are half-open [start,end): a meeting may end exactly when a busy interval begins, or start exactly when it ends. Adjacent available intervals are NOT merged. Choose the earliest feasible start; return start_minute, end_minute and possible=true. If no feasible slot exists return both minute fields as -1 and possible=false. Return only the declared JSON object.",
+        "data": {
+          "earliest": 541,
+          "latest": 900,
+          "duration": 45,
+          "grid": 15,
+          "people": [
+            {
+              "available": [
+                [
+                  540,
+                  720
+                ],
+                [
+                  780,
+                  900
+                ]
+              ],
+              "busy": [
+                [
+                  600,
+                  615
+                ]
+              ]
+            },
+            {
+              "available": [
+                [
+                  570,
+                  840
+                ]
+              ],
+              "busy": [
+                [
+                  630,
+                  675
+                ]
+              ]
+            },
+            {
+              "available": [
+                [
+                  555,
+                  765
+                ],
+                [
+                  795,
+                  900
+                ]
+              ],
+              "busy": [
+                [
+                  570,
+                  600
+                ],
+                [
+                  720,
+                  750
+                ]
+              ]
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "start_minute",
+              "type": "integer"
+            },
+            {
+              "name": "end_minute",
+              "type": "integer"
+            },
+            {
+              "name": "possible",
+              "type": "boolean"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-005",
+      "source_id": "hard-local-source-hard-dev-005",
+      "split": "dev",
+      "category": "formatting",
+      "family": "tags",
+      "validation_group": null,
+      "input": {
+        "instruction": "Normalize each tag and each blocked entry: strip leading/trailing ASCII spaces, underscores and hyphens; lowercase ASCII letters; replace every remaining consecutive run of spaces, underscores or hyphens with ONE hyphen. Ignore empty normalized tags. Count occurrences AFTER normalization, excluding blocked normalized values. Retain values with frequency at least minimum_frequency. Rank by frequency descending, then normalized string length ascending, then normalized ASCII lexical order ascending. Take at most top_k. Return tags as the chosen normalized values converted to UPPERCASE and joined by | with no spaces; counts as the corresponding frequencies joined by commas in THE SAME order; unique_count as the number of all retained distinct values BEFORE top_k. If none remain, tags and counts are empty strings and unique_count is zero. Return only the declared JSON object.",
+        "data": {
+          "tags": [
+            "  ALPHA_beta",
+            "alpha--beta ",
+            "ALPHA__BETA",
+            "z",
+            " Z ",
+            "_z_",
+            "a",
+            "A",
+            "beta",
+            " BETA ",
+            "b-e",
+            "B__E",
+            " Gamma ",
+            "gamma",
+            "__",
+            "ignored"
+          ],
+          "blocked": [
+            " gamma ",
+            "ignored"
+          ],
+          "minimum_frequency": 2,
+          "top_k": 3
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "tags",
+              "type": "string"
+            },
+            {
+              "name": "counts",
+              "type": "string"
+            },
+            {
+              "name": "unique_count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-006",
+      "source_id": "hard-local-source-hard-dev-006",
+      "split": "dev",
+      "category": "extraction",
+      "family": "selection",
+      "validation_group": null,
+      "input": {
+        "instruction": "Choose exactly data.choose DISTINCT ACTIVE items. Total cost must be at most budget, at least one chosen item must belong to EACH required category, and no conflict pair may both be chosen. Among feasible sets maximize total value; break ties by smaller total cost; if still tied, compare the sorted ASCII id lists lexicographically and choose the smallest list. Return the chosen ids sorted in ascending ASCII order and joined by commas without spaces, total cost, total value and possible=true. If there is no feasible set return ids as the empty string, cost=0, value=0, possible=false. Inactive items cannot be chosen even if their values are attractive. Return only the declared JSON object.",
+        "data": {
+          "choose": 4,
+          "budget": 22,
+          "required_categories": [
+            "storage",
+            "network"
+          ],
+          "conflicts": [
+            [
+              "A",
+              "D"
+            ],
+            [
+              "B",
+              "E"
+            ],
+            [
+              "G",
+              "I"
+            ]
+          ],
+          "items": [
+            {
+              "id": "A",
+              "cost": 8,
+              "value": 19,
+              "category": "compute",
+              "active": true
+            },
+            {
+              "id": "B",
+              "cost": 7,
+              "value": 17,
+              "category": "compute",
+              "active": true
+            },
+            {
+              "id": "C",
+              "cost": 6,
+              "value": 16,
+              "category": "storage",
+              "active": true
+            },
+            {
+              "id": "D",
+              "cost": 5,
+              "value": 12,
+              "category": "network",
+              "active": true
+            },
+            {
+              "id": "E",
+              "cost": 4,
+              "value": 11,
+              "category": "storage",
+              "active": true
+            },
+            {
+              "id": "F",
+              "cost": 3,
+              "value": 8,
+              "category": "network",
+              "active": true
+            },
+            {
+              "id": "G",
+              "cost": 9,
+              "value": 25,
+              "category": "compute",
+              "active": true
+            },
+            {
+              "id": "H",
+              "cost": 2,
+              "value": 4,
+              "category": "misc",
+              "active": true
+            },
+            {
+              "id": "I",
+              "cost": 6,
+              "value": 15,
+              "category": "network",
+              "active": true
+            },
+            {
+              "id": "J",
+              "cost": 1,
+              "value": 90,
+              "category": "storage",
+              "active": false
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "ids",
+              "type": "string"
+            },
+            {
+              "name": "cost",
+              "type": "integer"
+            },
+            {
+              "name": "value",
+              "type": "integer"
+            },
+            {
+              "name": "possible",
+              "type": "boolean"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-001",
+      "source_id": "hard-local-source-hard-similar-001",
+      "split": "validation",
+      "category": "arithmetic",
+      "family": "invoice",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Settle the order in integer cents. Ignore cancelled lines entirely. For every other line, billed quantity is quantity minus returned. Sum billed quantity times unit_cents to obtain subtotal_cents. If subtotal_cents is at least discount_threshold_cents, discount_cents is floor(subtotal_cents * discount_bps / 10000); otherwise it is zero. Subtract the discount before checking free shipping: shipping_cents is zero when that net amount is at least free_shipping_threshold_cents, otherwise charge data.shipping_cents. Tax the net amount plus shipping only if shipping_taxable is true. tax_cents is that taxable amount times tax_bps / 10000 rounded to the nearest integer cent, with exact halves rounded UP. Do not round at any earlier stage except the stated discount floor. total_cents is net plus shipping plus tax. Return only the JSON object with exactly the declared fields and integer types.",
+        "data": {
+          "lines": [
+            {
+              "unit_cents": 4275,
+              "quantity": 2,
+              "returned": 1,
+              "cancelled": false
+            },
+            {
+              "unit_cents": 1699,
+              "quantity": 5,
+              "returned": 1,
+              "cancelled": false
+            },
+            {
+              "unit_cents": 199,
+              "quantity": 9,
+              "returned": 0,
+              "cancelled": true
+            }
+          ],
+          "discount_threshold_cents": 11071,
+          "discount_bps": 750,
+          "free_shipping_threshold_cents": 20000,
+          "shipping_cents": 650,
+          "shipping_taxable": true,
+          "tax_bps": 1075
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "subtotal_cents",
+              "type": "integer"
+            },
+            {
+              "name": "discount_cents",
+              "type": "integer"
+            },
+            {
+              "name": "shipping_cents",
+              "type": "integer"
+            },
+            {
+              "name": "tax_cents",
+              "type": "integer"
+            },
+            {
+              "name": "total_cents",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-002",
+      "source_id": "hard-local-source-hard-similar-002",
+      "split": "validation",
+      "category": "arithmetic",
+      "family": "allocation",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Allocate the integer budget among enabled recipients with positive caps in proportion to their positive integer weights, without exceeding any cap. Disabled or zero-cap recipients receive zero. First set the allocatable amount to min(budget, sum of eligible caps); the excess is unallocated. Compute exact proportional shares of the currently remaining amount over the currently remaining recipients. If any shares STRICTLY exceed their caps, assign each such recipient its cap simultaneously, subtract those assigned amounts, remove those recipients, and recompute. Once no share exceeds a cap, assign each remaining recipient the floor of its exact share; distribute the leftover units one per recipient by descending fractional remainder, breaking ties by ascending ASCII id. Return allocations for ALL original recipients as id=amount joined by semicolons with no spaces, in ascending ASCII id order, and return the integer unallocated. Use exact arithmetic for comparisons and remainders. Return only the declared JSON object.",
+        "data": {
+          "budget": 23,
+          "recipients": [
+            {
+              "id": "C",
+              "weight": 1,
+              "cap": 100,
+              "enabled": true
+            },
+            {
+              "id": "B",
+              "weight": 1,
+              "cap": 100,
+              "enabled": true
+            },
+            {
+              "id": "A",
+              "weight": 1,
+              "cap": 100,
+              "enabled": true
+            },
+            {
+              "id": "D",
+              "weight": 10,
+              "cap": 200,
+              "enabled": false
+            },
+            {
+              "id": "E",
+              "weight": 100,
+              "cap": 0,
+              "enabled": true
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "allocations",
+              "type": "string"
+            },
+            {
+              "name": "unallocated",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-003",
+      "source_id": "hard-local-source-hard-similar-003",
+      "split": "validation",
+      "category": "extraction",
+      "family": "revisions",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Resolve events BEFORE filtering. For each id retain the event with greatest revision; equal revisions are resolved by the LAST occurrence in the input array. The input array is not chronological. Discard a retained deleted event entirely; never fall back to an older event. Keep remaining records whose region equals data.region and whose score is at least minimum_score. Sort them by score descending, then updated ascending, then id ascending ASCII. Traverse that order and keep only the first record for each owner. Return ids in this selected order joined by commas without spaces, count of selected records, and their score_total. Empty selection uses empty ids and zero counts. All text comparisons are case-sensitive. Return only the declared JSON object.",
+        "data": {
+          "region": "east",
+          "minimum_score": 70,
+          "events": [
+            {
+              "id": "Q",
+              "revision": 5,
+              "owner": "U",
+              "score": 80,
+              "updated": 5,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "R",
+              "revision": 2,
+              "owner": "U",
+              "score": 80,
+              "updated": 4,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "S",
+              "revision": 1,
+              "owner": "V",
+              "score": 70,
+              "updated": 3,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "T",
+              "revision": 3,
+              "owner": "W",
+              "score": 99,
+              "updated": 1,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "T",
+              "revision": 4,
+              "owner": "",
+              "score": 0,
+              "updated": 0,
+              "region": "north",
+              "deleted": true
+            },
+            {
+              "id": "U",
+              "revision": 1,
+              "owner": "X",
+              "score": 90,
+              "updated": 2,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "U",
+              "revision": 1,
+              "owner": "X",
+              "score": 69,
+              "updated": 9,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "Q",
+              "revision": 3,
+              "owner": "Z",
+              "score": 100,
+              "updated": 1,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "V",
+              "revision": 2,
+              "owner": "Y",
+              "score": 70,
+              "updated": 3,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "W",
+              "revision": 1,
+              "owner": "Z",
+              "score": 100,
+              "updated": 1,
+              "region": "west",
+              "deleted": false
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "ids",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            },
+            {
+              "name": "score_total",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-004",
+      "source_id": "hard-local-source-hard-similar-004",
+      "split": "validation",
+      "category": "extraction",
+      "family": "scheduling",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Find the earliest common meeting. All times are integer UTC minutes from midnight on one day; no time zone conversion is needed. A start must be at least earliest, an absolute multiple of grid (not relative to earliest), and its end must be at most latest. Duration is data.duration. For EACH person the entire meeting must fit inside ONE of that person's available intervals and must not overlap ANY of their busy intervals. Intervals are half-open [start,end): a meeting may end exactly when a busy interval begins, or start exactly when it ends. Adjacent available intervals are NOT merged. Choose the earliest feasible start; return start_minute, end_minute and possible=true. If no feasible slot exists return both minute fields as -1 and possible=false. Return only the declared JSON object.",
+        "data": {
+          "earliest": 481,
+          "latest": 840,
+          "duration": 40,
+          "grid": 20,
+          "people": [
+            {
+              "available": [
+                [
+                  480,
+                  600
+                ],
+                [
+                  660,
+                  840
+                ]
+              ],
+              "busy": [
+                [
+                  520,
+                  560
+                ]
+              ]
+            },
+            {
+              "available": [
+                [
+                  500,
+                  800
+                ]
+              ],
+              "busy": [
+                [
+                  600,
+                  660
+                ]
+              ]
+            },
+            {
+              "available": [
+                [
+                  480,
+                  840
+                ]
+              ],
+              "busy": [
+                [
+                  500,
+                  540
+                ],
+                [
+                  700,
+                  740
+                ]
+              ]
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "start_minute",
+              "type": "integer"
+            },
+            {
+              "name": "end_minute",
+              "type": "integer"
+            },
+            {
+              "name": "possible",
+              "type": "boolean"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-005",
+      "source_id": "hard-local-source-hard-similar-005",
+      "split": "validation",
+      "category": "formatting",
+      "family": "tags",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Normalize each tag and each blocked entry: strip leading/trailing ASCII spaces, underscores and hyphens; lowercase ASCII letters; replace every remaining consecutive run of spaces, underscores or hyphens with ONE hyphen. Ignore empty normalized tags. Count occurrences AFTER normalization, excluding blocked normalized values. Retain values with frequency at least minimum_frequency. Rank by frequency descending, then normalized string length ascending, then normalized ASCII lexical order ascending. Take at most top_k. Return tags as the chosen normalized values converted to UPPERCASE and joined by | with no spaces; counts as the corresponding frequencies joined by commas in THE SAME order; unique_count as the number of all retained distinct values BEFORE top_k. If none remain, tags and counts are empty strings and unique_count is zero. Return only the declared JSON object.",
+        "data": {
+          "tags": [
+            "aa",
+            "AA",
+            "bb",
+            " BB ",
+            "c",
+            "_C_",
+            "long tag",
+            "long__tag",
+            "LONG--TAG",
+            "d",
+            "D",
+            "--",
+            "skip_me",
+            "SKIP-ME"
+          ],
+          "blocked": [
+            " skip me "
+          ],
+          "minimum_frequency": 2,
+          "top_k": 4
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "tags",
+              "type": "string"
+            },
+            {
+              "name": "counts",
+              "type": "string"
+            },
+            {
+              "name": "unique_count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-006",
+      "source_id": "hard-local-source-hard-similar-006",
+      "split": "validation",
+      "category": "extraction",
+      "family": "selection",
+      "validation_group": "similar",
+      "input": {
+        "instruction": "Choose exactly data.choose DISTINCT ACTIVE items. Total cost must be at most budget, at least one chosen item must belong to EACH required category, and no conflict pair may both be chosen. Among feasible sets maximize total value; break ties by smaller total cost; if still tied, compare the sorted ASCII id lists lexicographically and choose the smallest list. Return the chosen ids sorted in ascending ASCII order and joined by commas without spaces, total cost, total value and possible=true. If there is no feasible set return ids as the empty string, cost=0, value=0, possible=false. Inactive items cannot be chosen even if their values are attractive. Return only the declared JSON object.",
+        "data": {
+          "choose": 3,
+          "budget": 14,
+          "required_categories": [
+            "red",
+            "blue"
+          ],
+          "conflicts": [
+            [
+              "H",
+              "R1"
+            ]
+          ],
+          "items": [
+            {
+              "id": "R1",
+              "cost": 4,
+              "value": 10,
+              "category": "red",
+              "active": true
+            },
+            {
+              "id": "R2",
+              "cost": 4,
+              "value": 10,
+              "category": "red",
+              "active": true
+            },
+            {
+              "id": "B1",
+              "cost": 5,
+              "value": 13,
+              "category": "blue",
+              "active": true
+            },
+            {
+              "id": "B2",
+              "cost": 5,
+              "value": 13,
+              "category": "blue",
+              "active": true
+            },
+            {
+              "id": "G1",
+              "cost": 3,
+              "value": 7,
+              "category": "green",
+              "active": true
+            },
+            {
+              "id": "X",
+              "cost": 1,
+              "value": 99,
+              "category": "red",
+              "active": false
+            },
+            {
+              "id": "H",
+              "cost": 6,
+              "value": 18,
+              "category": "blue",
+              "active": true
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "ids",
+              "type": "string"
+            },
+            {
+              "name": "cost",
+              "type": "integer"
+            },
+            {
+              "name": "value",
+              "type": "integer"
+            },
+            {
+              "name": "possible",
+              "type": "boolean"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-regression-001",
+      "source_id": "hard-local-source-hard-regression-001",
+      "split": "validation",
+      "category": "arithmetic",
+      "family": "basic_regression",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "(63 - 19) * 4 + 7"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "hard-regression-002",
+      "source_id": "hard-local-source-hard-regression-002",
+      "split": "validation",
+      "category": "arithmetic",
+      "family": "basic_regression",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Compute the expression. Return only the final JSON object with a numeric answer; follow output_format and numeric_tolerance.",
+        "data": {
+          "expression": "(81 / 6) - (5 / 4)"
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "number"
+            }
+          ],
+          "allow_extra_fields": false
+        },
+        "numeric_tolerance": 0
+      }
+    },
+    {
+      "task_id": "hard-regression-003",
+      "source_id": "hard-local-source-hard-regression-003",
+      "split": "validation",
+      "category": "extraction",
+      "family": "basic_regression",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Extract name and count from the text. Return only the final JSON object; follow output_format.",
+        "data": {
+          "text": "Count: 14. Name: Nia."
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-regression-004",
+      "source_id": "hard-local-source-hard-regression-004",
+      "split": "validation",
+      "category": "formatting",
+      "family": "basic_regression",
+      "validation_group": "regression",
+      "input": {
+        "instruction": "Sort the lowercase ASCII words in ascending alphabetical order, convert them to uppercase, and join them with a single comma and no spaces. Return the joined string as answer in the final JSON object.",
+        "data": {
+          "words": [
+            "lime",
+            "apricot",
+            "date",
+            "olive"
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "answer",
+              "type": "string"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-001",
+      "source_id": "hard-local-source-hard-test-001",
+      "split": "test",
+      "category": "arithmetic",
+      "family": "invoice",
+      "validation_group": null,
+      "input": {
+        "instruction": "Settle the order in integer cents. Ignore cancelled lines entirely. For every other line, billed quantity is quantity minus returned. Sum billed quantity times unit_cents to obtain subtotal_cents. If subtotal_cents is at least discount_threshold_cents, discount_cents is floor(subtotal_cents * discount_bps / 10000); otherwise it is zero. Subtract the discount before checking free shipping: shipping_cents is zero when that net amount is at least free_shipping_threshold_cents, otherwise charge data.shipping_cents. Tax the net amount plus shipping only if shipping_taxable is true. tax_cents is that taxable amount times tax_bps / 10000 rounded to the nearest integer cent, with exact halves rounded UP. Do not round at any earlier stage except the stated discount floor. total_cents is net plus shipping plus tax. Return only the JSON object with exactly the declared fields and integer types.",
+        "data": {
+          "lines": [
+            {
+              "unit_cents": 1999,
+              "quantity": 3,
+              "returned": 1,
+              "cancelled": false
+            },
+            {
+              "unit_cents": 100,
+              "quantity": 1,
+              "returned": 0,
+              "cancelled": false
+            },
+            {
+              "unit_cents": 2300,
+              "quantity": 2,
+              "returned": 2,
+              "cancelled": false
+            },
+            {
+              "unit_cents": 10000,
+              "quantity": 3,
+              "returned": 0,
+              "cancelled": true
+            }
+          ],
+          "discount_threshold_cents": 4000,
+          "discount_bps": 1000,
+          "free_shipping_threshold_cents": 4000,
+          "shipping_cents": 311,
+          "shipping_taxable": true,
+          "tax_bps": 125
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "subtotal_cents",
+              "type": "integer"
+            },
+            {
+              "name": "discount_cents",
+              "type": "integer"
+            },
+            {
+              "name": "shipping_cents",
+              "type": "integer"
+            },
+            {
+              "name": "tax_cents",
+              "type": "integer"
+            },
+            {
+              "name": "total_cents",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-002",
+      "source_id": "hard-local-source-hard-test-002",
+      "split": "test",
+      "category": "arithmetic",
+      "family": "allocation",
+      "validation_group": null,
+      "input": {
+        "instruction": "Allocate the integer budget among enabled recipients with positive caps in proportion to their positive integer weights, without exceeding any cap. Disabled or zero-cap recipients receive zero. First set the allocatable amount to min(budget, sum of eligible caps); the excess is unallocated. Compute exact proportional shares of the currently remaining amount over the currently remaining recipients. If any shares STRICTLY exceed their caps, assign each such recipient its cap simultaneously, subtract those assigned amounts, remove those recipients, and recompute. Once no share exceeds a cap, assign each remaining recipient the floor of its exact share; distribute the leftover units one per recipient by descending fractional remainder, breaking ties by ascending ASCII id. Return allocations for ALL original recipients as id=amount joined by semicolons with no spaces, in ascending ASCII id order, and return the integer unallocated. Use exact arithmetic for comparisons and remainders. Return only the declared JSON object.",
+        "data": {
+          "budget": 500,
+          "recipients": [
+            {
+              "id": "X",
+              "weight": 9,
+              "cap": 50,
+              "enabled": true
+            },
+            {
+              "id": "Y",
+              "weight": 3,
+              "cap": 125,
+              "enabled": true
+            },
+            {
+              "id": "Z",
+              "weight": 1,
+              "cap": 150,
+              "enabled": true
+            },
+            {
+              "id": "W",
+              "weight": 100,
+              "cap": 2000,
+              "enabled": false
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "allocations",
+              "type": "string"
+            },
+            {
+              "name": "unallocated",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-003",
+      "source_id": "hard-local-source-hard-test-003",
+      "split": "test",
+      "category": "extraction",
+      "family": "revisions",
+      "validation_group": null,
+      "input": {
+        "instruction": "Resolve events BEFORE filtering. For each id retain the event with greatest revision; equal revisions are resolved by the LAST occurrence in the input array. The input array is not chronological. Discard a retained deleted event entirely; never fall back to an older event. Keep remaining records whose region equals data.region and whose score is at least minimum_score. Sort them by score descending, then updated ascending, then id ascending ASCII. Traverse that order and keep only the first record for each owner. Return ids in this selected order joined by commas without spaces, count of selected records, and their score_total. Empty selection uses empty ids and zero counts. All text comparisons are case-sensitive. Return only the declared JSON object.",
+        "data": {
+          "region": "west",
+          "minimum_score": 90,
+          "events": [
+            {
+              "id": "L",
+              "revision": 1,
+              "owner": "A",
+              "score": 99,
+              "updated": 1,
+              "region": "west",
+              "deleted": false
+            },
+            {
+              "id": "L",
+              "revision": 2,
+              "owner": "",
+              "score": 0,
+              "updated": 0,
+              "region": "north",
+              "deleted": true
+            },
+            {
+              "id": "M",
+              "revision": 1,
+              "owner": "B",
+              "score": 90,
+              "updated": 1,
+              "region": "east",
+              "deleted": false
+            },
+            {
+              "id": "N",
+              "revision": 3,
+              "owner": "C",
+              "score": 89,
+              "updated": 1,
+              "region": "west",
+              "deleted": false
+            },
+            {
+              "id": "N",
+              "revision": 1,
+              "owner": "C",
+              "score": 100,
+              "updated": 0,
+              "region": "west",
+              "deleted": false
+            },
+            {
+              "id": "P",
+              "revision": 1,
+              "owner": "D",
+              "score": 95,
+              "updated": 2,
+              "region": "west",
+              "deleted": false
+            },
+            {
+              "id": "P",
+              "revision": 1,
+              "owner": "D",
+              "score": 80,
+              "updated": 3,
+              "region": "west",
+              "deleted": false
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "ids",
+              "type": "string"
+            },
+            {
+              "name": "count",
+              "type": "integer"
+            },
+            {
+              "name": "score_total",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-004",
+      "source_id": "hard-local-source-hard-test-004",
+      "split": "test",
+      "category": "extraction",
+      "family": "scheduling",
+      "validation_group": null,
+      "input": {
+        "instruction": "Find the earliest common meeting. All times are integer UTC minutes from midnight on one day; no time zone conversion is needed. A start must be at least earliest, an absolute multiple of grid (not relative to earliest), and its end must be at most latest. Duration is data.duration. For EACH person the entire meeting must fit inside ONE of that person's available intervals and must not overlap ANY of their busy intervals. Intervals are half-open [start,end): a meeting may end exactly when a busy interval begins, or start exactly when it ends. Adjacent available intervals are NOT merged. Choose the earliest feasible start; return start_minute, end_minute and possible=true. If no feasible slot exists return both minute fields as -1 and possible=false. Return only the declared JSON object.",
+        "data": {
+          "earliest": 435,
+          "latest": 690,
+          "duration": 45,
+          "grid": 30,
+          "people": [
+            {
+              "available": [
+                [
+                  450,
+                  510
+                ],
+                [
+                  570,
+                  660
+                ]
+              ],
+              "busy": [
+                [
+                  600,
+                  630
+                ]
+              ]
+            },
+            {
+              "available": [
+                [
+                  480,
+                  630
+                ]
+              ],
+              "busy": [
+                [
+                  480,
+                  510
+                ],
+                [
+                  570,
+                  600
+                ]
+              ]
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "start_minute",
+              "type": "integer"
+            },
+            {
+              "name": "end_minute",
+              "type": "integer"
+            },
+            {
+              "name": "possible",
+              "type": "boolean"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-005",
+      "source_id": "hard-local-source-hard-test-005",
+      "split": "test",
+      "category": "formatting",
+      "family": "tags",
+      "validation_group": null,
+      "input": {
+        "instruction": "Normalize each tag and each blocked entry: strip leading/trailing ASCII spaces, underscores and hyphens; lowercase ASCII letters; replace every remaining consecutive run of spaces, underscores or hyphens with ONE hyphen. Ignore empty normalized tags. Count occurrences AFTER normalization, excluding blocked normalized values. Retain values with frequency at least minimum_frequency. Rank by frequency descending, then normalized string length ascending, then normalized ASCII lexical order ascending. Take at most top_k. Return tags as the chosen normalized values converted to UPPERCASE and joined by | with no spaces; counts as the corresponding frequencies joined by commas in THE SAME order; unique_count as the number of all retained distinct values BEFORE top_k. If none remain, tags and counts are empty strings and unique_count is zero. Return only the declared JSON object.",
+        "data": {
+          "tags": [
+            "__",
+            " - ",
+            "alpha",
+            " ALPHA ",
+            "beta",
+            "BETA",
+            "single"
+          ],
+          "blocked": [
+            "ALPHA",
+            "_beta_"
+          ],
+          "minimum_frequency": 2,
+          "top_k": 3
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "tags",
+              "type": "string"
+            },
+            {
+              "name": "counts",
+              "type": "string"
+            },
+            {
+              "name": "unique_count",
+              "type": "integer"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-006",
+      "source_id": "hard-local-source-hard-test-006",
+      "split": "test",
+      "category": "extraction",
+      "family": "selection",
+      "validation_group": null,
+      "input": {
+        "instruction": "Choose exactly data.choose DISTINCT ACTIVE items. Total cost must be at most budget, at least one chosen item must belong to EACH required category, and no conflict pair may both be chosen. Among feasible sets maximize total value; break ties by smaller total cost; if still tied, compare the sorted ASCII id lists lexicographically and choose the smallest list. Return the chosen ids sorted in ascending ASCII order and joined by commas without spaces, total cost, total value and possible=true. If there is no feasible set return ids as the empty string, cost=0, value=0, possible=false. Inactive items cannot be chosen even if their values are attractive. Return only the declared JSON object.",
+        "data": {
+          "choose": 4,
+          "budget": 19,
+          "required_categories": [
+            "alpha",
+            "beta",
+            "gamma"
+          ],
+          "conflicts": [
+            [
+              "A1",
+              "C1"
+            ],
+            [
+              "B1",
+              "D1"
+            ]
+          ],
+          "items": [
+            {
+              "id": "A1",
+              "cost": 6,
+              "value": 15,
+              "category": "alpha",
+              "active": true
+            },
+            {
+              "id": "A2",
+              "cost": 5,
+              "value": 12,
+              "category": "alpha",
+              "active": true
+            },
+            {
+              "id": "B1",
+              "cost": 4,
+              "value": 11,
+              "category": "beta",
+              "active": true
+            },
+            {
+              "id": "B2",
+              "cost": 3,
+              "value": 8,
+              "category": "beta",
+              "active": true
+            },
+            {
+              "id": "C1",
+              "cost": 5,
+              "value": 14,
+              "category": "gamma",
+              "active": true
+            },
+            {
+              "id": "C2",
+              "cost": 4,
+              "value": 9,
+              "category": "gamma",
+              "active": true
+            },
+            {
+              "id": "D1",
+              "cost": 2,
+              "value": 7,
+              "category": "delta",
+              "active": true
+            },
+            {
+              "id": "E1",
+              "cost": 3,
+              "value": 8,
+              "category": "alpha",
+              "active": true
+            },
+            {
+              "id": "X1",
+              "cost": 1,
+              "value": 100,
+              "category": "gamma",
+              "active": false
+            }
+          ]
+        },
+        "output_format": {
+          "fields": [
+            {
+              "name": "ids",
+              "type": "string"
+            },
+            {
+              "name": "cost",
+              "type": "integer"
+            },
+            {
+              "name": "value",
+              "type": "integer"
+            },
+            {
+              "name": "possible",
+              "type": "boolean"
+            }
+          ],
+          "allow_extra_fields": false
+        }
+      }
+    }
+  ]
+}

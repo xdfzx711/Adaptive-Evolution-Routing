@@ -1,0 +1,246 @@
+{
+  "benchmark_id": "hard_local",
+  "dataset_version": "hard-local.v0.1.0",
+  "scorer_version": "toy.scoring.v1",
+  "specs": [
+    {
+      "task_id": "hard-dev-001",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "subtotal_cents": 13485,
+          "discount_cents": 1685,
+          "shipping_cents": 499,
+          "tax_cents": 974,
+          "total_cents": 13273
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-002",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "allocations": "A=80;B=100;C=91;D=0;E=46",
+          "unallocated": 0
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-003",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "ids": "B,I,F,G",
+          "count": 4,
+          "score_total": 372
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-004",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "start_minute": 675,
+          "end_minute": 720,
+          "possible": true
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-005",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "tags": "Z|ALPHA-BETA|A",
+          "counts": "3,3,2",
+          "unique_count": 5
+        }
+      }
+    },
+    {
+      "task_id": "hard-dev-006",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "ids": "C,E,F,G",
+          "cost": 22,
+          "value": 60,
+          "possible": true
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-001",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "subtotal_cents": 11071,
+          "discount_cents": 830,
+          "shipping_cents": 650,
+          "tax_cents": 1171,
+          "total_cents": 12062
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-002",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "allocations": "A=8;B=8;C=7;D=0;E=0",
+          "unallocated": 0
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-003",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "ids": "R,S,V",
+          "count": 3,
+          "score_total": 220
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-004",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "start_minute": 560,
+          "end_minute": 600,
+          "possible": true
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-005",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "tags": "LONG-TAG|C|D|AA",
+          "counts": "3,2,2,2",
+          "unique_count": 5
+        }
+      }
+    },
+    {
+      "task_id": "hard-similar-006",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "ids": "B1,B2,R1",
+          "cost": 14,
+          "value": 36,
+          "possible": true
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-001",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "subtotal_cents": 4098,
+          "discount_cents": 409,
+          "shipping_cents": 311,
+          "tax_cents": 50,
+          "total_cents": 4050
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-002",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "allocations": "W=0;X=50;Y=125;Z=150",
+          "unallocated": 175
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-003",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "ids": "",
+          "count": 0,
+          "score_total": 0
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-004",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "start_minute": -1,
+          "end_minute": -1,
+          "possible": false
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-005",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "tags": "",
+          "counts": "",
+          "unique_count": 0
+        }
+      }
+    },
+    {
+      "task_id": "hard-test-006",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "ids": "A1,A2,B1,C2",
+          "cost": 19,
+          "value": 47,
+          "possible": true
+        }
+      }
+    },
+    {
+      "task_id": "hard-regression-001",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 183,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "hard-regression-002",
+      "scoring_method": "numeric_answer",
+      "private_parameters": {
+        "expected": 12.25,
+        "absolute_tolerance": 0
+      }
+    },
+    {
+      "task_id": "hard-regression-003",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "name": "Nia",
+          "count": 14
+        }
+      }
+    },
+    {
+      "task_id": "hard-regression-004",
+      "scoring_method": "structured_answer",
+      "private_parameters": {
+        "expected": {
+          "answer": "APRICOT,DATE,LIME,OLIVE"
+        }
+      }
+    }
+  ]
+}
