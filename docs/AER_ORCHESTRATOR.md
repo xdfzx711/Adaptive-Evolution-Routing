@@ -1,6 +1,6 @@
 # AER 单任务自进化主控制器
 
-步骤 11 已实现同步 Orchestrator，把任务执行、失败诊断、目标路由、候选生成、配对验证、接受选择、实际提交和提交后复测接成一个任务 episode。
+同步 Orchestrator 把任务执行、失败诊断、目标路由、候选生成、配对验证、接受选择和实际提交接成一个任务 episode。2026-10-19 起采用单次观察语义：相同版本/任务/种子/评测条件复用已有执行与评分，提交后采用候选验证结果。
 
 ## 使用入口
 
@@ -20,7 +20,7 @@ execute-task、propose-prompt 和 validate-proposal 保留为独立调试入口�
 
 | 位置 | 职责 |
 | --- | --- |
-| aer_core/orchestrator.py | 单任务状态、停止检查、组件调用、提交/恢复、复测与 RunResult |
+| aer_core/orchestrator.py | 单任务状态、停止检查、组件调用、提交/恢复、验证结果承接与 RunResult |
 | aer_core/contracts/orchestration.py | ProposalService 和 CandidateValidationService 接口 |
 | aer_core/task_executor.py | 指定任务、Snapshot、RunContext 的独立执行和外部评分 |
 | experiments/orchestration.py | 装配、版本作用域、Benchmark 公开上下文策略、CLI 记录 |
@@ -37,10 +37,10 @@ execute-task、propose-prompt 和 validate-proposal 保留为独立调试入口�
 5. 调用生成服务，在 Router 前保存 attempt_started 并占用一轮。路由/生成错误停止；空候选继续检查下一轮。
 6. 构造冻结候选 Snapshot，配对验证并接受选择。普通无收益或回归拒绝继续下一轮；任一候选验证不完整或基础设施异常，整批不提交，以 validation_error 停止。
 7. 提交唯一选中的候选，使用其确切候选 Snapshot、完整验证报告和接受结果，不重新生成工件。
-8. 提交成功后，用新会话复测当前任务。最后允许的一轮也必须完成复测；Local Validation 不能替代此执行。
-9. 复测正常失败时保留新稳定版本，使用该版本的失败记录进入下一轮。成功或停止边界到达时保存最终结果和 task_finished。
+8. 提交前检查选中候选具有完整、任务/版本/seed 一致的当前任务验证结果。提交成功后直接采用该执行与评分，新增调用与成本为 0。
+9. 已采用结果为失败时保留新稳定版本，并据此诊断和进入下一轮；成功则结束。后续旧版验证复用该版本已保存的逐题结果。
 
-初始执行和复测不增加进化轮数；空候选、普通拒绝、Router/Evolver 错误和验证中断占用已经开始的轮次。多个候选仍是一轮。轮数来自配置，不固定在循环中。
+初始执行和结果复用不增加进化轮数；空候选、普通拒绝、Router/Evolver 错误和验证中断占用已经开始的轮次。多个候选仍是一轮。轮数来自配置，不固定在循环中。
 
 候选被拒绝时稳定版本没有改变，复用最近的当前任务执行/评分，不额外重跑相同版本。下一轮会重新构建包含刚完成经验的上下文。
 
@@ -48,18 +48,18 @@ execute-task、propose-prompt 和 validate-proposal 保留为独立调试入口�
 
 accepted、selected 与 committed 分开保存。Version Store 核对父版本与完整验证证据，原子切换稳定指针，控制器追加真实候选提交结果。
 
-普通提交失败保存 commit_failed 并停止，旧版本保持稳定。已发布指针但回执/事件未完成时，通过 Version Store 的持久化恢复核对并补齐；恢复完成后执行复测。若回执持续失败，保留已经发布的新版本及 committed=true 的已知事实，以 commit_error 停止，不能把它误记为未提交。
+普通提交失败保存 commit_failed 并停止，旧版本保持稳定。已发布指针但回执/事件未完成时，通过 Version Store 的持久化恢复核对并补齐。若回执持续失败，保留已经发布的新版本、对应候选验证结果及 committed=true 的事实，以 commit_error 停止。
 
 任务结果始终区分：
 
 - 最终稳定版本已经完成当前任务评分：final_evaluation_status=evaluated，final_execution/final_evaluation 属于该版本。
-- 新版本已经提交，但复测或评分失败：final_evaluation_status=not_evaluated，final_* 为 null，last_evaluated_* 保留之前版本的有效结果。
+- 选中候选缺少完整、匹配的当前任务结果：提交前以验证错误终止。新版本实际提交后，final_* 采用该版本已验证的执行与评分，包括发布后回执持续失败的情况。
 
-不能将旧版本分数绑定到新稳定版本。复测正常失败也不自动撤销通过独立验证的提交。
+不能将旧版本分数绑定到新稳定版本。当前任务验证失败也不自动撤销通过独立验证的提交。
 
 ## 身份、成本和经验
 
-一个任务从初始执行到最后复测始终使用同一个 run_id/episode_id；各次执行使用独立 operation_id 与工作空间引用。Agent 按接口创建新会话，当前确定性工具无跨执行可变状态。
+一个 episode 保持同一 run_id/episode_id。首次实际执行创建独立会话；缓存复用保留原始执行的 operation_id，reuse_operation_id 标记本次读取所属操作，不伪造新的模型轨迹。相同 run 内不同 episode 也可以复用满足条件的已保存观察。
 
 成本分别累计当前任务执行/评分、诊断、生成尝试、验证批次；不再次累加它们内部的嵌套 usage。缓存命中不计历史调用成本，共享旧版验证只计一次。episode.elapsed_seconds 直接用单调时钟测量，未知 tokens 保留 null。Qwen 配置使用大模型诊断，成功和失败调用的实际 usage 都累计一次；稳定版本与失败执行不变时复用诊断。本地规则诊断不调用 Provider。
 
@@ -86,7 +86,7 @@ accepted、selected 与 committed 分开保存。Version Store 核对父版本�
 
 run-task 默认显示简短进度和输出位置。运行目录中的 `evolution.txt` 用于浏览整体过程，多个 episode 顺序追加到同一文件；每个准备进入的进化轮次另用一个 `rounds/<任务名>-<会话时间>/round-001/record.json` 保存完整细节。每轮只有一个阅读 JSON，不按阶段或候选拆出更多日志，新运行不另建 `run.log`。时间采用带时区的本地时间，默认 run、episode、attempt、operation 编号也采用本地时间格式，例如 `run-2026-10-15_14-30-05_123456`。显式传入的 `--run-id` 保持原样。
 
-分轮 JSON 直接保存实际允许反馈、诊断、历史摘要、路由、稳定组件与候选组件的完整内容，以及逐题旧版/候选执行与评分、接受结果、选择、实际提交和提交后复测。每个候选使用轮内序号关联，省略技术 ID 和工件引用，不需要打开另一个文件才能读到候选或验证正文。验证条件只保留数据集/评分版本、实际插件和运行参数，避免重复写入注册表、配置 Schema 和隐藏评分答案。组件展开不限定 Prompt；结构化组件解析成 JSON，二进制使用 Base64。诊断引用的事件序号保留，业务输出内的 ID 字段保持原样。
+分轮 JSON 展开实际允许反馈、诊断、历史摘要、路由、组件、逐题执行与评分、接受选择、提交和提交后采用的验证结果。旧版与候选均标记缓存命中，原始 usage 与 new_usage 分开。候选使用轮内序号关联，省略技术 ID。验证条件只展示实际插件和运行参数，隐藏评分规格只用于私有缓存身份。结构化组件解析成 JSON，业务输出 ID 与诊断证据序号保留。
 
 分轮记录随阶段原子更新，是阅读视图，底层不可变工件、版本和经验负责程序加载。诊断失败也能留下对应轮次目录；这种情况尚未写入 attempt_started，RunResult.evolution_rounds_used 仍可能为 0。初始任务成功或进化关闭时，不创建空的分轮目录。报告不会反馈给 Agent/Evolver。
 
@@ -96,7 +96,7 @@ run-task 默认显示简短进度和输出位置。运行目录中的 `evolution
 2. 初始执行：逐次模型动作、工具调用参数与返回、错误、最终输出和外部评分；省略重复的请求历史消息。
 3. 每轮进化：起始稳定版本、诊断器输出、当轮过滤后的实际反馈与历史摘要、路由目标/理由、Operator，以及每个候选的组件变更和正文。组件表示通用，不限定为 Prompt。
 4. 配对评测：当前任务执行完整展开；同类和回归任务逐题列出旧版/候选分数、变化、终止原因、配对种子与缓存命中，对发生变化或失败的任务再展示输出、末次响应和工具错误片段。
-5. 接受与实际提交：区分 accepted、selected、committed；提交之后单独列出独立复测，验证通过但未提交的候选不会被描述为已经生效。
+5. 接受与实际提交：区分 accepted、selected、committed；提交之后单独列出“提交后任务结果（复用候选验证）”，新增调用为 0。分轮 JSON 使用 post_commit_result，source=candidate_validation；历史运行中的 post_commit_execution 仍按当时的真实复测呈现。
 6. 最终汇总：各候选最终状态、稳定版本、评分与输出、停止原因、分阶段成本和总成本，以及完整运行结果的原始记录路径。
 
 `evolution.txt` 中当轮详情路径指向该轮 `record.json`。原始工件、验证报告、批次、缓存、候选版本和提交凭据也写入对应轮次；初始共享内容位于 rounds/initial，初始任务执行位于该任务的 initial 子目录。稳定指针位于任务目录，累计模式位于 rounds/continual。文件名使用类型和时间，episodes 清单使用 episode 时间编号。storage_index.json 保存身份与位置映射，重复内容或缓存复用已有文件；run_manifest.json 合并五份启动清单，去掉重复插件 Schema 和装配细节。旧引用通过迁移映射仍可读取。

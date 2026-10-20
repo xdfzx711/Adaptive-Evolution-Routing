@@ -1,6 +1,6 @@
 # Adaptive Evolution Routing
 
-AER 是一个插件驱动的 Agent 自进化实验框架。当前完成步骤 1–5、7–11：配置与装配、存储、任务评分、两个 Agent、诊断、上下文过滤、目标路由、候选生成、配对验证、接受选择、主控制器提交与复测。步骤 6 的完整预算管理按 MVP 范围推迟；批量实验 Runner 和实验汇总仍待实现。
+AER 是一个插件驱动的 Agent 自进化实验框架。当前完成步骤 1–5、7–11：配置与装配、存储、任务评分、两个 Agent、诊断、上下文过滤、目标路由、候选生成、配对验证、接受选择、版本提交与验证结果复用。步骤 6 的完整预算管理按 MVP 范围推迟；批量实验 Runner 和实验汇总仍待实现。
 
 ## 安装与环境
 
@@ -136,7 +136,7 @@ Qwen Provider 支持兼容 Chat Completions、工具调用、实际 token usage 
 
 Qwen 示例配置现在使用 `assessment.diagnoser: llm_diagnoser`，复用相同的 ModelProvider 和 .env 模型设置。失败诊断返回观察事实、可能原因和轨迹证据，实际调用成本计入结果；稳定版本的同一次失败执行不重复诊断。本地 scripted 示例仍保留规则诊断器，可通过配置替换。
 
-新增 [Qwen Router 与步数进化](docs/AER_LLM_ROUTING.md)：`v0_1_qwen_router.yaml` 由模型选择 Prompt 或执行步数目标。初始 8 步，每轮步数候选增加 2，最高 16，均来自配置；沿用已有验证、接受、提交与复测。`evolution.txt` 和分轮 `record.json` 展示路由模型实际输入的完整提示词、返回决策及成本。
+新增 [Qwen Router 与步数进化](docs/AER_LLM_ROUTING.md)：`v0_1_qwen_router.yaml` 由模型选择 Prompt 或执行步数目标。初始 8 步，每轮步数候选增加 2，最高 16，均来自配置；沿用通用验证、接受和提交机制。`evolution.txt` 和分轮 `record.json` 展示路由模型实际输入的完整提示词、返回决策及成本。
 
 ```powershell
 .\.venv\Scripts\python.exe main.py run-task experiments/configs/v0_1_qwen_router.yaml --task-id hard-dev-001 --output router-result.json
@@ -168,7 +168,7 @@ Qwen 示例配置现在使用 `assessment.diagnoser: llm_diagnoser`，复用相�
 .\.venv\Scripts\aer.exe validate-proposal experiments/configs/v0_1_fixed_prompt.yaml proposal.json --run-id prompt-demo --output validation.json
 ```
 
-对成功生成的候选构建通用工件更新 Snapshot，在相同任务和种子下比较旧版与候选。保存 Local 修复、同类迁移、回归变化、独立统一分数、接受原因与唯一选中候选。缓存只复用评测条件相同的完整旧版结果，实际成本不重复累计；稳定版本保持不变。用法和数据约定见 [配对验证与接受策略](docs/AER_PAIRED_VALIDATION.md)。
+对候选构建通用工件更新 Snapshot，在相同任务和种子下比较旧版与候选，保存 Local 修复、同类迁移、回归变化和接受结果。初始执行、旧版与候选共用缓存：同一版本/任务/种子/条件只执行与评分一次，成本只累计新调用。用法和数据约定见 [配对验证与接受策略](docs/AER_PAIRED_VALIDATION.md)。
 
 ## 完整单任务进化闭环
 
@@ -176,7 +176,7 @@ Qwen 示例配置现在使用 `assessment.diagnoser: llm_diagnoser`，复用相�
 .\.venv\Scripts\aer.exe run-task experiments/configs/v0_1_fixed_prompt.yaml --task-id dev-001 --run-id loop-demo --output run-result.json
 ```
 
-Orchestrator 在一个 episode 内自动执行失败分析、配置轮数内的进化、候选验证、实际提交和提交后复测，返回匹配最终稳定版本的 RunResult。支持独立与累计版本作用域，所有普通拒绝、异常及真实提交状态可追踪。使用 Qwen 时选择 v0_1_qwen_fixed_prompt.yaml。控制逻辑、停止原因和 Python 入口见 [主控制器](docs/AER_ORCHESTRATOR.md)。
+Orchestrator 在一个 episode 内完成失败分析、配置轮数内的进化、候选验证和实际提交。提交后直接采用候选的当前任务验证结果，不再额外复测；成功则结束，失败继续进化。返回匹配最终稳定版本的 RunResult。控制逻辑、停止原因和 Python 入口见 [主控制器](docs/AER_ORCHESTRATOR.md)。
 
 每次运行用 `runs/<时间编号>/evolution.txt` 浏览整体过程，每轮细节放在独立子目录中，每轮只新增一个 `record.json`，不再为诊断、生成、验证和提交分别创建阅读日志：
 
@@ -195,14 +195,14 @@ runs/run-<时间>/
       round-001/
         record.json
         artifacts/
-        validation/            # 验证报告、批次与旧版缓存
+        validation/            # 验证报告、批次与逐任务执行缓存
         versions/              # 候选快照、关联记录与提交凭据
       round-002/...
 ```
 
-`record.json` 直接展开当轮任务、允许反馈、诊断、路由、候选组件完整正文、逐题旧版/候选验证、接受与选择、实际提交及复测。候选使用 1、2 等轮内序号，省略 attempt、operation、artifact 等技术 ID；无需再沿 candidate_ids 或工件路径查找正文。验证条件只展示实际使用的插件与运行参数，省略整套插件注册表、配置 Schema 和隐藏评分答案。Prompt 以外的组件也通过同一方式展开。新写入的 JSON 使用 UTF-8 和两空格缩进；控制台实时显示当前阶段和分轮记录路径。
+`record.json` 展开当轮任务、允许反馈、诊断、路由、候选完整内容、逐题验证、接受选择与实际提交。`post_commit_result` 明确标记 source=candidate_validation 和 reused=true，新增成本为 0；旧运行的复测记录仍按原始事实显示。候选使用轮内序号，省略技术 ID，JSON 使用 UTF-8 与两空格缩进；控制台实时显示阶段和分轮记录路径。
 
-`evolution.txt` 中当轮生成、上下文、候选组件和验证的详情路径指向该轮 `record.json`。底层工件、验证缓存和版本记录也放在对应轮次下，文件名使用类型、任务名和时间，不使用哈希。相同内容和旧版缓存仍可跨轮复用原文件。`storage_index.json` 负责内部身份到物理位置的映射，哈希仅用于内容身份与校验；JSONL 经验保持每事件一行。
+`evolution.txt` 中当轮生成、上下文、候选组件和验证的详情路径指向该轮 `record.json`。底层工件、执行缓存和版本记录也放在对应轮次下，文件名使用类型、任务名和时间，不使用哈希。相同内容与缓存跨轮复用原文件。`storage_index.json` 负责内部身份到物理位置的映射，哈希仅用于内容身份与校验；JSONL 经验保持每事件一行。
 
 原来的五份启动清单合并为一份 `run_manifest.json`，按 storage、execution、evolution、validation、orchestrator 分区，保存冻结配置、实际插件与版本、任务划分、模型参数和流程规则；不重复写入插件 Schema、工厂路径和依赖装配细节。已完成的旧运行可离线迁移，先在运行目录之外保留 ZIP 备份，再移动文件并校验工件、版本和真实提交记录；旧引用通过索引继续可读，不调用模型：
 

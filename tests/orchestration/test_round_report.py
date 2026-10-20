@@ -53,7 +53,7 @@ class RoundReportTests(unittest.TestCase):
             self.assertIn(str(paths[0]), text_report)
             self.assertNotIn("报告异常", text_report)
 
-    def test_multiple_candidates_keep_acceptance_selection_commit_and_retest_distinct(self):
+    def test_multiple_candidates_keep_acceptance_selection_commit_and_reuse_distinct(self):
         with tempfile.TemporaryDirectory() as directory:
             _, startup = configured(Path(directory), rounds=1, candidates=2)
             task = startup.prepare_task("dev-001")
@@ -64,8 +64,9 @@ class RoundReportTests(unittest.TestCase):
             self.assertTrue(all(candidate["acceptance"]["accepted"] for candidate in candidates))
             self.assertEqual(sum(candidate["selected"] for candidate in candidates), 1)
             self.assertEqual(sum(candidate["committed"] for candidate in candidates), 1)
-            self.assertEqual(data["post_commit_execution"]["execution"]["output"], dict(result.final_execution.output))
-            self.assertTrue(data["post_commit_execution"]["evaluation"]["success"])
+            self.assertEqual(data["post_commit_result"]["execution"]["output"], dict(result.final_execution.output))
+            self.assertTrue(data["post_commit_result"]["evaluation"]["success"])
+            self.assertTrue(data["post_commit_result"]["reused"])
 
     def test_empty_error_and_incomplete_validation_are_still_recorded(self):
         cases = [({"empty": True}, "empty_candidates"), ({"generation_error": True}, "evolution_error"),
@@ -134,7 +135,7 @@ class RoundReportTests(unittest.TestCase):
             task.run()
             self.assertEqual(len(records(root)), 2)
 
-    def test_offline_export_places_commit_retest_in_its_own_round(self):
+    def test_offline_export_places_committed_result_reuse_in_its_own_round(self):
         with tempfile.TemporaryDirectory() as directory:
             _, startup = configured(Path(directory), rounds=2)
             task = startup.prepare_task("dev-001")
@@ -143,8 +144,8 @@ class RoundReportTests(unittest.TestCase):
             root = startup.execution.storage.run_root
             old = [json.loads(path.read_text(encoding="utf-8")) for path in records(root)]
             self.assertTrue(old[0]["candidates"][0]["committed"])
-            self.assertIn("post_commit_execution", old[0])
-            self.assertNotIn("post_commit_execution", old[1])
+            self.assertIn("post_commit_result", old[0])
+            self.assertNotIn("post_commit_result", old[1])
             for path in records(root):
                 path.unlink()
             (root / "evolution.txt").unlink()
@@ -153,7 +154,7 @@ class RoundReportTests(unittest.TestCase):
             summarize_saved_run(source)
             rebuilt = [json.loads(path.read_text(encoding="utf-8")) for path in records(root)]
             for before, after in zip(old, rebuilt):
-                for key in ("candidates", "post_commit_execution", "evaluation_before_evolution", "input_to_evolver", "status"):
+                for key in ("candidates", "post_commit_result", "evaluation_before_evolution", "input_to_evolver", "status"):
                     self.assertEqual(before.get(key), after.get(key))
 
     def test_business_ids_and_generic_component_content_are_preserved(self):

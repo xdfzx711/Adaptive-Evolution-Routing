@@ -8,7 +8,7 @@ from aer_core.identifiers import timestamp_id
 from aer_core.errors import AERError, ContractError, ValidationError
 from aer_core.plugin_manager import BuiltPlugins, PluginManager
 from aer_core.schemas.experience import AttemptFinishedEvent, CandidateEvaluatedEvent, CandidateEvaluation
-from aer_core.schemas.paired import ValidationBatchResult
+from aer_core.schemas.paired import ValidationBatchResult, ValidationEvidence
 from aer_core.schemas.plugins import PluginBinding
 from aer_core.schemas.proposal import EvolutionProposalRecord
 from aer_core.schemas.runtime import RunContext
@@ -24,6 +24,7 @@ from plugins.validation.paired import paired_seed
 from .bootstrap import create_registry
 from .execution import PreparedExecution, prepare_execution
 from .reporting import ReportingTaskExecutor
+from .conditions import validation_conditions
 
 
 def load_proposal(path: Path) -> EvolutionProposalRecord:
@@ -79,7 +80,7 @@ class PreparedValidation:
                 materialized.append(candidate.replace(candidate_version_id=snapshot.version_id))
             except AERError as failure:
                 invalid.append((candidate, failure.to_info()))
-        # Always rerun Local baseline: legacy generation records do not carry verified execution seeds.
+        # Initial execution and validation share cached, verified observations.
         benchmark = self.execution.benchmark
         plan = ValidationPlan(current_task=task, baseline_execution=None, baseline_evaluation=None,
             similar_tasks=benchmark.similar_tasks, regression_tasks=benchmark.regression_tasks,
@@ -93,6 +94,15 @@ class PreparedValidation:
         reports = self.built_plugins.instances["validation"].validate(stable, tuple(materialized), plan, run_ctx)
         if len({report.candidate_id for report in reports}) != len(reports) or {report.candidate_id for report in reports} != {item.candidate_id for item in materialized}:
             raise ValidationError("Harness returned missing, duplicate or unknown candidate IDs", stage="local_validation")
+        current_results = {}
+        for report in reports:
+            if report.local_result_ref is None:
+                continue
+            evidence = ValidationEvidence.model_validate_json(storage.artifact_store.get(report.local_result_ref))
+            local = [pair.candidate for pair in evidence.results if pair.group == "local"]
+            if len(local) != 1 or local[0].task != task.identity or local[0].version_id != report.candidate_version_id or local[0].seed != run_ctx.seed:
+                raise ValidationError("Current task evidence differs from candidate/task/seed", stage="local_validation")
+            current_results[report.candidate_id] = local[0]
         policy = self.built_plugins.instances["acceptance"]
         acceptances = tuple(policy.evaluate(report) for report in reports)
         selected = select_candidate(reports, acceptances)
@@ -119,7 +129,8 @@ class PreparedValidation:
                 run_id=proposal.run_id, episode_id=proposal.episode_id, timestamp=now, payload=outcome)))
         result = ValidationBatchResult(run_id=proposal.run_id, episode_id=proposal.episode_id,
             attempt_id=proposal.attempt.attempt_id, stable_version_id=stable.version_id, reports=reports, outcomes=outcomes,
-            selected_candidate_id=selected, usage=sum_usage(report.usage for report in reports), experience_refs=refs)
+            selected_candidate_id=selected, usage=sum_usage(report.usage for report in reports), experience_refs=refs,
+            current_task_results=current_results)
         files.immutable(batch_path, canonical_bytes(result.model_dump(mode="json")))
         return result
 
@@ -135,7 +146,7 @@ def prepare_validation(path: str | Path, *, run_id: str) -> PreparedValidation:
     return assemble_validation(prepare_execution(path, run_id=run_id))
 
 
-def assemble_validation(execution: PreparedExecution, *, progress=None) -> PreparedValidation:
+def assemble_validation(execution: PreparedExecution, *, progress=None, conditions=None) -> PreparedValidation:
     config, benchmark = execution.benchmark.loaded_config.config, execution.benchmark
     registry = create_registry()
     validation_config = config.validation.model_dump(mode="json")
@@ -143,19 +154,7 @@ def assemble_validation(execution: PreparedExecution, *, progress=None) -> Prepa
         config=validation_config, dependency_bindings={key: key for key in
         ("task_executor", "artifact_store", "version_store", "validation_cache", "conditions")}),
         PluginBinding(name="acceptance", category="acceptance_policy", plugin_id=config.validation.acceptance_policy, config=validation_config)]
-    model = execution.built_plugins.instances.get("model")
-    # Full scoring conditions stay private to validation/cache evidence, outside evolution contexts.
-    conditions = {"schema_version": "aer.validation.conditions.v0.1", "dataset_version": benchmark.benchmark.dataset_version,
-        "scorer_version": benchmark.evaluator.scorer_version,
-        "execution_plugins": {"plugins": compact_plugins(execution.built_plugins.manifest)},
-        "benchmark_plugins": {"plugins": compact_plugins(benchmark.built_plugins.manifest)},
-        "model_runtime": model.runtime_info() if callable(getattr(model, "runtime_info", None)) else None,
-        "model_endpoint": getattr(getattr(model, "credentials", None), "base_url", None),
-        "model_timeout_seconds": config.limits.model_call_timeout_seconds, "tool_timeout_seconds": config.limits.tool_call_timeout_seconds,
-        "max_output_tokens": config.limits.max_output_tokens_per_call,
-        "tasks": [item.model_dump(mode="json") for item in (*benchmark.execution_tasks, *benchmark.similar_tasks, *benchmark.regression_tasks)],
-        "scoring_specs": [benchmark.benchmark.evaluation_spec(item).model_dump(mode="json")
-                          for item in (*benchmark.execution_tasks, *benchmark.similar_tasks, *benchmark.regression_tasks)]}
+    conditions = validation_conditions(execution) if conditions is None else conditions
     executor = ScoredTaskExecutor(execution.agent, benchmark.benchmark, benchmark.evaluator)
     if progress is not None:
         executor = ReportingTaskExecutor(executor, progress)

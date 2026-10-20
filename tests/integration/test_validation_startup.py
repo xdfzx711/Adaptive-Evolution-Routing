@@ -84,8 +84,8 @@ class ValidationStartupTests(unittest.TestCase):
             original = harness.validate
             harness.validate = lambda *args: tuple(reversed(original(*args)))
             result = prepared.validate(proposal)
-            self.assertEqual(len(model.requests), 27)
-            self.assertEqual(result.usage.model_calls, 27)
+            self.assertEqual(len(model.requests), 26)
+            self.assertEqual(result.usage.model_calls, 26)
             self.assertEqual(sum(outcome.selected for outcome in result.outcomes), 1)
             self.assertTrue(all(outcome.acceptance.accepted for outcome in result.outcomes))
             self.assertEqual(result.selected_candidate_id, min(item.candidate_id for item in proposal.response.candidates))

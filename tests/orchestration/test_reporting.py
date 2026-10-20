@@ -23,7 +23,7 @@ class ReportingTests(unittest.TestCase):
             result = task.run()
             root = startup.execution.storage.run_root
             log = (root / "evolution.txt").read_text(encoding="utf-8")
-            for stage in ("初始执行", "诊断器输出", "候选 R1-C1", "R1-C1 接受与选择", "提交后复测 1", "最终结果", "成本"):
+            for stage in ("初始执行", "诊断器输出", "候选 R1-C1", "R1-C1 接受与选择", "提交后任务结果（复用候选验证）", "最终结果", "成本"):
                 self.assertIn(f"【{stage}】", log)
             self.assertIn("独立验证分：0.000 → 1.000", log)
             self.assertNotIn("验证进度", log)
@@ -196,7 +196,7 @@ class ReportingTests(unittest.TestCase):
             self.assertEqual(text.count("[任务记录结束："), 2)
             self.assertLess(text.index("任务：dev-001"), text.index("任务：dev-002"))
             self.assertIn("实际提交数：1", text)
-            self.assertIn("提交后复测 1", text)
+            self.assertIn("提交后任务结果（复用候选验证）", text)
 
     def test_renderer_failure_cannot_change_evolution_outcome(self):
         with tempfile.TemporaryDirectory() as directory:

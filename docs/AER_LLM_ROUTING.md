@@ -53,7 +53,7 @@ ReAct 的初始 Snapshot 保存 `prompt` 和 `execution_limits` 两个工件。`
 
 Agent 每次从传入 Snapshot 读取有效步数。旧 Snapshot 无此工件时，沿用其原有配置值；SingleCall Agent 固定一步，不支持该目标。`ExecutionResult.state_summary.effective_max_steps` 记录本次有效上限，`model_steps` 记录实际调用步数。
 
-旧版验证读取旧工件，候选验证读取候选工件，其余外部运行条件和配对种子保持一致。缓存键包含完整 Snapshot。候选沿用现有接受策略，增加步数本身不构成接受理由；拒绝或验证不完整不会改变稳定版本。提交后复测读取已提交工件，后续 Prompt 进化会保留已提交的步数。
+旧版验证读取旧工件，候选验证读取候选工件，其余外部运行条件和配对种子保持一致。缓存键包含完整 Snapshot。候选沿用现有接受策略，增加步数本身不构成接受理由；拒绝或验证不完整不会改变稳定版本。提交后直接采用候选在当前任务上的验证结果，后续 Prompt 进化保留已提交步数。相同版本/任务/seed/条件的 Agent 执行与评分只观察一次；Router、Diagnoser 和 Evolver 的调用独立计费。
 
 ## 日志与成本
 

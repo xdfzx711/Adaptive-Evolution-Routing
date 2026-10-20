@@ -58,7 +58,7 @@ class EvolutionTextReport:
         self.sources = {}
         self.readable_sources = {}
         self.seen_executions = {}
-        self.costs = {"执行与复测": [], "诊断": [], "生成（含路由）": [], "配对验证": []}
+        self.costs = {"任务执行": [], "诊断": [], "生成（含路由）": [], "配对验证": []}
         self.round_rows = {}
         self.attempt_rounds = {}
         self.commits = 0
@@ -188,7 +188,9 @@ class EvolutionTextReport:
             lines += ["最终解析输出：", json.dumps(execution.model_dump(mode="json")["output"], ensure_ascii=False, indent=2)]
         if scored.error:
             lines.append(f"执行/评分异常：{scored.error.code}；{scored.error.message}")
-        lines.append(self.usage_line(scored.usage))
+        lines.append("原始执行成本：" + self.usage_line(scored.usage))
+        if scored.cache_hit:
+            lines.append("复用已保存结果；本次新增成本：" + self.usage_line(scored.charged_usage))
         self.block(title, lines)
 
     def proposal(self, value, ref):
@@ -267,11 +269,11 @@ class EvolutionTextReport:
                     "原始验证报告：" + report_source,
                     "证据路径：" + "；".join(dict.fromkeys(label for _, label in pairs)),
                     "独立验证任务正文与原始响应未送入当轮 Evolver；下表供研究者检查。",
-                    "分组 | 任务 | 旧版分 → 候选分 | 变化 | 候选终止原因 | 配对种子 | 旧版缓存"])
+                    "分组 | 任务 | 旧版分 → 候选分 | 变化 | 候选终止原因 | 配对种子 | 旧版缓存 | 候选缓存"])
                 for pair, _ in pairs:
                     old, new = pair.baseline, pair.candidate
                     delta = f"{new.evaluation.score - old.evaluation.score:+.3f}" if old.evaluation and new.evaluation else "未知"
-                    self.write(f"{pair.group} | {old.task.task_id} | {score(old)} → {score(new)} | {delta} | {termination(new)} | {new.seed} | {'命中' if pair.baseline_cached else '未命中'}\n")
+                    self.write(f"{pair.group} | {old.task.task_id} | {score(old)} → {score(new)} | {delta} | {termination(new)} | {new.seed} | {'命中' if pair.baseline_cached else '未命中'} | {'命中' if pair.candidate_cached else '未命中'}\n")
                 for pair, label in pairs:
                     if pair.group == "local":
                         self.execution(pair.baseline, f"{alias} 当前任务：旧版执行", label + " / baseline")
@@ -321,7 +323,7 @@ class EvolutionTextReport:
             self.commits += 1
             stable = "V" + str(self.commits)
             self.version_names[outcome.candidate_version_id] = stable
-            message = f"实际提交：成功；{alias} 升级为稳定版本 {stable}；提交后执行见后续复测。"
+            message = f"实际提交：成功；{alias} 升级为稳定版本 {stable}；提交后的任务结果见后文。"
         else:
             message = f"实际提交：失败；{outcome.commit_error.message if outcome.commit_error else '未记录原因'}"
         self.round_rows[outcome.candidate_id] = (f"{alias}：{outcome.status.value}；"
@@ -356,20 +358,26 @@ class EvolutionTextReport:
             f"异常：{result.error.message if result.error else '无'}"])
         lines = [name + "：" + self.usage_line(sum_usage(items)) for name, items in self.costs.items()]
         lines += ["总消耗（以 RunResult 为准）：" + self.usage_line(result.usage),
-            "配对验证成本只累计实际调用；旧版缓存不重复计费；阶段耗时相加不等于墙钟总耗时。"]
+            "成本只累计实际新增调用；缓存与提交后结果复用不重复计费；阶段耗时相加不等于墙钟总耗时。"]
         self.block("成本", lines)
         self.write(f"\n[任务记录结束：{result.episode_id}]\n")
 
     def record(self, kind, value, ref=None):
         if kind == "controller_execution":
             timestamps = [event.timestamp for event in value.execution.trajectory if event.timestamp] if value.execution else []
-            if timestamps:
+            if timestamps and not value.cache_hit:
                 self.current_time = max(timestamps)
-            self.costs["执行与复测"].append(value.usage)
-            count = len(self.costs["执行与复测"])
+            self.costs["任务执行"].append(value.charged_usage)
+            count = len(self.costs["任务执行"])
             title = "初始执行" if count == 1 else f"提交后复测 {count - 1}"
             source = self.source(title, ref)
             self.execution(value, title, source)
+        elif kind == "committed_task_result":
+            self.block("提交后任务结果（复用候选验证）", [
+                f"稳定版本：{self.version_names.get(value.version_id, '未命名版本')}；得分：{score(value)}",
+                "结果来源：候选在当前任务上的执行与评分；提交后未再次执行或评分。",
+                "输出：" + compact(value.execution.model_dump(mode="json")["output"]),
+                "本次新增成本：" + self.usage_line(value.charged_usage)])
         elif kind == "diagnosis":
             self.diagnosis(value)
         elif kind == "evolution_proposal":

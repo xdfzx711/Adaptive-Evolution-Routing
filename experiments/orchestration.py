@@ -12,12 +12,14 @@ from aer_core.schemas.plugins import PluginBinding
 from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.task import Task
 from aer_core.task_executor import ScoredTaskExecutor
+from aer_core.cached_executor import CachedTaskExecutor
+from plugins.validation.cache import LocalValidationCache
 from plugins.storage._files import FileRoot, canonical_bytes
 from plugins.storage.layout import RunLayout, write_manifest
 from .bootstrap import create_registry
 from .evolution import PreparedEvolution, assemble_evolution
 from .execution import PreparedExecution, prepare_execution
-from .validation import PreparedValidation, assemble_validation
+from .validation import PreparedValidation, assemble_validation, validation_conditions
 from .reporting import RunReporter
 from .feedback import context_builder
 
@@ -63,7 +65,8 @@ class PreparedOrchestrator:
         versions.initialize(initial)
         scoped = replace(base, storage=replace(storage, version_store=versions))
         evolution = assemble_evolution(scoped) if config.evolution.mode != "disabled" else None
-        validation = assemble_validation(scoped, progress=reporter) if config.evolution.mode != "disabled" else None
+        conditions = validation_conditions(scoped)
+        validation = assemble_validation(scoped, progress=reporter, conditions=conditions) if config.evolution.mode != "disabled" else None
         context = RunContext(run_id=storage.run_id, episode_id=episode_id, operation_id=episode_id,
             stage="initial_execution", seed=config.experiment.seed, budget=None,
             workspace_ref=str(storage.run_root / "workspaces" / episode_id),
@@ -72,7 +75,8 @@ class PreparedOrchestrator:
             max_output_tokens=config.limits.max_output_tokens_per_call)
         reporter.configure(scoped.benchmark.benchmark.task_view(task), config, context, storage.artifact_store, versions)
         controller = Orchestrator(config=config,
-            executor=ScoredTaskExecutor(scoped.agent, scoped.benchmark.benchmark, scoped.benchmark.evaluator),
+            executor=CachedTaskExecutor(ScoredTaskExecutor(scoped.agent, scoped.benchmark.benchmark, scoped.benchmark.evaluator),
+                                        LocalValidationCache(storage.run_root), conditions),
             diagnoser=scoped.diagnoser, contexts=context_builder(scoped, task),
             artifacts=storage.artifact_store, versions=versions, experience=storage.experience_store,
             evolution=evolution, validation=validation, progress=reporter, storage_placement=layout)
@@ -98,7 +102,7 @@ class PreparedOrchestrator:
             "log_path": str(storage.run_root / "evolution.txt"),
             "round_records_path": str(storage.run_root / "rounds") if (storage.run_root / "rounds").exists() else None,
             "record_ref": ref.model_dump(mode="json"), "record": result.model_dump(mode="json"),
-            "notes": ["One complete task evolution episode, including actual commit and post-commit execution.",
+            "notes": ["One complete task evolution episode, including commit and reuse of validated task results.",
                       "Resource hard limits and consecutive-no-commit stopping remain deferred."]}
 
 
@@ -107,6 +111,6 @@ def prepare_orchestrator(path: str | Path, *, run_id: str | None = None, console
     write_manifest(execution.storage.run_root, "orchestrator", {
         "schema_version": "aer.orchestrator.v0.1", "plugin_api": execution.built_plugins.manifest.api_version,
         "budget_enforced": False, "incomplete_validation": "stop_without_commit",
-        "evolution_rounds": "attempt_started", "post_commit_execution": "mandatory",
+        "evolution_rounds": "attempt_started", "post_commit_execution": "reuse_validated_current_task_result",
         "task_mode": execution.benchmark.loaded_config.config.state.task_mode})
     return PreparedOrchestrator(execution, console=console)

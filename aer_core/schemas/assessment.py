@@ -19,6 +19,8 @@ class TaskExecutionRecord(DomainModel):
     diagnosis: Diagnosis | None
     assessment_error: ErrorInfo | None = None
     assessment_usage: ResourceUsage = Field(default_factory=ResourceUsage.zero)
+    execution_usage: ResourceUsage | None = None
+    execution_reused: bool = False
 
     @model_validator(mode="after")
     def association(self):

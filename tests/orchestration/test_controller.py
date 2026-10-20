@@ -97,7 +97,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(result.stop_reason, "manual_plan_exhausted")
         self.assertEqual(result.evolution_rounds_used, 1)
 
-    def test_both_agents_commit_exact_validated_version_and_retest_on_last_round(self):
+    def test_both_agents_commit_exact_validated_version_and_reuse_current_result(self):
         for single in (False, True):
             with self.subTest(single=single), tempfile.TemporaryDirectory() as root:
                 _, startup = configured(Path(root), rounds=1, single=single)
@@ -114,7 +114,8 @@ class ControllerTests(unittest.TestCase):
                 self.assertEqual(result.usage.model_calls, len(model.requests))
                 self.assertEqual(result.usage.total_tokens, sum(item.input_tokens + item.output_tokens for item in reports))
                 self.assertEqual({ctx.episode_id for _, ctx in model.requests}, {result.episode_id})
-                self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 1)
+                self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 0)
+                self.assertIn("/candidate/", result.final_execution.operation_id)
                 outcome = self.events(task, CandidateEvaluatedEvent)[-1].payload
                 self.assertTrue(outcome.committed)
                 self.assertEqual(result.final_evaluation_status, "evaluated")
@@ -130,9 +131,9 @@ class ControllerTests(unittest.TestCase):
         self.assertFalse(self.events(task, VersionCommittedEvent))
         # Second batch reuses the full baseline; all actual model calls counted once.
         self.assertEqual(result.usage.model_calls, len(model.requests))
-        self.assertEqual(len(model.requests), 30)
+        self.assertEqual(len(model.requests), 29)
 
-    def test_local_and_retest_failure_keep_improved_committed_version(self):
+    def test_failed_local_result_keeps_improved_committed_version(self):
         _, task = self.setup_task(rounds=1)
         attach_model(task, local_failure=True)
         result = task.run()
@@ -140,9 +141,9 @@ class ControllerTests(unittest.TestCase):
         self.assertFalse(result.final_evaluation.success)
         self.assertNotEqual(result.final_stable_version_id, result.initial_version_id)
         self.assertEqual(result.final_execution.agent_version_id, result.final_stable_version_id)
-        self.assertIn("post_commit_execution", result.final_execution.operation_id)
+        self.assertIn("/candidate/", result.final_execution.operation_id)
 
-    def test_next_round_uses_committed_snapshot_and_failed_retest_record(self):
+    def test_next_round_uses_committed_snapshot_and_saved_local_result(self):
         import json
         _, task = self.setup_task(rounds=2)
         model, _ = attach_model(task, local_failure=True)
@@ -154,7 +155,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(payloads[0]["context"]["stable_version_id"], result.initial_version_id)
         self.assertEqual(payloads[1]["context"]["stable_version_id"], result.final_stable_version_id)
         self.assertTrue(payloads[1]["context"]["history"][0]["candidate_summaries"][0]["committed"])
-        self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 1)
+        self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 0)
         self.assertEqual(result.usage.model_calls, len(model.requests))
 
     def test_rejected_first_round_can_accept_second_using_cached_baseline(self):
@@ -172,24 +173,24 @@ class ControllerTests(unittest.TestCase):
         result = task.run()
         self.assertEqual(result.stop_reason, "task_succeeded")
         self.assertEqual(result.evolution_rounds_used, 2)
-        self.assertEqual(len(model.requests), 31)
-        self.assertEqual(result.usage.model_calls, 31)
+        self.assertEqual(len(model.requests), 29)
+        self.assertEqual(result.usage.model_calls, 29)
         self.assertEqual(len(self.events(task, VersionCommittedEvent)), 1)
 
-    def test_failed_post_commit_execution_never_attaches_old_score_to_new_version(self):
+    def test_post_commit_adoption_does_not_call_agent_again(self):
         _, task = self.setup_task(rounds=1)
         attach_model(task, post_commit_error=True)
         result = task.run()
-        self.assertEqual(result.stop_reason, "execution_error")
-        self.assertEqual(result.stop_stage, "post_commit_execution")
-        self.assertEqual(result.final_evaluation_status, "not_evaluated")
-        self.assertIsNone(result.final_execution)
-        self.assertIsNone(result.final_evaluation)
-        self.assertEqual(result.last_evaluated_execution.agent_version_id, result.initial_version_id)
+        self.assertEqual(result.stop_reason, "task_succeeded")
+        self.assertEqual(result.stop_stage, "commit")
+        self.assertEqual(result.final_evaluation_status, "evaluated")
+        self.assertEqual(result.final_execution.agent_version_id, result.final_stable_version_id)
+        self.assertTrue(result.final_evaluation.success)
+        self.assertIn("/candidate/", result.final_execution.operation_id)
         self.assertNotEqual(result.final_stable_version_id, result.initial_version_id)
-        self.assertIsNone(result.usage.total_tokens)
+        self.assertIsNotNone(result.usage.total_tokens)
 
-    def test_failed_post_commit_scoring_preserves_new_pointer_and_old_evaluated_pair(self):
+    def test_post_commit_adoption_does_not_call_evaluator_again(self):
         _, task = self.setup_task(rounds=1)
         attach_model(task)
         evaluator = task.execution.benchmark.evaluator
@@ -200,9 +201,9 @@ class ControllerTests(unittest.TestCase):
             return original(task, execution, spec, ctx)
         with patch.object(evaluator, "evaluate", side_effect=evaluate):
             result = task.run()
-        self.assertEqual(result.stop_reason, "evaluation_error")
-        self.assertEqual(result.final_evaluation_status, "not_evaluated")
-        self.assertNotEqual(result.final_stable_version_id, result.last_evaluated_execution.agent_version_id)
+        self.assertEqual(result.stop_reason, "task_succeeded")
+        self.assertEqual(result.final_evaluation_status, "evaluated")
+        self.assertEqual(result.final_stable_version_id, result.last_evaluated_execution.agent_version_id)
 
     def test_diagnosis_and_router_errors_are_terminal_with_correct_round_count(self):
         _, task = self.setup_task()
@@ -261,7 +262,7 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(outcome.selected)
         self.assertFalse(outcome.committed)
 
-    def test_commit_publication_followed_by_log_failure_recovers_then_retests(self):
+    def test_commit_publication_followed_by_log_failure_recovers_and_adopts_saved_result(self):
         _, task = self.setup_task(rounds=1)
         model, _ = attach_model(task)
         versions = task.execution.storage.version_store
@@ -278,7 +279,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(result.stop_reason, "task_succeeded")
         self.assertGreaterEqual(count, 2)
         self.assertEqual(len(self.events(task, VersionCommittedEvent)), 1)
-        self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 1)
+        self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 0)
 
     def test_persistent_commit_receipt_error_preserves_published_pointer_and_actual_status(self):
         _, task = self.setup_task(rounds=1)
@@ -288,7 +289,8 @@ class ControllerTests(unittest.TestCase):
             result = task.run()
         self.assertEqual(result.stop_reason, "commit_error")
         self.assertNotEqual(result.final_stable_version_id, result.initial_version_id)
-        self.assertEqual(result.final_evaluation_status, "not_evaluated")
+        self.assertEqual(result.final_evaluation_status, "evaluated")
+        self.assertEqual(result.final_execution.agent_version_id, result.final_stable_version_id)
         self.assertTrue(self.events(task, CandidateEvaluatedEvent)[-1].payload.committed)
         # Reopening the durable pointer completes its receipt after the injected failure ends.
         self.assertEqual(versions.stable().version_id, result.final_stable_version_id)

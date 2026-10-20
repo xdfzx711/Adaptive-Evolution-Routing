@@ -113,6 +113,9 @@ class ExecutionStartupTests(unittest.TestCase):
 
     def test_evaluator_failure_is_distinct_from_wrong_answer(self):
         class BrokenEvaluator:
+            scorer_version = "broken.fixture.v1"
+            score_policy = "fixture scorer failure"
+
             def evaluate(self, task, result, spec, run_ctx):
                 raise RuntimeError("scoring unavailable")
         with tempfile.TemporaryDirectory() as directory:

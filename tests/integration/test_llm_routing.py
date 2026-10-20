@@ -35,7 +35,7 @@ class LLMRoutingIntegrationTests(unittest.TestCase):
         path.write_text(yaml.safe_dump(data), encoding="utf-8")
         return path
 
-    def attach(self, task, choices=("execution_limits",), *, wrong=False, fail_retest=False, fail_evolver=False,
+    def attach(self, task, choices=("execution_limits",), *, wrong=False, local_failure=False, fail_evolver=False,
                fail_validation=False):
         scripted = ScriptedModel(MODEL)
         decisions = iter(choices)
@@ -61,7 +61,7 @@ class LLMRoutingIntegrationTests(unittest.TestCase):
                 record.add_usage(response("{}").usage)
                 actual.append(response("{}").usage)
                 raise ExecutionError("fixture validation failure", stage=ctx.stage, usage=record.usage())
-            elif wrong or fail_retest and ctx.stage == "post_commit_execution":
+            elif wrong or local_failure and body.get("public_metadata", {}).get("split") == "dev":
                 result = response('{"answer":-999}')
             else:
                 result = scripted.generate(request, ctx)
@@ -85,7 +85,7 @@ class LLMRoutingIntegrationTests(unittest.TestCase):
         self.assertEqual(result.usage.total_tokens, record.usage().total_tokens)
         self.assertEqual(result.usage.model_calls, record.usage().model_calls)
 
-    def test_step_candidate_is_paired_accepted_committed_and_retested_with_full_router_log(self):
+    def test_step_candidate_is_paired_committed_and_reused_with_full_router_log(self):
         with tempfile.TemporaryDirectory() as directory:
             startup = prepare_orchestrator(self.config(Path(directory)), run_id="router-test")
             task = startup.prepare_task("dev-001")
@@ -182,7 +182,7 @@ class LLMRoutingIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             startup = prepare_orchestrator(self.config(Path(directory), rounds=2), run_id="router-test")
             task = startup.prepare_task("dev-001")
-            _, actual = self.attach(task, choices=("execution_limits", "prompt"), fail_retest=True)
+            _, actual = self.attach(task, choices=("execution_limits", "prompt"), local_failure=True)
             result = task.run()
             root = startup.execution.storage.run_root
             first, second = self.round(root, 1), self.round(root, 2)

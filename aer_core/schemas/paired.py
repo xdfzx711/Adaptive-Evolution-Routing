@@ -1,9 +1,9 @@
 """Execution evidence and a batch outcome for isolated paired validation."""
 
 from typing import Literal
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
-from .base import DomainModel, Identifier, Items, JsonObject, NonNegativeInt
+from .base import DomainModel, Identifier, Items, JsonObject, NonNegativeInt, ReadOnlyMap
 from .execution import ErrorInfo, EvaluationResult, ExecutionResult
 from .experience import CandidateEvaluation
 from .references import RecordRef
@@ -20,6 +20,8 @@ class ScoredExecution(DomainModel):
     evaluation: EvaluationResult | None
     usage: ResourceUsage
     error: ErrorInfo | None
+    cache_hit: bool = False
+    reuse_operation_id: Identifier | None = None
 
     @model_validator(mode="after")
     def identities(self):
@@ -31,11 +33,18 @@ class ScoredExecution(DomainModel):
             raise ValueError("only scoreable executions may carry an evaluation")
         if self.evaluation is None and self.error is None:
             raise ValueError("unscored execution requires an explicit error")
+        if self.cache_hit and not self.complete:
+            raise ValueError("only complete execution evidence may be reused")
         return self
 
     @property
     def complete(self) -> bool:
         return self.evaluation is not None and self.error is None and self.usage.usage_complete
+
+    @property
+    def charged_usage(self) -> ResourceUsage:
+        """Original evidence retains its cost; reuse adds no new calls."""
+        return ResourceUsage.zero() if self.cache_hit else self.usage
 
 
 class PairedTaskResult(DomainModel):
@@ -43,6 +52,7 @@ class PairedTaskResult(DomainModel):
     baseline: ScoredExecution
     candidate: ScoredExecution
     baseline_cached: bool
+    candidate_cached: bool = False
 
     @model_validator(mode="after")
     def paired(self):
@@ -68,6 +78,7 @@ class ValidationBatchResult(DomainModel):
     selected_candidate_id: Identifier | None
     usage: ResourceUsage
     experience_refs: Items[RecordRef]
+    current_task_results: ReadOnlyMap[ScoredExecution] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def association(self):
@@ -86,4 +97,8 @@ class ValidationBatchResult(DomainModel):
         selected = [outcome.candidate_id for outcome in self.outcomes if outcome.selected]
         if selected != ([] if self.selected_candidate_id is None else [self.selected_candidate_id]):
             raise ValueError("selected candidate must match the unique selected outcome")
+        if not set(self.current_task_results) <= set(report_ids):
+            raise ValueError("current task results must belong to reported candidates")
+        if any(result.version_id != outcomes[key].candidate_version_id for key, result in self.current_task_results.items()):
+            raise ValueError("current task result must match the candidate version")
         return self

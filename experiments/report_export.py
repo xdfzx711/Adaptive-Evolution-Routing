@@ -58,7 +58,7 @@ def _records(root, episode_ids, artifacts):
         kind, model = None, None
         if "execution" in data and "version_id" in data and "seed" in data:
             kind, model = "controller_execution", ScoredExecution
-            operation = (data.get("execution") or {}).get("operation_id") or (data.get("error") or {}).get("operation_id") or ""
+            operation = data.get("reuse_operation_id") or (data.get("execution") or {}).get("operation_id") or (data.get("error") or {}).get("operation_id") or ""
             episode = next((key for key in episode_ids if operation.startswith(key + "/")), None)
         elif "diagnosis" in data and "started_at" in data and "feedback" in data:
             kind, model, episode = "diagnosis", DiagnosisRecord, data.get("episode_id")
@@ -79,7 +79,7 @@ def _records(root, episode_ids, artifacts):
             timestamp = value.finished_at
         elif kind == "controller_execution":
             timestamps = [event.timestamp for event in value.execution.trajectory if event.timestamp] if value.execution else []
-            timestamp = min(timestamps) if timestamps else _file_time(path)
+            timestamp = _file_time(path) if value.cache_hit else min(timestamps) if timestamps else _file_time(path)
         elif kind == "evolution_proposal":
             timestamp = value.attempt.finished_at if value.attempt else datetime.min.replace(tzinfo=timezone.utc)
         else:
@@ -123,6 +123,12 @@ def export_saved_run(path: Path) -> Path:
             if (event.episode_id == episode and isinstance(event, CandidateEvaluatedEvent)
                 and (event.payload.committed or event.payload.commit_error)):
                 records.append((event.timestamp, 1, "commit_outcome", event.payload, None))
+                if event.payload.committed:
+                    batch = next((value for _, _, kind, value, _ in records if kind == "validation_batch"
+                                  and value.attempt_id == event.payload.attempt_id), None)
+                    scored = batch.current_task_results.get(event.payload.candidate_id) if batch else None
+                    if scored is not None:
+                        records.append((event.timestamp, 2, "committed_task_result", scored.replace(cache_hit=True), None))
         records.sort(key=lambda item: (item[0], item[1]))
         report = EvolutionTextReport(buffer.write, artifacts, versions, root=root)
         rounds = RoundReport(root, tasks[result.task_id], context, artifacts, config=config)

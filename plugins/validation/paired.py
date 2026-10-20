@@ -3,6 +3,8 @@
 from dataclasses import replace
 from hashlib import sha256
 
+from aer_core.cached_executor import CachedTaskExecutor
+
 from aer_core.contracts.storage import ArtifactStore, VersionStore
 from aer_core.contracts.validation import ValidationCache, ValidationTaskExecutor
 from aer_core.errors import AERError, ValidationError
@@ -43,11 +45,12 @@ class PairedValidation:
         self.executor, self.artifacts, self.versions, self.cache = executor, artifacts, versions, cache
         # Own a serializable, immutable conditions record; caller mutations cannot change a cache key.
         self.conditions = ValidationEvidence(conditions=conditions, results=[])
+        self.cached_executor = CachedTaskExecutor(executor, cache, conditions)
 
     def _execute(self, task, snapshot, context):
         result = None
         try:
-            result = self.executor.execute(task, snapshot, context)
+            result = self.cached_executor.execute(task, snapshot, context)
             if not isinstance(result, ScoredExecution) or (result.task != task.identity or
                 result.version_id != snapshot.version_id or result.seed != context.seed):
                 raise ValidationError("Executor returned mismatched task/version/seed evidence", stage=context.stage)
@@ -87,20 +90,12 @@ class PairedValidation:
         condition_data = self.conditions.model_dump(mode="json")["conditions"]
         baseline, cached, charged = [], [], []
         for group, task, seed in jobs:
-            key = sha256(canonical_bytes({"snapshot": stable.model_dump(mode="json"),
-                "task": task.model_dump(mode="json"), "seed": seed, "conditions": condition_data})).hexdigest()
-            previous = self.cache.get(key)
-            if previous is not None and (previous.task != task.identity or previous.version_id != stable.version_id or previous.seed != seed):
-                raise ValidationError("Cached baseline identities differ", stage="local_validation")
-            hit = previous is not None
-            if previous is None:
-                context = replace(run_ctx, stage=group + "_validation", seed=seed,
-                    operation_id=run_ctx.operation_id + "/baseline/" + group + "/" + task.benchmark_id + "/" + task.task_id)
-                previous = self._execute(task, stable, context)
-                charged.append(previous.usage)
-                self.cache.put(key, previous)
+            context = replace(run_ctx, stage=group + "_validation", seed=seed,
+                operation_id=run_ctx.operation_id + "/baseline/" + group + "/" + task.benchmark_id + "/" + task.task_id)
+            previous = self._execute(task, stable, context)
+            charged.append(previous.charged_usage)
             baseline.append((group, previous))
-            cached.append(hit)
+            cached.append(previous.cache_hit)
         baseline_complete = all(item.complete for _, item in baseline)
         reports = []
         for index, candidate in enumerate(candidates):
@@ -110,8 +105,9 @@ class PairedValidation:
                 context = replace(run_ctx, stage=group + "_validation", seed=seed,
                     operation_id=run_ctx.operation_id + "/" + candidate.candidate_id + "/" + task.benchmark_id + "/" + task.task_id)
                 new = self._execute(task, version, context)
-                candidate_costs.append(new.usage)
-                pairs.append(PairedTaskResult(group=group, baseline=old, candidate=new, baseline_cached=hit))
+                candidate_costs.append(new.charged_usage)
+                pairs.append(PairedTaskResult(group=group, baseline=old, candidate=new, baseline_cached=hit,
+                                            candidate_cached=new.cache_hit))
             complete = baseline_complete and all(pair.candidate.complete for pair in pairs)
             # Shared baseline calls are charged once, to the first report in this batch.
             usage = sum_usage(candidate_costs + (charged if index == 0 else []))
@@ -135,5 +131,7 @@ class PairedValidation:
                 baseline_metrics=metrics(baseline) if complete else None,
                 candidate_metrics=metrics(new_results, baseline) if complete else None,
                 local_result_ref=local_ref, private_results_ref=private_ref,
-                candidate_validation_tokens=sum_usage(candidate_costs).total_tokens, usage=usage, error=error, local_metrics=local_metrics))
+                candidate_validation_tokens=sum_usage(pair.candidate.usage for pair in pairs).total_tokens,
+                candidate_cache_hits=sum(pair.candidate_cached for pair in pairs),
+                usage=usage, error=error, local_metrics=local_metrics))
         return tuple(reports)

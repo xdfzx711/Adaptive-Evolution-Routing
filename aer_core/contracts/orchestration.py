@@ -17,4 +17,10 @@ class ProposalService(Protocol):
 
 @runtime_checkable
 class CandidateValidationService(Protocol):
+    """Return paired reports and candidate-ID-linked current_task_results.
+
+    A selected candidate needs complete current-task execution evidence for
+    the controller to adopt after commit, without invoking the Agent again.
+    """
+
     def validate(self, proposal: EvolutionProposalRecord) -> ValidationBatchResult: ...

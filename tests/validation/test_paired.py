@@ -82,10 +82,13 @@ class PairedTests(unittest.TestCase):
         self.assertEqual(sum_usage(report.usage for report in reports).total_tokens, 24)
         self.assertEqual([report.candidate_validation_tokens for report in reports], [8, 8])
         report = self.validate(operation="validate-2")[0]
-        self.assertEqual(len(self.executor.calls), 16)
-        self.assertEqual(report.usage.total_tokens, 8)
+        self.assertEqual(len(self.executor.calls), 12)
+        self.assertEqual(report.usage.total_tokens, 0)
+        self.assertEqual(report.candidate_validation_tokens, 8)
+        self.assertEqual(report.candidate_cache_hits, 4)
         evidence = ValidationEvidence.model_validate_json(self.artifacts.get(report.private_results_ref))
         self.assertTrue(all(pair.baseline_cached for pair in evidence.results))
+        self.assertTrue(all(pair.candidate_cached for pair in evidence.results))
 
     def test_cache_conditions_version_and_seed_changes_prevent_reuse(self):
         self.validate()
@@ -96,7 +99,7 @@ class PairedTests(unittest.TestCase):
         old_plan = self.plan
         self.plan = self.plan.replace(pair_seeds=[seed.replace(seed=seed.seed + 1) for seed in self.plan.pair_seeds])
         self.validate(operation="seed-change")
-        self.assertEqual(len(self.executor.calls), 23)
+        self.assertEqual(len(self.executor.calls), 22)
         self.plan = old_plan
         stable2 = self.stable.replace(version_id="v2")
         self.versions.save(stable2)
@@ -104,7 +107,7 @@ class PairedTests(unittest.TestCase):
         candidate = candidate.replace(candidate_version_id=self.versions.materialize(stable2, candidate).version_id)
         with patch.object(self.versions, "stable", return_value=stable2):
             self.harness.validate(stable2, (candidate,), self.plan, context(operation_id="version-change", stage="local_validation"))
-        self.assertEqual(len(self.executor.calls), 31)
+        self.assertEqual(len(self.executor.calls), 30)
 
     def test_unknown_usage_is_incomplete_and_never_rewarded(self):
         self.executor.unknown = True
@@ -175,8 +178,8 @@ class PairedTests(unittest.TestCase):
         self.executor.execute = execute
         report = self.validate(operation="retry")[0]
         self.assertEqual(report.status, "complete")
-        # Three complete baseline tasks reused; failed baseline task rerun.
-        self.assertEqual(report.usage.total_tokens, 10)
+        # Complete results on both sides reused; only the failed baseline task reruns.
+        self.assertEqual(report.usage.total_tokens, 2)
 
     def test_regression_failure_count_tracks_old_success_lost(self):
         self.executor.make_score = lambda task, snapshot: float(

@@ -1,4 +1,4 @@
-"""Run-local, immutable cache of complete baseline execution evidence."""
+"""Run-local, immutable cache of complete task execution and scoring evidence."""
 
 from aer_core.errors import StorageError
 from aer_core.schemas.paired import ScoredExecution
@@ -31,7 +31,7 @@ class LocalValidationCache:
                     raise ValueError("cache entry is incomplete")
                 return result
             except (ValueError, KeyError) as error:
-                raise StorageError("Invalid baseline validation cache", stage="setup") from error
+                raise StorageError("Invalid task execution cache", stage="setup") from error
 
     def put(self, key: str, result: ScoredExecution) -> None:
         if not result.complete:

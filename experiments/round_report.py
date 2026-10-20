@@ -64,7 +64,8 @@ def execution_view(value):
 def scored_view(value):
     return {"execution": execution_view(value.execution),
             "evaluation": fields(value.evaluation, "score", "success", "metrics", "reason_code", "feedback"),
-            "usage": plain(value.usage), "error": error_view(value.error)}
+            "usage": plain(value.usage), "new_usage": plain(value.charged_usage), "reused": value.cache_hit,
+            "error": error_view(value.error)}
 
 
 def condition_view(value):
@@ -211,6 +212,7 @@ class RoundReport:
                     tasks.append({"group": pair.group, "task": pair.baseline.task.task_id,
                         "input": public_inputs.get(pair.baseline.task.task_id),
                         "seed": pair.baseline.seed, "baseline_cached": pair.baseline_cached,
+                        "candidate_cached": pair.candidate_cached,
                         "baseline": scored_view(pair.baseline), "candidate": scored_view(pair.candidate)})
             entry["validation"] = {"status": report.status.value,
                 "baseline_metrics": plain(report.baseline_metrics), "candidate_metrics": plain(report.candidate_metrics),
@@ -225,8 +227,12 @@ class RoundReport:
         elif kind == "controller_execution":
             self.latest_execution = scored_view(value)
             if self.data is not None:
-                # Controller executions after a round are mandatory commit retests.
+                # Preserve legacy retest records when rendering historical runs.
                 self.data["post_commit_execution"] = self.latest_execution
+        elif kind == "committed_task_result":
+            self.latest_execution = scored_view(value)
+            if self.data is not None:
+                self.data["post_commit_result"] = {"source": "candidate_validation", **self.latest_execution}
         elif kind == "diagnosis":
             self.latest_diagnosis = diagnosis_view(value)
             if self.data is not None:

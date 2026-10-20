@@ -126,13 +126,13 @@ class Orchestrator:
 
     def _execute(self, task, context, state, stage):
         state.stage, state.charged = stage, False
-        label = "初始执行" if stage == "initial_execution" else "提交后复测"
-        self._notify(label, f"开始执行 {task.task_id}")
+        label = "初始执行" if stage == "initial_execution" else "任务执行"
+        self._notify(label, f"获取 {task.task_id} 的执行与评分")
         operation = self._context(context, stage)
         scored = self.executor.execute(task, state.stable, operation)
         if not isinstance(scored, ScoredExecution):
             raise ContractError("Executor must return ScoredExecution", stage=stage)
-        state.costs.append(scored.usage)
+        state.costs.append(scored.charged_usage)
         state.charged = True
         if scored.task != task.identity or scored.version_id != state.stable.version_id or scored.seed != operation.seed:
             raise ContractError("Task execution differs from the episode task/version/seed", stage=stage)
@@ -141,16 +141,30 @@ class Orchestrator:
             return scored.error
         if scored.evaluation is None or scored.execution is None:
             raise ContractError("Current task execution has no external score", stage=stage)
+        self._set_task_result(task, context, state, scored)
+        if not scored.complete:
+            return ContractError("Task usage is incomplete; cannot reuse this observation for evolution",
+                                 stage=stage, usage=scored.usage).to_info()
+        return None
+
+    def _set_task_result(self, task, context, state, scored):
         state.last_scored = scored
         # Only fixed public explanations are exposed to diagnosis and evolution.
         evaluation = scored.evaluation
         feedback = self.contexts.feedback(evaluation)
         state.record = TaskExecutionRecord(run_id=context.run_id, episode_id=context.episode_id, task=task.identity,
-            execution=scored.execution, evaluation=evaluation, feedback=feedback, diagnosis=None)
+            execution=scored.execution, evaluation=evaluation, feedback=feedback, diagnosis=None,
+            execution_usage=scored.charged_usage, execution_reused=scored.cache_hit)
         output = json.dumps(scored.execution.model_dump(mode="json")["output"], ensure_ascii=False, separators=(",", ":"))
-        self._notify(label, f"{'成功' if evaluation.success else '未通过'}；得分={evaluation.score:.3f}；"
+        label = "采用验证结果" if state.stage == "commit" else "初始执行"
+        source = "复用已保存结果" if scored.cache_hit else "本次执行"
+        self._notify(label, f"{source}；{'成功' if evaluation.success else '未通过'}；得分={evaluation.score:.3f}；"
             f"输出={output[:300]}{'…' if len(output) > 300 else ''}")
-        return None
+
+    def _adopt_validated(self, task, context, state, scored):
+        reused = scored.replace(cache_hit=True, reuse_operation_id=context.operation_id + f"/adopt/{state.rounds}")
+        self._set_task_result(task, context, state, reused)
+        report_record(self.progress, "committed_task_result", reused)
 
     def run_task(self, task: Task, public_task: TaskView, context: RunContext, *, allowed_history_task_ids=()) -> RunResult:
         if task.identity.benchmark_id != public_task.benchmark_id or task.task_id != public_task.task_id:
@@ -256,6 +270,10 @@ class Orchestrator:
                 if batch.selected_candidate_id is None:
                     continue
                 selected = next(item for item in batch.outcomes if item.candidate_id == batch.selected_candidate_id)
+                selected_result = batch.current_task_results.get(selected.candidate_id)
+                if (selected_result is None or not selected_result.complete or selected_result.task != task.identity or
+                    selected_result.version_id != selected.candidate_version_id or selected_result.seed != context.seed):
+                    raise ValidationError("Selected candidate requires complete, matching current-task evidence", stage="local_validation")
                 state.stage, state.charged = "commit", True
                 self._notify("提交", f"提交候选 {by_id[selected.candidate_id]} 为稳定版本")
                 snapshot = self.versions.load(selected.candidate_version_id)
@@ -273,6 +291,7 @@ class Orchestrator:
                     except CommitFinalizationError:
                         # Publication is durable even if receipt recovery remains unavailable.
                         self._commit_outcome(selected, context)
+                        self._adopt_validated(task, context, state, selected_result)
                         raise
                     if recovered != snapshot:
                         raise CommitError("Recovered stable version differs from selected candidate", stage="commit")
@@ -284,11 +303,8 @@ class Orchestrator:
                     raise CommitError("Commit receipt differs from the selected candidate", stage="commit")
                 state.stable = snapshot
                 self._commit_outcome(selected, context)
-                self._notify("提交", "稳定版本已更新，开始独立复测")
-                # This execution is mandatory even after the last permitted evolution round.
-                error = self._execute(task, context, state, "post_commit_execution")
-                if error:
-                    return self._finish(task, context, state, self._stop_reason(error, state.stage), error)
+                self._notify("提交", "稳定版本已更新，采用候选在当前任务上的验证结果")
+                self._adopt_validated(task, context, state, selected_result)
         except Exception as failure:
             error = self._failure(failure, state.stage)
             if not state.charged:

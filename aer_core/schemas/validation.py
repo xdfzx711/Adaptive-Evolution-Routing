@@ -109,6 +109,7 @@ class ValidationReport(DomainModel):
     usage: ResourceUsage
     error: ErrorInfo | None = None
     local_metrics: LocalValidationMetrics | None = None
+    candidate_cache_hits: NonNegativeInt = 0
 
     @model_validator(mode="after")
     def complete_report_has_evidence(self):
@@ -122,7 +123,9 @@ class ValidationReport(DomainModel):
             baseline, candidate = self.baseline_metrics, self.candidate_metrics
             if (baseline.task_count, baseline.similar_count, baseline.regression_count) != (candidate.task_count, candidate.similar_count, candidate.regression_count):
                 raise ValueError("paired versions must use identical group counts")
-            if self.candidate_validation_tokens > self.usage.total_tokens:
+            if self.candidate_cache_hits > candidate.task_count + 1:
+                raise ValueError("candidate cache hits exceed evaluated tasks")
+            if not self.candidate_cache_hits and self.candidate_validation_tokens > self.usage.total_tokens:
                 raise ValueError("candidate token usage cannot exceed total validation token usage")
         if self.status == ValidationStatus.ERROR and self.error is None:
             raise ValueError("error validation requires ErrorInfo")

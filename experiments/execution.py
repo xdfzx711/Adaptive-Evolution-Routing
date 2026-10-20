@@ -15,6 +15,8 @@ from aer_core.schemas.states import RunStage
 from aer_core.schemas.usage import ResourceUsage
 from aer_core.usage import sum_usage
 from aer_core.task_executor import ScoredTaskExecutor
+from aer_core.cached_executor import CachedTaskExecutor
+from plugins.validation.cache import LocalValidationCache
 from plugins.storage.layout import RunLayout, compact_plugins, write_manifest
 
 from .benchmark import PreparedBenchmark, prepare_benchmark
@@ -22,6 +24,7 @@ from .bootstrap import agent_bindings, component_binding, create_registry, evolu
 from .feedback import context_builder
 from .storage import PreparedStorage, prepare_storage
 from .environment import provider_dependencies, resolve_model
+from .conditions import validation_conditions
 
 
 @dataclass(frozen=True)
@@ -45,20 +48,24 @@ class PreparedExecution:
             max_output_tokens=config.limits.max_output_tokens_per_call)
         RunLayout(self.storage.run_root).begin_episode(task.identity, context)
         task_view = self.benchmark.benchmark.task_view(task)
-        scored = ScoredTaskExecutor(self.agent, self.benchmark.benchmark, self.benchmark.evaluator).execute(
-            task, self.storage.version_store.stable(), context)
+        scored = CachedTaskExecutor(ScoredTaskExecutor(self.agent, self.benchmark.benchmark, self.benchmark.evaluator),
+            LocalValidationCache(self.storage.run_root), validation_conditions(self)).execute(
+                task, self.storage.version_store.stable(), context)
         if scored.execution is None:
             raise ExecutionError("Agent did not return an associated execution result", stage="initial_execution", usage=scored.usage)
         result, evaluation = scored.execution, scored.evaluation
         feedback, diagnosis = None, None
         assessment_usage = ResourceUsage.zero()
         error = scored.error if result.status in {"completed", "step_limit"} else None
+        if scored.error is None and not scored.complete:
+            error = ExecutionError("Task usage is incomplete; observation cannot be reused for evolution",
+                                   stage="initial_execution", usage=scored.usage).to_info()
         if evaluation is not None:
             assessment_context = replace(context, stage=RunStage.DIAGNOSIS, operation_id=context.operation_id + "/diagnosis")
             try:
                 builder = context_builder(self, task)
                 public_task, execution_view, feedback = builder.public_views(task_view, result, evaluation)
-                if config.benchmark.execution_split == "dev":
+                if config.benchmark.execution_split == "dev" and error is None:
                     diagnosis = validate_diagnosis(self.diagnoser.diagnose(public_task, execution_view, feedback, assessment_context), execution_view, feedback)
                     assessment_usage = diagnosis.usage or ResourceUsage.zero()
             except AERError as failure:
@@ -71,7 +78,7 @@ class PreparedExecution:
                                    operation_id=assessment_context.operation_id).to_info()
         return TaskExecutionRecord(run_id=context.run_id, episode_id=context.episode_id, task=task.identity,
             execution=result, evaluation=evaluation, feedback=feedback, diagnosis=diagnosis, assessment_error=error,
-            assessment_usage=assessment_usage)
+            assessment_usage=assessment_usage, execution_usage=scored.charged_usage, execution_reused=scored.cache_hit)
 
     def save_record(self, record: TaskExecutionRecord) -> dict:
         if record.run_id != self.storage.run_id:
@@ -81,8 +88,10 @@ class PreparedExecution:
             "dataset_version": self.benchmark.benchmark.dataset_version,
             "scorer_version": self.benchmark.evaluator.scorer_version,
             "record_ref": ref.model_dump(mode="json"), "record": record.model_dump(mode="json"),
-            "usage": sum_usage([record.execution.usage, record.evaluation.usage if record.evaluation and record.evaluation.usage else ResourceUsage.zero(), record.assessment_usage]).model_dump(mode="json"),
-            "notes": ["One fresh-session execution and external evaluation; development tasks also receive public-evidence diagnosis.",
+            "usage": sum_usage([record.execution_usage if record.execution_usage is not None else sum_usage([
+                record.execution.usage, record.evaluation.usage if record.evaluation and record.evaluation.usage else ResourceUsage.zero()]),
+                record.assessment_usage]).model_dump(mode="json"),
+            "notes": ["Reuse complete task evidence for identical version/task/seed/conditions; development tasks also receive public-evidence diagnosis.",
                       "Final test feedback is not passed to the Diagnoser.",
                       "No evolution, candidate validation or stable version commit was performed.",
                       "Model usage sources distinguish provider-reported and simulated tokens; resource budgets are not enforced."]}

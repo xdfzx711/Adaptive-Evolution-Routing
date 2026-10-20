@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from contextlib import ExitStack
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -256,13 +257,15 @@ class FeedbackContractTests(unittest.TestCase):
             for incorrect_identity in (False, True):
                 with patch.object(evaluator, "evaluate", side_effect=lambda *args, bad=incorrect_identity:
                     original(*args).replace(usage=usage, operation_id="foreign" if bad else args[3].operation_id)):
-                    scored = task.controller.executor.execute(task.task, task.execution.storage.version_store.stable(), task.context)
+                    scored = task.controller.executor.execute(task.task, task.execution.storage.version_store.stable(),
+                                                              replace(task.context, seed=100 + int(incorrect_identity)))
                     self.assertEqual(scored.usage.total_tokens, 5)
                     self.assertEqual(scored.usage.model_calls, 1)
                     self.assertEqual(scored.usage.tool_calls, 1)
                     self.assertEqual(scored.error is not None, incorrect_identity)
             with patch.object(evaluator, "evaluate", side_effect=EvaluationError("fixture", stage="evaluation", usage=usage)):
-                scored = task.controller.executor.execute(task.task, task.execution.storage.version_store.stable(), task.context)
+                scored = task.controller.executor.execute(task.task, task.execution.storage.version_store.stable(),
+                                                          replace(task.context, seed=102))
                 self.assertEqual(scored.usage.total_tokens, 5)
                 self.assertIsNone(scored.evaluation)
 
@@ -306,7 +309,7 @@ class FeedbackContractTests(unittest.TestCase):
             self.assertEqual(len(committed), 1)
             self.assertEqual(committed[0].acceptance.delta_score, 0.5)
 
-    def test_model_evaluator_shares_provider_and_reports_cost_through_validation_and_retest(self):
+    def test_model_evaluator_shares_provider_and_charges_once_through_validation_and_reuse(self):
         class ModelEvaluator(NativeEvaluator):
             def __init__(self, model):
                 self.model = model
@@ -336,7 +339,7 @@ class FeedbackContractTests(unittest.TestCase):
             self.assertEqual(result.stop_reason, "task_succeeded")
             self.assertEqual(result.usage.model_calls, len(model.requests))
             self.assertEqual(result.usage.total_tokens, 5 * len(model.requests))
-            self.assertEqual(len([ctx for _, ctx in model.requests if ctx.stage == "evaluation"]), 8)
+            self.assertEqual(len([ctx for _, ctx in model.requests if ctx.stage == "evaluation"]), 6)
 
 
 if __name__ == "__main__":

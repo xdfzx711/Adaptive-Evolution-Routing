@@ -140,7 +140,7 @@ class HardLocalTests(unittest.TestCase):
             self.assertEqual(len(prepared.regression_tasks), 4)
             self.assertEqual(prepared.as_dict()["execution_task_ids"][0], "hard-dev-001")
 
-    def test_hard_task_flows_through_generation_paired_validation_commit_and_retest(self):
+    def test_hard_task_flows_through_generation_validation_commit_and_result_reuse(self):
         with tempfile.TemporaryDirectory() as directory:
             startup = prepare_orchestrator(self.local_config(Path(directory)), run_id="hard")
             task = startup.prepare_task("hard-dev-001")
@@ -166,7 +166,7 @@ class HardLocalTests(unittest.TestCase):
             self.assertEqual(result.evolution_rounds_used, 1)
             self.assertNotEqual(result.initial_version_id, result.final_stable_version_id)
             self.assertEqual(result.usage.model_calls, len(model.requests))
-            self.assertEqual(result.usage.model_calls, 26)
+            self.assertEqual(result.usage.model_calls, 24)
             self.assertEqual(len([event for event in task.execution.storage.experience_store.events()
                                   if isinstance(event, VersionCommittedEvent)]), 1)
             evolution_input = next(request.messages[-1].content for request, _ in model.requests

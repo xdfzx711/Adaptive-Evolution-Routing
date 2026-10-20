@@ -2,7 +2,7 @@
 
 步骤 10 已实现。输入是步骤 9 的完成生成记录，输出包含逐候选验证报告、接受原因与唯一选中候选。此步骤不提交稳定版本，也不执行提交后复测。
 
-步骤 11 的 [主控制器](AER_ORCHESTRATOR.md) 已通过进程内服务复用此验证流程，并负责后续提交与复测；独立 validate-proposal 命令继续只验证和选择。
+步骤 11 的 [主控制器](AER_ORCHESTRATOR.md) 通过进程内服务复用此验证流程，提交后直接采用候选的当前任务验证结果；独立 validate-proposal 命令继续只验证和选择。
 
 ## 使用入口
 
@@ -34,7 +34,7 @@ ScoredTaskExecutor 通过 AgentPlugin、BenchmarkPlugin 和 EvaluatorPlugin 执�
 
 ValidationPlan 固定当前任务、非空且互斥的 Similar/Regression 两组、顺序和独立任务的 PairSeed。旧版和所有候选共用任务与种子。种子由基础 seed、当前开发任务身份、验证任务身份和重复编号派生，不含 candidate/version ID。MVP 每个任务执行一次，不据此声称统计显著性。
 
-Local 的两侧使用 experiment.seed。当前生成记录没有可核验的原执行 seed，首版重新执行旧版 Local，不把过滤后的执行视图伪造为完整执行事实。此后可以使用条件一致的验证缓存。计划中的 baseline_execution/baseline_evaluation 必须同时提供或同时为 null；提供时检查身份，当前 Harness 仍以重新执行或验证缓存获得对照。
+Local 两侧使用 experiment.seed。初始执行、独立 execute-task 与配对验证共用完整 ScoredExecution 缓存；同一版本、任务、种子与评测条件只保存一次完整执行和评分。旧版 Local 可直接复用初始执行，候选提交后可直接作为下一轮基线。过滤后的执行视图不作为缓存证据。计划中的 baseline_execution/baseline_evaluation 仍必须同时提供或同时为 null；实际对照来自统一执行缓存。
 
 不调用 Diagnoser，不更新稳定指针，不把验证任务记录写成开发任务完成事件。Provider 不支持 seed 时将能力写入条件记录，相同请求种子不代表远端输出确定。
 
@@ -58,13 +58,15 @@ delta_regression_score >= -validation.max_regression_drop
 
 ## 缓存与成本
 
-缓存只保存 complete 的旧版 ScoredExecution，保存在首次执行该旧版验证的轮次目录 validation/cache 下。key 包含完整旧版 Snapshot、公开任务、seed，以及模型/工具/Agent/Benchmark/Evaluator 的插件版本、模型运行信息、任务集合与划分、私有评分规格版本和内容、调用参数等评测条件。条件变化不能复用旧结果。
+缓存保存 complete 的 ScoredExecution，不区分初始、旧版或候选角色。正常评分为 0 也缓存；异常、未评分和成本不完整的结果不缓存。物理文件位于首次执行所属的 initial 或 round 目录下的 validation/cache。key 包含完整 Snapshot、任务、seed、插件版本与配置、模型运行信息、任务集合与划分、私有评分规格，以及实际超时和输出上限。角色、轮次和提交状态不进入 key；条件变化后重新执行。
 
-同批次只执行一份旧版 Local 与独立验证。缓存命中保留原始结果及其 operation ID，并在 PairedTaskResult 中标记 baseline_cached；不重复计入原调用成本。
+同批次共享旧版结果；候选结果也在执行后写入相同缓存。ScoredExecution.cache_hit 与 PairedTaskResult.baseline_cached/candidate_cached 标记复用。缓存保留原始执行、评分、operation ID 和 usage；charged_usage 表示本次新增成本，命中为 0。相邻轮次基线可直接沿用上轮已提交候选的逐题分数，仍重新聚合指标、计算相对变化和调用接受策略。
 
 每个 report.usage 是本批次实际归属到它的成本，共用旧版的新调用归属到返回序列第一份报告一次，其余报告只承担候选成本。批次 usage 累加这些报告；报告中的逐任务证据保留旧版历史 usage，不能再次累加。
 
-candidate_validation_tokens 只计该候选 Local 和独立验证的输入加输出，不含旧版、候选生成或其他候选。未知用量保持 null，不作为已知 0。
+candidate_validation_tokens 表示候选 Local 和独立验证的原始执行 token 成本，用于成本排序；缓存命中不会将其改成 0。ValidationReport.usage 与批次 usage 只累计本轮实际新增调用，candidate_cache_hits 记录候选命中数。未知用量保持 null，不作为已知 0。
+
+ValidationBatchResult.current_task_results 按 candidate_id 返回标准 ScoredExecution。启动适配层从 Local 验证证据中提取并核对任务、版本与 seed；主控制器在提交前再次检查完整性。提交成功后直接采用该结果，不再次调用 Agent 或 Evaluator。
 
 ## 多候选与存储
 
@@ -82,7 +84,7 @@ candidate_validation_tokens 只计该候选 Local 和独立验证的输入加输
     artifacts/                # 当前任务和独立逐题证据、批次工件
     versions/                 # 候选快照、关联和提交凭据
     validation/               # ValidationReport 与验证批次
-      cache/                  # 完整旧版缓存，后续轮次可复用
+      cache/                  # 完整逐任务观察，候选转为基线后可直接复用
     record.json               # 一份直接展开内容的阅读日志
   experience/events.jsonl     # 尝试、评估和真实提交事件
 ```

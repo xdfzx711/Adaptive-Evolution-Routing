@@ -15,6 +15,7 @@ class ValidationTaskExecutor(Protocol):
 
 @runtime_checkable
 class ValidationCache(Protocol):
+    """Immutable complete observations, shared across candidate/baseline roles."""
     def get(self, key: str) -> ScoredExecution | None: ...
 
     def put(self, key: str, result: ScoredExecution) -> None: ...
@@ -22,7 +23,10 @@ class ValidationCache(Protocol):
 
 @runtime_checkable
 class ValidationPlugin(Protocol):
-    """Use fresh sessions with paired tasks/seeds; return reports linked by ID.
+    """Use paired tasks/seeds and reuse complete observations when available.
+
+    New observations use fresh sessions; cached observations retain original
+    execution evidence and incur no new model/tool/scoring calls.
 
     Candidates must have candidate_version_id before validation. Partial
     results are incomplete, infrastructure failures raise ValidationError;

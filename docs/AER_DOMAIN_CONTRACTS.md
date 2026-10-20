@@ -131,6 +131,8 @@ EvolutionCandidate 的状态为 generated；候选评估状态使用 not_validat
 
 ExperienceEvent 是按 record_type 区分的类型联合，支持 attempt_started、attempt_finished、candidate_evaluated、version_committed、task_finished。可使用 `pydantic.TypeAdapter(ExperienceEvent)` 解析 JSONL 单行，恢复具体事件类型。
 
-测试包括 JSON/JSON dict 往返、Snapshot 不可变、引用匹配、预算未知值、状态一致性、未来经验隔离、五类事件恢复和异常成本保留。两个 Mock Agent、两个 Mock Router、两个 Mock Evolver 通过同一组接口调用验证可替换性；两个实际 Agent 已通过完整主循环中的接受、提交与复测验收。
+测试覆盖 JSON 往返、Snapshot 不可变、引用匹配、预算未知值、状态一致性、未来经验隔离、事件恢复、异常成本，以及插件替换。两个实际 Agent 均验证接受、提交和结果承接。相同版本/任务/seed/条件的完整观察只执行与评分一次，初始执行、候选与基线共用缓存。
+
+ScoredExecution.cache_hit 标记复用，usage 保留原始成本，charged_usage 返回本次新增成本。reuse_operation_id 保留本次读取的操作身份，不覆盖原始执行 ID。TaskExecutionRecord.execution_usage/execution_reused 记录执行与评分的新成本及复用状态，assessment_usage 单独记录诊断成本。PairedTaskResult 增加 candidate_cached；ValidationReport.candidate_cache_hits 支持原始候选成本与新增批次成本分离。ValidationBatchResult.current_task_results 按 candidate_id 返回对应版本的当前任务结果，供提交后直接采用。
 
 Qwen 路由扩展保留 `RouterPlugin.select(context)`：EvolutionContext 可携带 RunContextRecord 与目标说明；运行上下文不发送给模型。EvolutionDecision 的可选 usage/record_ref 提供实际成本及调用工件引用。RoutingRecord 保存 ModelRequest、ModelResponse、决策、时间、usage 与错误，失败通过 RoutingError 关联工件。旧插件与旧领域记录可以继续缺省这些字段。
