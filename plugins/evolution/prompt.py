@@ -11,7 +11,7 @@ from aer_core.schemas.base import DomainModel, Identifier, Items
 from aer_core.schemas.evolution import EvolutionCandidate, EvolutionCapabilities, EvolutionRequest, EvolutionResponse
 from aer_core.schemas.providers import ModelMessage, ModelRequest, ModelResponse
 from plugins.agents.execution import SessionRecord
-from plugins.agents.react import parse_final
+from plugins.json_output import parse_final
 
 
 class PromptEvolverConfig(Settings):
@@ -36,9 +36,9 @@ class SimplePromptEvolver:
         self.model = model
 
     def capabilities(self) -> EvolutionCapabilities:
-        return EvolutionCapabilities(supported_targets=["prompt"], compatible_agents=["react_agent", "single_call_agent"],
+        return EvolutionCapabilities(supported_targets=["prompt"], compatible_agents=["react_agent", "single_call_agent", "codex_cli_agent"],
             required_artifact_kinds=["prompt"], supports_multiple_candidates=True, reports_usage=True,
-            target_descriptions={"prompt": "Improve reusable Agent instructions, output formatting and task/tool-use strategy; does not change the execution step limit."})
+            target_descriptions={"prompt": "Improve reusable Agent instructions, output formatting and task/tool-use strategy; does not change the execution model."})
 
     def evolve(self, request: EvolutionRequest) -> EvolutionResponse:
         stable = request.context.stable_snapshot

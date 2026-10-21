@@ -49,7 +49,8 @@ class AgentSettings(Settings):
     plugin: NonBlank
     initial_prompt: NonBlank | None
     initial_snapshot_ref: NonBlank | None
-    max_steps: PositiveInt
+    max_steps: PositiveInt | None = None
+    config: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 class ModelProviderSettings(Settings):

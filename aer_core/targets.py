@@ -74,6 +74,10 @@ class TargetRegistry:
                         reason = "required_artifact_missing"
                     elif snapshot.artifacts[target].kind != target:
                         reason = "target_artifact_kind_mismatch"
+                    else:
+                        applicable = getattr(self.resolver.resolve(target).operator, "is_applicable", None)
+                        if callable(applicable) and not applicable(snapshot):
+                            reason = "operator_not_applicable"
             results.append(TargetAvailability(target=target, operator_id=operator_id,
                                               feasible=reason == "available", reason_code=reason))
         return FeasibleTargets(targets=[item.target for item in results if item.feasible], availability=results)

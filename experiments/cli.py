@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     validation.add_argument("proposal", type=Path, help="EvolutionProposalRecord or propose-prompt JSON report")
     validation.add_argument("--run-id", required=True)
     validation.add_argument("--output", type=Path)
-    run = subparsers.add_parser("run-task", help="run one complete task evolution episode, including commit and retest")
+    run = subparsers.add_parser("run-task", help="run one task evolution episode, including validation and commit")
     run.add_argument("config", type=Path)
     run.add_argument("--task-id", required=True)
     run.add_argument("--run-id", help="optional run directory name; default uses local time")
@@ -75,6 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
     summary.add_argument("result", type=Path)
     reorganize = subparsers.add_parser("reorganize-run", help="move a completed legacy run into round directories without model calls")
     reorganize.add_argument("run_root", type=Path)
+    for command in (validate, assemble, storage, benchmark, score, execute, propose, validation, run):
+        command.add_argument("--set", dest="overrides", action="append", default=[], metavar="PATH=VALUE",
+            help="override a YAML field before validation; repeat for multiple plugin/runtime settings")
     return parser
 
 
@@ -92,6 +95,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             log_path = summarize_saved_run(args.result)
             print(log_path)
             return 0
+        if args.overrides:
+            args.config = load_experiment_config(args.config, benchmark_index=getattr(args, "benchmark_index", None),
+                overrides=args.overrides)
         if args.command == "run-task":
             if not args.quiet:
                 print("[准备] 正在加载配置、任务和插件…", file=sys.stderr, flush=True)

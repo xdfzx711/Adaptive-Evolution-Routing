@@ -136,11 +136,13 @@ Qwen Provider 支持兼容 Chat Completions、工具调用、实际 token usage 
 
 Qwen 示例配置现在使用 `assessment.diagnoser: llm_diagnoser`，复用相同的 ModelProvider 和 .env 模型设置。失败诊断返回观察事实、可能原因和轨迹证据，实际调用成本计入结果；稳定版本的同一次失败执行不重复诊断。本地 scripted 示例仍保留规则诊断器，可通过配置替换。
 
-新增 [Qwen Router 与步数进化](docs/AER_LLM_ROUTING.md)：`v0_1_qwen_router.yaml` 由模型选择 Prompt 或执行步数目标。初始 8 步，每轮步数候选增加 2，最高 16，均来自配置；沿用通用验证、接受和提交机制。`evolution.txt` 和分轮 `record.json` 展示路由模型实际输入的完整提示词、返回决策及成本。
+新增 [Codex CLI 与双组件进化](docs/AER_CODEX_AGENT.md)：`codex_cli_agent` 执行任务，Qwen 负责诊断、路由和进化。Router 选择 `prompt` 或 `model`，默认执行模型为 `gpt-5.6-sol`。旧步数进化组件已移除；ReAct 仍可作为对照插件。`evolution.txt` 展示路由决策，分轮 `record.json` 保存路由模型的实际输入与原始响应。
 
 ```powershell
-.\.venv\Scripts\python.exe main.py run-task experiments/configs/v0_1_qwen_router.yaml --task-id hard-dev-001 --output router-result.json
+.\.venv\Scripts\python.exe main.py run-task experiments/configs/v0_1_codex_router.yaml --task-id hard-dev-001 --output codex-result.json
 ```
+
+命令行支持重复的 `--set 路径=YAML值`，例如 `--set agent.config.initial_model=gpt-6-sol`、`--set limits.max_evolution_rounds=5`。覆盖值先经过完整配置检查，再用于装配、Snapshot、验证及日志，原 YAML 不变。Codex 使用本机 CLI 认证，默认跳过用户 config.toml，Provider 继承方式见接入文档；Qwen 继续使用 `.env`。
 
 ## 较难本地任务
 
@@ -179,6 +181,8 @@ Qwen 示例配置现在使用 `assessment.diagnoser: llm_diagnoser`，复用相�
 Orchestrator 在一个 episode 内完成失败分析、配置轮数内的进化、候选验证和实际提交。提交后直接采用候选的当前任务验证结果，不再额外复测；成功则结束，失败继续进化。返回匹配最终稳定版本的 RunResult。控制逻辑、停止原因和 Python 入口见 [主控制器](docs/AER_ORCHESTRATOR.md)。
 
 每次运行用 `runs/<时间编号>/evolution.txt` 浏览整体过程，每轮细节放在独立子目录中，每轮只新增一个 `record.json`，不再为诊断、生成、验证和提交分别创建阅读日志：
+
+`evolution.txt` 保留诊断、路由理由、候选组件变更、逐题评分对比、接受与提交结果，以及分阶段成本汇总。执行轨迹、任务输出、工具异常详情和 Router 完整调用正文保存在执行工件或分轮 `record.json` 中，总览只提供详细记录路径。
 
 ```text
 runs/run-<时间>/

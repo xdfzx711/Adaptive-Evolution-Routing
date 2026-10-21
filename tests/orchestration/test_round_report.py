@@ -45,6 +45,8 @@ class RoundReportTests(unittest.TestCase):
                 self.assertEqual({pair["group"] for pair in pairs}, {"local", "similar", "regression"})
                 self.assertEqual(len(pairs), 9)
                 self.assertEqual(pairs[0]["baseline"]["execution"]["output"], {"answer": -999})
+                responses = [event for event in pairs[0]["candidate"]["execution"]["trace"] if event["kind"] == "model_response"]
+                self.assertEqual(responses[-1]["result"]["content"], '{"answer":-999}')
                 self.assertIsNotNone(pairs[0]["input"])
             second = json.loads(paths[1].read_text(encoding="utf-8"))
             self.assertEqual(second["input_to_evolver"]["history"][0]["round"], 1)
@@ -52,6 +54,9 @@ class RoundReportTests(unittest.TestCase):
             text_report = (root / "evolution.txt").read_text(encoding="utf-8")
             self.assertIn(str(paths[0]), text_report)
             self.assertNotIn("报告异常", text_report)
+            self.assertIn("旧版分 → 候选分", text_report)
+            for detail in ('{"answer":-999}', "变化或失败证据：", "末次响应事件", "旧版输出：", "候选输出：", "最终解析输出："):
+                self.assertNotIn(detail, text_report)
 
     def test_multiple_candidates_keep_acceptance_selection_commit_and_reuse_distinct(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -120,6 +125,9 @@ class RoundReportTests(unittest.TestCase):
                 for key in ("candidates", "routing", "input_to_evolver", "run_result", "status"):
                     self.assertEqual(old.get(key), new.get(key))
             self.assertEqual(events_path.read_bytes(), original_events)
+            text_report = (root / "evolution.txt").read_text(encoding="utf-8")
+            self.assertNotIn('{"answer":-999}', text_report)
+            self.assertNotIn("变化或失败证据：", text_report)
 
     def test_repeated_tasks_use_separate_time_folders_and_no_evolution_creates_none(self):
         with tempfile.TemporaryDirectory() as directory:

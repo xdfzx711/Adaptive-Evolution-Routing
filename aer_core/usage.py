@@ -11,7 +11,7 @@ def sum_usage(reports) -> ResourceUsage:
     incoming, outgoing = tokens("input_tokens"), tokens("output_tokens")
     return ResourceUsage(input_tokens=incoming, output_tokens=outgoing,
         total_tokens=None if incoming is None or outgoing is None else incoming + outgoing,
-        model_calls=sum(item.model_calls for item in reports), tool_calls=sum(item.tool_calls for item in reports),
+        model_calls=tokens("model_calls"), tool_calls=sum(item.tool_calls for item in reports),
         elapsed_seconds=sum(item.elapsed_seconds for item in reports),
         usage_complete=all(item.usage_complete for item in reports),
         usage_sources=list(dict.fromkeys(source for item in reports for source in item.usage_sources)),

@@ -57,7 +57,6 @@ class EvolutionTextReport:
         self.candidate_names = {}
         self.sources = {}
         self.readable_sources = {}
-        self.seen_executions = {}
         self.costs = {"任务执行": [], "诊断": [], "生成（含路由）": [], "配对验证": []}
         self.round_rows = {}
         self.attempt_rounds = {}
@@ -103,7 +102,7 @@ class EvolutionTextReport:
             f"最大进化轮数：{config.limits.max_evolution_rounds}；单次输出上限：{context.max_output_tokens}",
             f"接受阈值：独立验证分提升至少 {config.validation.min_improvement}；回归分最大下降 {config.validation.max_regression_drop}",
             "总资源预算：当前 MVP 未强制执行；下文记录实际消耗。",
-            "报告中的系统评测证据与当轮实际提供给 Evolver 的反馈分开列出。",
+            "本报告展示进化决策与评测汇总；执行轨迹、输出和原始模型响应见对应详细记录。",
             "公开任务输入（完整，仅在此展示一次）：", json.dumps(task.model_dump(mode="json"), ensure_ascii=False, indent=2)])
         self.block("初始稳定版本 V0", ["初始组件内容（原始记录路径就地列出）："])
         for name, ref in snapshot.artifacts.items():
@@ -153,44 +152,14 @@ class EvolutionTextReport:
 
     def execution(self, scored, title, source):
         execution = scored.execution
-        if execution and execution.operation_id in self.seen_executions:
-            self.block(title, [f"复用已展示执行：{self.seen_executions[execution.operation_id]}；得分：{score(scored)}"])
-            return
         lines = [f"版本：{self.version_names.get(scored.version_id, '未命名版本')}；seed：{scored.seed}",
             f"得分：{score(scored)}；终止：{termination(scored)}；完整记录：{source}"]
-        if execution:
-            lines.append(f"实际使用步数：{execution.state_summary.get('model_steps', '未记录')}；"
-                         f"本次有效步数上限：{execution.state_summary.get('effective_max_steps', '未记录')}")
-            self.seen_executions[execution.operation_id] = title
-            events = [plain(event) for event in execution.trajectory]
-            results = {event["payload"].get("call_id"): event["payload"] for event in events if event["kind"] == "tool_result"}
-            model_step = 0
-            for event in events:
-                data, seq = event["payload"], event["seq"]
-                timestamp = moment(datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))) if event.get("timestamp") else "时间未记录"
-                if event["kind"] == "model_response":
-                    model_step += 1
-                    if data.get("tool_calls"):
-                        action = "请求工具 " + ", ".join(call["name"] for call in data["tool_calls"])
-                    else:
-                        action = "返回最终响应" if execution.output else "返回文本响应"
-                    lines.append(f"  {timestamp} | 模型步骤 {model_step} | 事件 {seq} | {action}；finish_reason={data.get('finish_reason', '未记录')}")
-                    if data.get("content") and (not data.get("tool_calls") or str(data.get("finish_reason")) == "length"):
-                        lines.append("    响应：" + excerpt(data["content"], 700))
-                elif event["kind"] == "tool_call":
-                    result = results.get(data.get("call_id"))
-                    returned = compact(result.get("output", {})) if result else "未记录返回"
-                    if result and result.get("error"):
-                        returned = f"{result['error']['code']}：{result['error']['message']}"
-                    lines.append(f"  事件 {seq} | {data.get('name')} {compact(data.get('arguments', {}))} → {excerpt(returned, 500)}")
-                elif event["kind"] in {"step_limit", "output_parse_error", "execution_error"}:
-                    lines.append(f"  事件 {seq} | {event['kind']} | {excerpt(compact(data), 500)}")
-            lines += ["最终解析输出：", json.dumps(execution.model_dump(mode="json")["output"], ensure_ascii=False, indent=2)]
+        if execution and execution.state_summary.get("execution_model"):
+            lines.append("执行模型：" + execution.state_summary["execution_model"])
         if scored.error:
             lines.append(f"执行/评分异常：{scored.error.code}；{scored.error.message}")
-        lines.append("原始执行成本：" + self.usage_line(scored.usage))
         if scored.cache_hit:
-            lines.append("复用已保存结果；本次新增成本：" + self.usage_line(scored.charged_usage))
+            lines.append("复用已保存结果。")
         self.block(title, lines)
 
     def proposal(self, value, ref):
@@ -209,14 +178,11 @@ class EvolutionTextReport:
             f"Operator：{value.operator_id or '未选择'}；生成状态：{value.response.status.value if value.response else value.status}"])
         receipt = routing_record(value, self.artifacts)
         if receipt is not None:
-            lines = []
-            for message in receipt.request.messages:
-                lines += [f"[{message.role}]", message.content or ""]
-            lines += ["模型原始响应：", receipt.response.content or "[无文本响应]" if receipt.response else "[调用失败，无响应]",
-                      "路由调用成本：" + self.usage_line(receipt.usage)]
+            lines = ["完整提示词与原始响应：" + proposal_source + " / routing.model_call",
+                     "路由调用成本：" + self.usage_line(receipt.usage)]
             if receipt.error:
                 lines.append("路由异常：" + receipt.error.message)
-            self.block("Router 实际收到的提示词与返回结果（完整正文）", lines)
+            self.block("Router 调用摘要", lines)
         if context:
             context_label = self.source(f"第 {value.round_id} 轮实际进化上下文", attempt.pre_state_ref, when=attempt.started_at)
             lines = [f"原始过滤上下文：{context_label}", "任务公开输入：同本报告开头；执行证据：本轮稳定版本最近一次执行。",
@@ -231,7 +197,7 @@ class EvolutionTextReport:
                         f"accepted={candidate.accepted}；selected={candidate.selected}；committed={candidate.committed}；原因={candidate.reason}")
             if not context.history:
                 lines.append("  无")
-            lines.append("其余轨迹正文见已展示执行；过滤后的完整输入见本节上下文路径，未把私有验证轨迹补入此视图。")
+            lines.append("过滤后的完整输入与执行轨迹见本节上下文路径。")
             self.block("Evolver 实际收到的反馈", lines)
         if attempt:
             self.costs["生成（含路由）"].append(attempt.usage)
@@ -274,14 +240,6 @@ class EvolutionTextReport:
                     old, new = pair.baseline, pair.candidate
                     delta = f"{new.evaluation.score - old.evaluation.score:+.3f}" if old.evaluation and new.evaluation else "未知"
                     self.write(f"{pair.group} | {old.task.task_id} | {score(old)} → {score(new)} | {delta} | {termination(new)} | {new.seed} | {'命中' if pair.baseline_cached else '未命中'} | {'命中' if pair.candidate_cached else '未命中'}\n")
-                for pair, label in pairs:
-                    if pair.group == "local":
-                        self.execution(pair.baseline, f"{alias} 当前任务：旧版执行", label + " / baseline")
-                        self.execution(pair.candidate, f"{alias} 当前任务：候选执行", label + " / candidate")
-                    elif (not pair.baseline.complete or not pair.candidate.complete or
-                          not pair.candidate.evaluation.success or
-                          pair.baseline.evaluation.score != pair.candidate.evaluation.score):
-                        self.failure_evidence(pair, alias, label)
                 lines = [f"状态：{report.status.value}；完整批次：{batch_label}"]
                 if report.baseline_metrics and report.candidate_metrics:
                     old, new = report.baseline_metrics, report.candidate_metrics
@@ -298,25 +256,6 @@ class EvolutionTextReport:
             self.round_rows[outcome.candidate_id] = (f"{alias}：{outcome.status.value}；收益={acceptance.reward if acceptance else '未知'}；"
                 f"选中={outcome.selected}；实际提交=False")
 
-    def failure_evidence(self, pair, alias, label):
-        lines = [f"旧版：{score(pair.baseline)} / {termination(pair.baseline)}；候选：{score(pair.candidate)} / {termination(pair.candidate)}"]
-        for side, scored in (("旧版", pair.baseline), ("候选", pair.candidate)):
-            execution = scored.execution
-            lines.append(side + "输出：" + (excerpt(compact(execution.model_dump(mode="json")["output"]), 500) if execution else "无"))
-            if execution:
-                responses = [plain(event) for event in execution.trajectory if event.kind == "model_response"]
-                if responses and (not scored.evaluation or not scored.evaluation.success):
-                    last = responses[-1]
-                    lines.append(f"{side}末次响应事件 {last['seq']}；finish_reason={last['payload'].get('finish_reason')}：" + excerpt(last["payload"].get("content") or "[工具调用，尚无文本输出]", 500))
-                for event in execution.trajectory:
-                    if event.kind == "tool_result" and event.payload.get("error"):
-                        data = plain(event)["payload"]["error"]
-                        lines.append(f"{side}工具异常事件 {event.seq}：{data.get('code')}；{excerpt(data.get('message'), 220)}")
-            if scored.error:
-                lines.append(f"{side}异常：{scored.error.code}；{scored.error.message}")
-        lines.append("完整执行轨迹：" + label + " / " + pair.baseline.task.task_id)
-        self.block(f"{alias} 变化或失败证据：{pair.baseline.task.task_id}", lines)
-
     def commit(self, outcome):
         alias = self.candidate_names.get(outcome.candidate_id, "未记录候选")
         if outcome.committed:
@@ -332,7 +271,7 @@ class EvolutionTextReport:
 
     @staticmethod
     def usage_line(usage):
-        return (f"tokens={usage.total_tokens if usage.total_tokens is not None else '未知'}；模型调用={usage.model_calls}；"
+        return (f"tokens={usage.total_tokens if usage.total_tokens is not None else '未知'}；模型调用={usage.model_calls if usage.model_calls is not None else '未知'}；"
             f"工具调用={usage.tool_calls}；耗时={usage.elapsed_seconds:.2f}s；usage={'完整' if usage.usage_complete else '不完整'}")
 
     def finish(self, result, ref):
@@ -352,7 +291,6 @@ class EvolutionTextReport:
             f"最终稳定版本：{self.version_names.get(result.final_stable_version_id, '见本节完整结果记录')}",
             f"最终评分状态：{result.final_evaluation_status}；当前任务成功：{result.final_evaluation.success if result.final_evaluation else '未评测'}",
             f"最终得分：{result.final_evaluation.score if result.final_evaluation else '未评测'}",
-            "最终输出：" + (compact(result.final_execution.model_dump(mode="json")["output"]) if result.final_execution else "无本版本的有效评分输出"),
             f"稳定版本{'已更新' if result.initial_version_id != result.final_stable_version_id else '未更新'}",
             f"停止原因：{result.stop_reason.value}；阶段：{result.stop_stage.value}",
             f"异常：{result.error.message if result.error else '无'}"])
@@ -376,8 +314,7 @@ class EvolutionTextReport:
             self.block("提交后任务结果（复用候选验证）", [
                 f"稳定版本：{self.version_names.get(value.version_id, '未命名版本')}；得分：{score(value)}",
                 "结果来源：候选在当前任务上的执行与评分；提交后未再次执行或评分。",
-                "输出：" + compact(value.execution.model_dump(mode="json")["output"]),
-                "本次新增成本：" + self.usage_line(value.charged_usage)])
+                "本次新增成本：0（复用候选验证结果）。"])
         elif kind == "diagnosis":
             self.diagnosis(value)
         elif kind == "evolution_proposal":

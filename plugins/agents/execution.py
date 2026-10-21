@@ -43,7 +43,7 @@ class SessionRecord:
                 complete = complete and report.usage_complete
         return ResourceUsage(input_tokens=input_tokens, output_tokens=output_tokens,
             total_tokens=None if input_tokens is None or output_tokens is None else input_tokens + output_tokens,
-            model_calls=sum(report.model_calls for report in self.reports),
+            model_calls=tokens("model_calls"),
             tool_calls=sum(report.tool_calls for report in self.reports), elapsed_seconds=monotonic() - self.start,
             usage_complete=complete and "unknown" not in sources and not pending,
             usage_sources=sources, pending_reservations=pending)

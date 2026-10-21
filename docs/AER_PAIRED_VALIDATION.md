@@ -26,7 +26,7 @@ EvolutionCandidate.artifact_updates 是非空的工件更新映射，key 与引�
 
 VersionStore.materialize 将更新合并到父 Snapshot 的 artifacts 中，保留其余工件、Agent ID 和运行配置，持久化新版本后填写 candidate_version_id。候选工件与父版本必须有效；执行层检查目标和更新工件是否在 Agent 能力及配置允许范围内。
 
-实际 ReAct Agent 支持 Prompt 与 execution_limits，SingleCall Agent 支持 Prompt；这些约束属于插件能力。步数通过 execution_limits 工件进化，Snapshot.config 保持原样，Agent 从传入 Snapshot 读取有效值。Memory 等后续工件也可复用构造与验证机制。修改模型客户端等非工件状态，需要相应组件的状态与装配契约。
+ReAct 与 SingleCall Agent 支持 Prompt；Codex CLI Agent 支持 Prompt 与 model。这些约束属于插件能力。模型选择保存在 model 工件中，Snapshot.config 保持原样；Codex 每次从传入 Snapshot 读取模型并映射为 --model。候选验证只改变声明的工件，其他执行条件共享。CLI 不支持显式采样 seed 时如实记录，不能将配对种子视作确定性保证。
 
 ## 执行与配对
 

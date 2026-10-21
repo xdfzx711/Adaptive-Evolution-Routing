@@ -46,7 +46,7 @@ independent 只使用同 run、同 episode、同任务的已完成较早轮次�
 
 ## 可行目标与路由
 
-TargetRegistry 同时检查配置允许目标、Agent 支持目标、独立会话能力、已装配的配置 Operator、Agent/Operator 兼容性、Agent 支持的工件类型，以及 Snapshot 中所需工件。返回可行集合与每个目标的可用性原因；当前真实目标包括 prompt 和 execution_limits，后者仅适配 ReAct。Qwen 模型路由与步数进化见 [扩展说明](AER_LLM_ROUTING.md)。
+TargetRegistry 同时检查配置允许目标、Agent 支持目标、独立会话能力、已装配 Operator、Agent/Operator 兼容性、Agent 支持的工件类型，以及 Snapshot 中所需工件。插件可通过 is_applicable(snapshot) 排除当前没有可执行变化的目标。当前真实目标包括 prompt 和 model，后者适配 Codex CLI，见 [接入说明](AER_CODEX_AGENT.md)。
 
 OperatorResolver 根据 targets.default_operators 的精确映射选择实例，找不到或能力不匹配时报错，不自动替换。Fixed Router 只选配置目标；Manual Router 按 EvolutionContext.round_id 取人工计划，目标必须可行。两者输出 EvolutionDecision，不指定 Operator。
 

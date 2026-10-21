@@ -11,7 +11,7 @@ from aer_core.schemas.diagnosis import DiagnosisRecord
 from aer_core.schemas.execution import Diagnosis, DiagnosisStatement
 from aer_core.schemas.providers import ModelMessage, ModelRequest, ModelResponse
 from plugins.agents.execution import SessionRecord
-from plugins.agents.react import parse_final
+from plugins.json_output import parse_final
 from .lightweight import LightweightDiagnoser
 
 

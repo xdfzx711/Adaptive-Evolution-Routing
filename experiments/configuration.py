@@ -9,6 +9,8 @@ from .environment import resolve_model
 
 
 def load_experiment_config(
-    path: str | Path, *, benchmark_index: str | Path | None = None
+    path: str | Path | LoadedConfig, *, benchmark_index: str | Path | None = None,
+    overrides: tuple[str, ...] | list[str] = (),
 ) -> LoadedConfig:
-    return resolve_model(load_config(path, catalog=create_registry().configuration_catalog(v0_1_catalog()), benchmark_index=benchmark_index))
+    return resolve_model(load_config(path, catalog=create_registry().configuration_catalog(v0_1_catalog()),
+        benchmark_index=benchmark_index, overrides=overrides))

@@ -2,7 +2,7 @@
 
 状态：开发步骤 1 的设计基线；日期：2026-10-13。
 
-2026-10-16 扩展：新增 Qwen 驱动的 `llm_router`、`llm` 运行模式和 `execution_limits` 步数进化目标。实现及调用日志见 [Qwen 路由与执行步数进化](AER_LLM_ROUTING.md)。验证、接受和提交语义沿用原有规则。
+2026-10-20 扩展：新增 `codex_cli_agent`，由 Snapshot 的 prompt/model 工件控制执行指令与模型，Qwen 继续负责诊断、路由和进化。步数进化组件已移除。接入与命令行说明见 [Codex CLI Agent](AER_CODEX_AGENT.md)。验证、接受和提交语义沿用原有规则。
 
 本文落实 `AER_MVP.md` 的首版范围。两份文档有冲突时，v0.1 的配置字段、轮数、反馈权限和接受规则以本文为准。修改实验策略时更新策略版本和运行 manifest；不把策略阈值写入 Orchestrator。
 
@@ -17,7 +17,7 @@
 | Agent | `react_agent`；`single_call_agent` 作为第二个最小 Agent，单次模型调用、不使用工具 | 第三方 Agent、Code Agent、多 Agent |
 | 模型与工具 | 注入 ModelProvider、ToolProvider；`scripted_model` 用于工程验收，`qwen_model` 接入真实 API，工具由 `deterministic_tools` 提供 | 更多模型 Provider 与正式实验 |
 | Router | `fixed_router`、`manual_router`、`llm_router`；只决定 target | 学习型 Router |
-| Evolver | `simple_prompt_evolver` 产生 Prompt；`step_limit_evolver` 产生步数工件；每轮候选数由配置限制 | Memory、Tool、Code 等 Evolver |
+| Evolver | `simple_prompt_evolver` 产生 Prompt；`model_selection_evolver` 产生执行模型工件；每轮候选数由配置限制 | Memory、Tool、Code 等 Evolver |
 | Benchmark | `toy_tasks`，公开任务输入与私有评分规格分离 | 正式 Benchmark Adapter |
 | Evaluator | `deterministic_evaluator`；根据评分规格输出标准化分数与成功标记 | 更多任务评分方法 |
 | Diagnoser | `lightweight_diagnoser`；基于可见轨迹和反馈生成标签与证据，不选择 target | 模型诊断 |
@@ -26,7 +26,7 @@
 | 存储 | `local_files`、`local_manifest`、`jsonl` | 数据库、远程对象存储 |
 | Runner | `aer`；支持四种模式，同步执行 | External Baseline Runner |
 
-当前可执行目标是小写 `prompt` 和 `execution_limits`，后者仅支持 ReAct。目标由 Agent 与 Evolver 的插件能力及当前工件共同约束，不在核心配置中固定目标名称。Agent 可以具有不同内部执行方式，但都须支持从 Snapshot 重建独立会话、标准结果与成本输出。
+当前可执行目标是小写 `prompt` 和 `model`，后者适配 Codex CLI。目标由 Agent 与 Evolver 的插件能力及当前工件共同约束，不在核心配置中固定目标名称。Agent 可以具有不同内部执行方式，但都须支持从 Snapshot 重建独立会话、标准结果与成本输出。
 
 `single_call_agent` 用于验证替换能力，不要求与 ReAct Agent 有相同表现。`scripted_model` 的固定响应和模拟成本只用于工程路径验收，不用于宣称进化或路由的研究收益。两个目标与 Qwen 路由已具备状态选择的执行路径，决策质量需要后续实验评估。
 

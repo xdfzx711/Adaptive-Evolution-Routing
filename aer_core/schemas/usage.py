@@ -52,7 +52,8 @@ class ResourceUsage(DomainModel):
     input_tokens: NonNegativeInt | None
     output_tokens: NonNegativeInt | None
     total_tokens: NonNegativeInt | None
-    model_calls: NonNegativeInt
+    # External runtimes can report exact tokens without exposing request counts.
+    model_calls: NonNegativeInt | None
     tool_calls: NonNegativeInt
     elapsed_seconds: NonNegativeFloat
     usage_complete: bool

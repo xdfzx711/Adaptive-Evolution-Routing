@@ -58,6 +58,11 @@ def validate_semantics(config: ExperimentConfig, catalog: ConfigCatalog) -> list
         require(config.validation.split in benchmark.splits, "validation.split", "split is not declared by the Benchmark")
     if policy:
         require(config.validation.policy_version in policy.policy_versions, "validation.policy_version", f"supported policy versions: {', '.join(policy.policy_versions)}")
+    if agent and agent.config_model:
+        try:
+            agent.config_model.model_validate(config.agent.model_dump(mode="json"))
+        except ValidationError as error:
+            issues.extend(schema_issues(error, "agent"))
     if model and model.config_model:
         try:
             model.config_model.model_validate(config.providers.model.config)

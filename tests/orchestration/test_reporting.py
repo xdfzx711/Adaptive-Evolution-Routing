@@ -165,16 +165,23 @@ class ReportingTests(unittest.TestCase):
                 self.assertIn("实际提交数：0", text)
                 self.assertNotIn("报告异常", text)
 
-    def test_tool_actions_and_step_limit_are_visible_without_full_model_requests(self):
+    def test_execution_details_stay_in_saved_records_while_summary_keeps_score_and_reason(self):
         with tempfile.TemporaryDirectory() as directory:
             _, startup = configured(Path(directory), mode="disabled")
             task = startup.prepare_task("dev-001")
             result = task.run()
             text = (startup.execution.storage.run_root / "evolution.txt").read_text(encoding="utf-8")
             self.assertIn("calculator", text)
-            self.assertIn('"value":75', text)
+            self.assertIn("得分：", text)
+            self.assertIn("完整记录：", text)
             self.assertIn("step_limit", text)
-            self.assertNotIn('"messages":', text)
+            for detail in ('"value":75', '"messages":', "最终解析输出：", "最终输出：", "原始执行成本：", " | 事件 "):
+                self.assertNotIn(detail, text)
+            tool_results = [event for event in result.final_execution.trajectory if event.kind == "tool_result"]
+            self.assertEqual(tool_results[0].payload["output"]["value"], 75)
+            finished = next(event for event in task.execution.storage.experience_store.events() if isinstance(event, TaskFinishedEvent))
+            saved = RunResult.model_validate_json(task.execution.storage.artifact_store.get(finished.payload.result_ref))
+            self.assertEqual(saved.final_execution.trajectory, result.final_execution.trajectory)
             self.assertEqual(result.evolution_rounds_used, 0)
 
     def test_offline_export_preserves_all_episodes_in_execution_order(self):

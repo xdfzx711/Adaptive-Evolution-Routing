@@ -16,6 +16,6 @@ def context_builder(execution, task):
         metadata_fields=declaration.metadata_fields, allow_evolution=declaration.allow_evolution,
         reason_messages=declaration.reason_messages, artifact_kinds=capabilities.supported_artifact_kinds,
         state_fields=capabilities.feedback_state_fields, snapshot_config_fields=capabilities.feedback_config_fields,
-        tool_arguments={tool.name: tool.feedback_arguments for tool in specs},
-        tool_outputs={tool.name: tool.feedback_outputs for tool in specs})
+        tool_arguments={**dict(capabilities.feedback_tool_arguments), **{tool.name: tool.feedback_arguments for tool in specs}},
+        tool_outputs={**dict(capabilities.feedback_tool_outputs), **{tool.name: tool.feedback_outputs for tool in specs}})
     return ContextBuilder(execution.storage.experience_store, policy)

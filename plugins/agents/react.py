@@ -4,13 +4,13 @@ import json
 from dataclasses import replace
 from time import monotonic
 
-from pydantic import TypeAdapter
+from pydantic import model_validator
 
 from aer_core.config.models import AgentSettings, ModelProviderSettings, ToolProviderSettings
 from aer_core.contracts.providers import ModelProvider, ToolProvider
 from aer_core.contracts.storage import ArtifactStore
 from aer_core.errors import AERError, BudgetExceeded, ContractError, ExecutionError, OperationTimeout, UnsupportedCapability
-from aer_core.schemas.base import DomainModel, JsonObject, PositiveInt
+from aer_core.schemas.base import DomainModel, PositiveInt
 from aer_core.schemas.evolution import AgentCapabilities
 from aer_core.schemas.execution import ExecutionResult
 from aer_core.schemas.providers import ModelMessage, ModelRequest, ModelResponse, ToolResult
@@ -19,7 +19,7 @@ from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.task import TaskView
 
 from .execution import SessionRecord
-from .limits import ExecutionLimits
+from plugins.json_output import parse_final
 
 
 def snapshot_config(config):
@@ -29,8 +29,6 @@ def snapshot_config(config):
 
 def initial_artifacts(config):
     components = {"prompt": config.agent.initial_prompt.encode("utf-8")}
-    if config.agent.plugin == "react_agent":
-        components["execution_limits"] = ExecutionLimits(max_steps=config.agent.max_steps).model_dump_json().encode("utf-8")
     return components
 
 
@@ -40,25 +38,14 @@ class ControlledConfig(DomainModel):
     tools: ToolProviderSettings
 
 
-def parse_final(content: str | None) -> dict:
-    def pairs(items):
-        data = {}
-        for key, value in items:
-            if key in data:
-                raise ValueError(f"duplicate output key: {key}")
-            data[key] = value
-        return data
-
-    def invalid(value):
-        raise ValueError(f"nonfinite output number: {value}")
-
-    if content is None:
-        raise ValueError("final response has no content")
-    data = json.loads(content, object_pairs_hook=pairs, parse_constant=invalid)
-    if not isinstance(data, dict):
-        raise ValueError("final response must be a JSON object")
-    TypeAdapter(JsonObject).validate_python(data)
-    return data
+class LocalAgentSettings(AgentSettings):
+    @model_validator(mode="after")
+    def require_limit(self):
+        if self.max_steps is None:
+            raise ValueError("this Agent requires max_steps")
+        if self.config:
+            raise ValueError("this Agent has no plugin-specific config")
+        return self
 
 
 class ReActAgent:
@@ -96,23 +83,12 @@ class ReActAgent:
             raise UnsupportedCapability("single_call_agent requires max_steps=1", stage="setup", plugin_id=self.plugin_id)
         if "prompt" not in snapshot.artifacts or snapshot.artifacts["prompt"].kind != "prompt":
             raise UnsupportedCapability("Snapshot must contain a prompt artifact", stage="setup", plugin_id=self.plugin_id)
-        if "execution_limits" in snapshot.artifacts:
-            if not self.uses_tools or snapshot.artifacts["execution_limits"].kind != "execution_limits":
-                raise UnsupportedCapability("Agent does not support this execution limits artifact", stage="setup", plugin_id=self.plugin_id)
-            self._step_limit(snapshot, controlled)
+        if set(snapshot.artifacts) - set(self.capabilities().supported_artifact_kinds):
+            raise UnsupportedCapability("Snapshot contains unsupported Agent components", stage="setup", plugin_id=self.plugin_id)
         return controlled
 
-    def _step_limit(self, snapshot, controlled):
-        ref = snapshot.artifacts.get("execution_limits")
-        if ref is None:
-            return controlled.max_steps
-        try:
-            return ExecutionLimits.model_validate_json(self.artifacts.get(ref)).max_steps
-        except ValueError as failure:
-            raise UnsupportedCapability("Invalid execution_limits artifact", stage="setup", plugin_id=self.plugin_id) from failure
-
     def capabilities(self) -> AgentCapabilities:
-        kinds = ["prompt", "execution_limits"] if self.uses_tools else ["prompt"]
+        kinds = ["prompt"]
         return AgentCapabilities(supported_targets=kinds, supported_artifact_kinds=kinds,
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "model_steps", "effective_max_steps", "termination_reason", "fresh_session"])
@@ -135,7 +111,7 @@ class ReActAgent:
 
     def run(self, task: TaskView, snapshot: AgentSnapshot, run_ctx: RunContext) -> ExecutionResult:
         controlled = self._validate_snapshot(snapshot)
-        max_steps = self._step_limit(snapshot, controlled)
+        max_steps = controlled.max_steps
         record = SessionRecord()
         output = {}
         steps = 0

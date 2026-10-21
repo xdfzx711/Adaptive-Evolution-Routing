@@ -72,15 +72,37 @@ def _resolve(path: str | Path, source: Path, field: str, base: Path | None = Non
 
 
 def load_config(
-    path: str | Path, *, catalog: ConfigCatalog, benchmark_index: str | Path | None = None
+    path: str | Path | LoadedConfig, *, catalog: ConfigCatalog, benchmark_index: str | Path | None = None,
+    overrides: tuple[str, ...] | list[str] = (),
 ) -> LoadedConfig:
-    source = _resolve(path, Path(path), "$file")
-    try:
-        data = yaml.load(source.read_text(encoding="utf-8-sig"), Loader=_UniqueKeyLoader)
-    except (OSError, UnicodeError, yaml.YAMLError) as error:
-        raise ConfigError(source, [ConfigIssue("$file", str(error))]) from error
+    existing = path if isinstance(path, LoadedConfig) else None
+    source = existing.source_path if existing else _resolve(path, Path(path), "$file")
+    if existing:
+        data = existing.config.model_dump(mode="json")
+        benchmark_index = benchmark_index or existing.benchmark_index_path
+    else:
+        try:
+            data = yaml.load(source.read_text(encoding="utf-8-sig"), Loader=_UniqueKeyLoader)
+        except (OSError, UnicodeError, yaml.YAMLError) as error:
+            raise ConfigError(source, [ConfigIssue("$file", str(error))]) from error
     if not isinstance(data, dict):
         raise ConfigError(source, [ConfigIssue("$", "YAML document must be a non-empty mapping")])
+    for override in overrides:
+        key, separator, raw = override.partition("=")
+        parts = key.split(".")
+        if not separator or any(not part for part in parts):
+            raise ConfigError(source, [ConfigIssue("--set", "expected dotted.path=YAML_VALUE")])
+        target = data
+        for part in parts[:-1]:
+            if part not in target:
+                target[part] = {}
+            if not isinstance(target[part], dict):
+                raise ConfigError(source, [ConfigIssue(key, "override traverses a non-mapping field")])
+            target = target[part]
+        try:
+            target[parts[-1]] = yaml.load(raw, Loader=_UniqueKeyLoader)
+        except yaml.YAMLError as error:
+            raise ConfigError(source, [ConfigIssue(key, f"invalid override value: {error}")]) from error
     try:
         config = ExperimentConfig.model_validate(data)
     except ValidationError as error:

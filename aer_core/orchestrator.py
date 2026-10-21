@@ -120,7 +120,7 @@ class Orchestrator:
             self._notify("异常", f"{error.stage.value} / {error.code}：{error.message}")
         usage = result.usage
         self._notify("成本", f"tokens={usage.total_tokens if usage.total_tokens is not None else '未知'}；"
-            f"模型调用={usage.model_calls}；工具调用={usage.tool_calls}；耗时={usage.elapsed_seconds:.1f}s；"
+            f"模型调用={usage.model_calls if usage.model_calls is not None else '未知'}；工具调用={usage.tool_calls}；耗时={usage.elapsed_seconds:.1f}s；"
             f"usage={'完整' if usage.usage_complete else '不完整'}")
         return result
 

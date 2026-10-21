@@ -16,6 +16,7 @@ def validation_conditions(execution):
         "benchmark_plugin_configs": {item.binding_name: item.model_dump(mode="json")["resolved_config"]
                                      for item in benchmark.built_plugins.manifest.instances},
         "model_runtime": model.runtime_info() if callable(getattr(model, "runtime_info", None)) else None,
+        "agent_runtime": execution.agent.runtime_info() if callable(getattr(execution.agent, "runtime_info", None)) else None,
         "model_endpoint": getattr(getattr(model, "credentials", None), "base_url", None),
         "model_timeout_seconds": config.limits.model_call_timeout_seconds,
         "tool_timeout_seconds": config.limits.tool_call_timeout_seconds,

@@ -192,7 +192,9 @@ class RegistryManagerTests(unittest.TestCase):
     def test_registered_declarations_are_derived_from_metadata(self):
         registry = create_registry()
         catalog = registry.configuration_catalog()
-        self.assertEqual(len(catalog.declarations), 26)
+        self.assertEqual({(item.category, item.plugin_id) for item in catalog.declarations},
+                         {(item.metadata.category, item.metadata.id) for item in registry.descriptors()})
+        self.assertEqual(catalog.get("agent", "codex_cli_agent").targets, ("prompt", "model"))
         self.assertEqual(catalog.get("router", "mock_router_b").routing_modes, ("fixed", "manual"))
         self.assertEqual(catalog.get("evolution", "mock_prompt_evolver_a").compatible_agents, ("mock_agent_a", "mock_agent_b"))
         with self.assertRaises(DuplicatePluginError):

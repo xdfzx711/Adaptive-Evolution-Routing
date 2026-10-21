@@ -21,6 +21,8 @@ class AgentCapabilities(DomainModel):
     snapshot_scope: Identifier
     feedback_state_fields: Items[Identifier] = ("agent_plugin", "model_steps", "termination_reason", "fresh_session")
     feedback_config_fields: Items[Identifier] = ("max_steps",)
+    feedback_tool_arguments: ReadOnlyMap[Items[str]] = Field(default_factory=dict)
+    feedback_tool_outputs: ReadOnlyMap[Items[str]] = Field(default_factory=dict)
 
 
 class EvolutionCapabilities(DomainModel):

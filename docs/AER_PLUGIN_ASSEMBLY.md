@@ -29,7 +29,7 @@
 
 原始三份 v0.1 YAML 均已可装配真实组件。Fixed/Manual Router 和 Prompt Evolver 通过显式工厂构建；execute-task 只构建执行与评估依赖，propose-prompt 另外构建路由与生成依赖。
 
-新增 `llm_router` 与 `step_limit_evolver`，仍通过相同 Registry/Manager 装配。Router 声明 ModelProvider 与 ArtifactStore 依赖；步数 Evolver 只依赖 ArtifactStore。`targets.operator_configs` 透传并校验各 Operator 参数。Agent 可注册 `initial_artifacts(config) -> dict[str, bytes]` 回调，供启动层创建初始工件；未注册时兼容旧 Prompt 初始化。`snapshot_config` 继续描述冻结配置，实际可进化的步数保存在独立工件中。详见 [Qwen 路由与执行步数进化](AER_LLM_ROUTING.md)。
+`llm_router`、`model_selection_evolver` 和 `codex_cli_agent` 通过相同 Registry/Manager 装配。Codex Agent 不依赖框架 ModelProvider；诊断、路由和 Evolver 继续注入其 Provider。`targets.operator_configs` 透传并校验 Operator 参数。Agent 注册 initial_artifacts 与 snapshot_config 回调，分别创建初始工件与冻结运行配置。Agent 插件配置也在加载时检查；通用 CLI --set 覆盖发生在所有校验之前。详见 [Codex CLI Agent](AER_CODEX_AGENT.md)。
 
 Mock 示例使用明确的 mock_* 名称。默认 Registry 注册六个 Mock、三个本地存储、三个 Benchmark/评分（toy_tasks、hard_local、确定性评分器）、六个执行层工厂、三个路由/进化工厂和两个验证/接受工厂，共 23 个。validate-proposal 通过 experiments.validation 装配 Harness、接受策略和评估侧依赖。配置 catalog 由声明与注册元数据合并生成。validate-config 不创建运行插件实例。Qwen 凭据由启动层读取 .env 并作为 runtime-only 依赖注入，见 [Qwen 接入](AER_QWEN_PROVIDER.md)。
 
