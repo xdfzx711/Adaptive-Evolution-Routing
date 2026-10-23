@@ -11,6 +11,7 @@ PluginCategory = Literal[
     "agent", "router", "evolution", "model_provider", "tool_provider",
     "benchmark", "evaluator", "diagnoser", "validation", "acceptance_policy",
     "artifact_store", "version_store", "experience_store", "runner",
+    "workspace_provider", "result_collector",
 ]
 
 

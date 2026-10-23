@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from aer_core.config.models import AgentSettings, NonBlank, NonNegativeInt, PositiveFloat, Settings
+from aer_core.config.models import AgentSettings, ComponentSettings, NonBlank, NonNegativeInt, PositiveFloat, Settings
 from aer_core.errors import ExecutionError, PluginConfigurationError, UnsupportedCapability
 from aer_core.identifiers import timestamp_id
 from aer_core.schemas.evolution import AgentCapabilities
@@ -24,6 +24,10 @@ from aer_core.schemas.usage import ResourceUsage
 from plugins.agents.execution import SessionRecord
 from plugins.agents.model_selection import ModelId, ModelSelection, SUPPORTED_MODELS
 from plugins.agents.output import PublicJsonOutput
+from plugins.workspace.local import EmptyWorkspace
+from plugins.workspace.collectors import JsonResultCollector
+from plugins.agents.codex_runtime import native_tools, task_environment, error_message
+from plugins.agents.codex_process import capture_cli
 
 
 class CodexConfig(Settings):
@@ -36,6 +40,8 @@ class CodexConfig(Settings):
     ignore_user_config: bool = True
     windows_sandbox: Literal["mxc", "elevated"] = "mxc"
     startup_retries: NonNegativeInt = 2
+    workspace: ComponentSettings = Field(default_factory=lambda: ComponentSettings(plugin="empty_workspace"))
+    collector: ComponentSettings = Field(default_factory=lambda: ComponentSettings(plugin="json_result_collector"))
 
     @model_validator(mode="after")
     def valid_catalog(self):
@@ -126,16 +132,23 @@ def retryable_startup_failure(stdout, stderr):
 class CodexCliAgent:
     plugin_id = "codex_cli_agent"
 
-    def __init__(self, config, initial_snapshot, artifacts, output_adapter=None):
+    def __init__(self, config, initial_snapshot, artifacts, output_adapter=None, *, workspace_provider=None, result_collector=None):
         if config.plugin != self.plugin_id:
             raise ValueError("Agent config does not match its factory")
         self.settings = CodexConfig.model_validate(config.config)
+        if workspace_provider is None and self.settings.workspace.plugin != "empty_workspace":
+            raise PluginConfigurationError("Selected workspace plugin must be injected by startup", stage="setup", plugin_id=self.plugin_id)
+        if result_collector is None and self.settings.collector.plugin != "json_result_collector":
+            raise PluginConfigurationError("Selected result collector must be injected by startup", stage="setup", plugin_id=self.plugin_id)
         self.artifacts = artifacts
         self.output_adapter = output_adapter or PublicJsonOutput()
+        self.workspace_provider = workspace_provider or EmptyWorkspace()
+        self.result_collector = result_collector or JsonResultCollector(self.output_adapter)
         self._snapshot = initial_snapshot
         self._controlled = {key: value for key, value in self.settings.model_dump(mode="json").items()
                             if key != "initial_model"}
         self.project_root = Path(__file__).resolve().parents[2]
+        self.tool_executables, self.tool_read_roots = native_tools(self.project_root)
         self.workspace_root = Path(self.settings.workspace_root or (Path(tempfile.gettempdir()) / "aer-codex-workspaces")).resolve()
         if self.workspace_root.is_relative_to(self.project_root):
             raise PluginConfigurationError("Codex workspace_root must be outside the AER project", stage="setup", plugin_id=self.plugin_id)
@@ -155,7 +168,8 @@ class CodexCliAgent:
     def capabilities(self):
         return AgentCapabilities(supported_targets=["prompt", "model"], supported_artifact_kinds=["prompt", "model"],
             can_rebuild_session=True, snapshot_scope="controlled_config",
-            feedback_state_fields=["agent_plugin", "execution_model", "termination_reason", "fresh_session", "seed_supported"],
+            feedback_state_fields=["agent_plugin", "execution_model", "termination_reason", "fresh_session", "seed_supported",
+                                   "result_kind", "evaluation_mode"],
             feedback_config_fields=["allowed_models"],
             feedback_tool_arguments={"command_execution": ["command"], "file_change": ["changes"],
                 "web_search": ["query"], "mcp_tool_call": ["server", "tool", "arguments"]},
@@ -194,6 +208,8 @@ class CodexCliAgent:
         fingerprints = {name: hashlib.sha256((home / name).read_bytes()).hexdigest()
                         for name in names if (home / name).is_file()}
         return {"cli_version": self.cli_version, "command": self.command, "config_fingerprints": fingerprints,
+                "tool_executables": self.tool_executables,
+                "tool_read_roots": [str(path) for path in self.tool_read_roots],
                 "windows_sandbox": self.settings.windows_sandbox if os.name == "nt" else None,
                 "seed_supported": False, "model_calls_reported": False, "tool_calls_scope": "visible_cli_items"}
 
@@ -233,6 +249,11 @@ class CodexCliAgent:
                   if not any(path != parent and path.is_relative_to(parent) for parent in denied_paths)}
         filesystem = '":root"="deny", ":minimal"="read", ":tmpdir"="deny", ":slash_tmp"="deny", '
         filesystem += ', '.join(json.dumps(path) + '="deny"' for path in sorted(denied))
+        # Nonstandard Windows Git/rg installs are absent from :minimal. Permit
+        # only their runtime folders, keeping task data and host sources denied.
+        for path in self.tool_read_roots:
+            if not any(path.is_relative_to(parent) or parent.is_relative_to(path) for parent in denied_paths):
+                filesystem += ', ' + json.dumps(str(path)) + '="read"'
         overrides = ["approval_policy=\"never\"", "default_permissions=\"aer_task\"",
             "permissions.aer_task.extends=\":workspace\"",
             "permissions.aer_task.filesystem={" + filesystem + "}",
@@ -257,15 +278,20 @@ class CodexCliAgent:
         tools, completed_tools = set(), set()
         startup_attempts = 0
         session_started, turn_started = False, False
+        handle, collected, terminal_shutdown = None, None, False
         try:
             model_id, prompt = self._validate_snapshot(snapshot)
             self.workspace_root.mkdir(parents=True, exist_ok=True)
             workspace = Path(tempfile.mkdtemp(prefix=timestamp_id("task") + "-", dir=self.workspace_root))
-            schema = self.output_adapter.schema(task)
+            handle = self.workspace_provider.prepare(task, workspace, run_ctx)
+            workspace = handle.path
+            schema = self.result_collector.schema(task)
             schema_path = workspace / "output-schema.json" if schema is not None else None
             if schema_path:
                 schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
-            public_input = task.model_dump_json(indent=2)
+            public_data = task.model_dump(mode="json")
+            public_data["execution_environment"] = task_environment(workspace, self.tool_executables)
+            public_input = json.dumps(public_data, ensure_ascii=False, indent=2)
             args = self._arguments(workspace, schema_path, model_id, prompt, run_ctx)
             timed_out = False
             deadline = record.start + self.settings.timeout_seconds
@@ -280,12 +306,9 @@ class CodexCliAgent:
                 process = subprocess.Popen(args, cwd=workspace, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                     **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}))
-                try:
-                    stdout, stderr = process.communicate(public_input, timeout=remaining)
-                except subprocess.TimeoutExpired:
-                    timed_out = True
-                    stop_process_tree(process)
-                    stdout, stderr = process.communicate(timeout=10)
+                captured = capture_cli(process, public_input, remaining, stop_process_tree)
+                stdout, stderr = captured.stdout, captured.stderr
+                timed_out, terminal_shutdown = captured.timed_out, captured.terminal_shutdown
                 if (not timed_out and process.returncode != 0 and os.name == "nt"
                     and startup_attempts <= self.settings.startup_retries
                     and retryable_startup_failure(stdout, stderr)):
@@ -295,7 +318,7 @@ class CodexCliAgent:
                     sleep(min(0.2, max(0, deadline - monotonic())))
                     continue
                 break
-            failed, turn_completed = False, False
+            failed, turn_completed, cli_errors = False, False, []
             for line in stdout.splitlines():
                 if not line.strip():
                     continue
@@ -310,9 +333,13 @@ class CodexCliAgent:
                     turn_usage = event.get("usage")
                 elif kind == "turn.failed":
                     failed = True
-                    record.event("execution_error", {"message": str(event.get("error", event.get("message", "Codex failed")))})
+                    message = error_message(event.get("error", event.get("message", "Codex failed")))
+                    cli_errors.append(message)
+                    record.event("execution_error", {"message": message})
                 elif kind == "error":
-                    record.event("runtime_notice", {"message": str(event.get("message", event.get("error", "Codex notice")))})
+                    message = error_message(event.get("message", event.get("error", "Codex notice")))
+                    cli_errors.append(message)
+                    record.event("runtime_notice", {"message": message})
                 elif kind in {"item.started", "item.completed"}:
                     item_type = item.get("type")
                     if item_type == "agent_message" and kind == "item.completed":
@@ -335,13 +362,16 @@ class CodexCliAgent:
                             record.event("tool_result", {"call_id": identity, "name": item_type,
                                 "status": "error" if tool_error or item.get("status") == "failed" else "completed", "output": result,
                                 "error": {"code": "tool_error", "message": str(tool_error)} if tool_error else None})
-            if timed_out or process.returncode != 0 or failed or not turn_completed or final is None:
+            if timed_out or (process.returncode != 0 and not terminal_shutdown) or failed or not turn_completed or final is None:
                 phase = "model turn" if turn_started else "session startup"
                 detail = f"timeout during {phase}; {stderr[-2000:]}" if timed_out else f"exit={process.returncode}; {stderr[-2000:]}"
+                if cli_errors:
+                    detail += "; " + cli_errors[-1][-2000:]
                 raise ExecutionError(f"Codex execution failed after {startup_attempts} startup attempt(s): " + detail,
                                      stage=run_ctx.stage, plugin_id=self.plugin_id)
             try:
-                output = self.output_adapter.parse(final)
+                collected = self.result_collector.collect(task, handle, final, run_ctx)
+                output = collected.model_dump(mode="json")["output"]
             except ValueError as failure:
                 termination = "invalid_output_format"
                 record.event("output_parse_error", {"message": str(failure), "raw_output": final})
@@ -355,6 +385,11 @@ class CodexCliAgent:
             if process is not None and process.poll() is None:
                 stop_process_tree(process)
                 process.communicate(timeout=10)
+            if handle is not None:
+                try:
+                    self.workspace_provider.release(handle)
+                except Exception as failure:
+                    record.event("workspace_release_error", {"message": str(failure)})
         incoming = turn_usage.get("input_tokens") if isinstance(turn_usage, dict) else None
         outgoing = turn_usage.get("output_tokens") if isinstance(turn_usage, dict) else None
         if process is None:
@@ -372,4 +407,7 @@ class CodexCliAgent:
                 "termination_reason": termination, "fresh_session": True, "seed_supported": False,
                 "workspace": str(workspace) if workspace else None, "model_calls_scope": "not_reported",
                 "tool_calls_scope": "visible_cli_items", "startup_attempts": startup_attempts,
-                "session_started": session_started, "turn_started": turn_started})
+                "session_started": session_started, "turn_started": turn_started,
+                "shutdown_after_terminal_event": terminal_shutdown,
+                **(collected.model_dump(mode="json")["state"] if collected else {})},
+            artifact_refs=collected.artifact_refs if collected else ())

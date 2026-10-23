@@ -43,6 +43,10 @@ class EvolutionDecision(DomainModel):
 
 class CandidateSummary(DomainModel):
     candidate_id: Identifier
+    target: Identifier | None = None
+    updated_components: Items[Identifier] = ()
+    change_summary: str | None = None
+    generation_rationale: str | None = None
     reward: Reward | None
     delta_score: Reward | None
     delta_similar_score: Reward | None
@@ -51,6 +55,7 @@ class CandidateSummary(DomainModel):
     selected: bool
     committed: bool
     reason: str
+    acceptance_reason: Identifier | None = None
 
     @model_validator(mode="after")
     def decision_flags(self):

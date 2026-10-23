@@ -54,11 +54,23 @@ def main():
     prompt = next(value for value in config if value.startswith("developer_instructions="))
     is_dev = task.get("public_metadata", {}).get("split") == "dev"
     emit({"type": "thread.started", "thread_id": "fixture-thread"})
+    if mode == "quota":
+        emit({"type": "error", "message": "You have hit your usage limit."})
+        emit({"type": "turn.failed", "error": {"message": "You have hit your usage limit."}})
+        return 1
     if mode == "recoverable-error":
         emit({"type": "error", "message": "fixture recoverable connection error"})
     if mode == "failure" or (mode == "validation-error" and not is_dev and model != "gpt-5.6-sol"):
         emit({"type": "turn.failed", "error": {"message": "fixture model unavailable"}})
         return 1
+    if mode == "patch":
+        workspace = Path(sys.argv[sys.argv.index("--cd") + 1])
+        group = task.get("public_metadata", {}).get("validation_group")
+        if model != "gpt-5.6-sol" or group == "regression":
+            (workspace / "module.py").write_text("answer = 2\n", encoding="utf-8")
+        emit({"type": "item.completed", "item": {"id": "answer", "type": "agent_message", "text": "Updated the source file."}})
+        emit({"type": "turn.completed", "usage": {"input_tokens": 20, "output_tokens": 5}})
+        return 0
     data = task["input"]["data"]
     if "expression" in data:
         answer = {"answer": calculate(ast.parse(data["expression"], mode="eval"))}
@@ -75,7 +87,9 @@ def main():
     text = "```json\n{}\n```" if mode == "bad-json" else json.dumps(answer)
     emit({"type": "item.completed", "item": {"id": "answer", "type": "agent_message", "text": text}})
     emit({"type": "turn.completed", **({} if mode == "missing-usage" else {"usage": {"input_tokens": 20, "cached_input_tokens": 10, "output_tokens": 5}})})
-    return 0
+    if mode == "completed-hang":
+        time.sleep(60)
+    return 1 if mode == "completed-nonzero" else 0
 
 
 if __name__ == "__main__":

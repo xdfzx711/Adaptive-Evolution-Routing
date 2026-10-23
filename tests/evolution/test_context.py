@@ -5,7 +5,7 @@ from aer_core.context import ContextBuilder
 from aer_core.errors import ContractError, NoFeasibleTargets
 from aer_core.schemas.evolution import EvolutionDecision
 from aer_core.schemas.execution import TraceEvent
-from aer_core.schemas.experience import AttemptFinishedEvent, CandidateEvaluatedEvent, CandidateEvaluation, TaskFinishedEvent
+from aer_core.schemas.experience import AttemptFinishedEvent, CandidateChange, CandidateEvaluatedEvent, CandidateEvaluation, TaskFinishedEvent
 from tests.domain_helpers import NOW, acceptance, run_result
 from tests.evolution.helpers import MemoryExperience, fixture
 from tests.storage.helpers import attempt
@@ -129,4 +129,28 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(summary.diagnosis.evidence_step_ids, ())
         self.assertEqual(summary.candidate_summaries[0].reward, 0.5)
         self.assertFalse(summary.candidate_summaries[0].accepted)
+        self.assertEqual(summary.candidate_summaries[0].acceptance_reason, "unknown")
         self.assertEqual(next(item for item in state.history if item.attempt_id == "empty").candidate_summaries, ())
+
+    def test_history_includes_candidate_change_and_policy_reason_with_configured_limits(self):
+        _, stable, _, task, record, live, policy = fixture()
+        first = attempt(attempt_id="first")
+        second = attempt(attempt_id="second").replace(
+            candidate_changes={"candidate-1": CandidateChange(target="model", updated_components=["model"],
+                change_summary="Execution model: gpt-5.6-sol -> gpt-6.1-sol",
+                generation_rationale="Try a stronger model after repeated tool failures")})
+        result = CandidateEvaluation(attempt_id="second", candidate_id="candidate-1", candidate_version_id="v2",
+            validation_ref=None, acceptance=acceptance(False), status="rejected", selected=False,
+            committed=False, commit_error=None, final_recorded_at=NOW)
+        state = ContextBuilder(MemoryExperience([terminal(first), terminal(second),
+            CandidateEvaluatedEvent(event_id="second/outcome", run_id="run-1", episode_id="episode-1",
+                timestamp=NOW, payload=result)]),
+            policy.replace(history_max_attempts=1, history_max_text_chars=35)).build(
+                task, record, stable, live, round_id=2, feasible_targets=["prompt"], as_of=NOW)
+        self.assertEqual([item.attempt_id for item in state.history], ["second"])
+        candidate = state.history[0].candidate_summaries[0]
+        self.assertEqual(candidate.target, "model")
+        self.assertEqual(candidate.updated_components, ("model",))
+        self.assertEqual(candidate.change_summary, "Execution model: gpt-5.6-sol -> gpt")
+        self.assertEqual(candidate.generation_rationale, "Try a stronger model after repeated")
+        self.assertEqual(candidate.acceptance_reason, "regression_guard")

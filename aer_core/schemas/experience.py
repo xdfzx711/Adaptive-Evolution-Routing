@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from .base import DomainModel, Identifier, Items, PositiveInt, UtcTimestamp
+from .base import DomainModel, Identifier, Items, PositiveInt, ReadOnlyMap, UtcTimestamp
 from .evolution import EvolutionDecision
 from .execution import Diagnosis, ErrorInfo
 from .experiment import RunResult, TaskFinishedSummary
@@ -12,6 +12,15 @@ from .references import AgentSnapshot, ArtifactRef, RecordRef
 from .states import AttemptStatus, AttemptStatusValue, CandidateStatus, CandidateStatusValue
 from .usage import BudgetRemaining, ResourceUsage
 from .validation import AcceptanceResult
+
+
+class CandidateChange(DomainModel):
+    """Public, compact account of what a generated candidate changed."""
+
+    target: Identifier
+    updated_components: Items[Identifier]
+    change_summary: str | None = None
+    generation_rationale: str | None = None
 
 
 class EvolutionAttempt(DomainModel):
@@ -27,6 +36,7 @@ class EvolutionAttempt(DomainModel):
     decision: EvolutionDecision | None
     operator_id: Identifier | None
     candidate_ids: Items[Identifier]
+    candidate_changes: ReadOnlyMap[CandidateChange] = Field(default_factory=dict)
     status: AttemptStatusValue
     error: ErrorInfo | None
     budget_before: BudgetRemaining | None
@@ -40,6 +50,8 @@ class EvolutionAttempt(DomainModel):
     def attempt_lifecycle(self):
         if len(set(self.candidate_ids)) != len(self.candidate_ids):
             raise ValueError("candidate IDs must be unique")
+        if not set(self.candidate_changes) <= set(self.candidate_ids):
+            raise ValueError("candidate changes must belong to generated candidates")
         if self.status == AttemptStatus.STARTED:
             if self.finished_at is not None or self.budget_after is not None:
                 raise ValueError("started attempt cannot have terminal time or budget")

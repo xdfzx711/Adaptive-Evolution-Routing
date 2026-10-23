@@ -106,7 +106,8 @@ def prepare_execution(path: str | Path, *, run_id: str | None = None) -> Prepare
     bindings.append(component_binding("diagnoser", "diagnoser", config.assessment.diagnoser, {}, registry))
     # Providers may be required only by the Diagnoser, Router or Evolver.
     plan = with_providers(config, registry, [*bindings, *evolution_bindings(config, registry)])
-    bindings = [binding for binding in plan if binding.category in {"agent", "diagnoser", "model_provider", "tool_provider"}]
+    bindings = [binding for binding in plan if binding.category in {
+        "agent", "diagnoser", "model_provider", "tool_provider", "workspace_provider", "result_collector"}]
     # Resolve factories before creating a persistent run directory.
     for binding in bindings:
         registry.get(binding.category, binding.plugin_id)

@@ -12,7 +12,7 @@ from aer_core.errors import AERError, BudgetExceeded, ContractError, EvolutionEr
 from aer_core.plugin_manager import BuiltPlugins, PluginManager
 from aer_core.schemas.assessment import TaskExecutionRecord
 from aer_core.schemas.evolution import EvolutionDecision, EvolutionRequest, EvolutionResponse
-from aer_core.schemas.experience import AttemptFinishedEvent, AttemptStartedEvent, CandidateEvaluatedEvent, CandidateEvaluation, EvolutionAttempt
+from aer_core.schemas.experience import AttemptFinishedEvent, AttemptStartedEvent, CandidateChange, CandidateEvaluatedEvent, CandidateEvaluation, EvolutionAttempt
 from aer_core.schemas.proposal import EvolutionProposalRecord
 from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.states import RunStage, StopReason
@@ -87,7 +87,9 @@ class PreparedEvolution:
             budget=None, workspace_ref=str(storage.run_root), model_timeout_seconds=config.limits.model_call_timeout_seconds,
             tool_timeout_seconds=config.limits.tool_call_timeout_seconds, max_output_tokens=config.limits.max_output_tokens_per_call)
         public_task = self.execution.benchmark.benchmark.task_view(task)
-        builder = context_builder(self.execution, task)
+        builder = context_builder(self.execution, task,
+            history_max_attempts=config.evolution.history_max_attempts,
+            history_max_text_chars=config.evolution.history_max_text_chars)
         context = builder.build(public_task, record, stable, run_ctx, round_id=round_id,
             feasible_targets=availability.targets, task_mode=config.state.task_mode,
             allowed_history_task_ids=[item.task_id for item in self.execution.benchmark.benchmark.tasks("dev")])
@@ -151,8 +153,17 @@ class PreparedEvolution:
             response = EvolutionResponse(candidates=[], usage=usage, status="budget_interrupted" if isinstance(failure, BudgetExceeded) else "error", error=error)
         finished_at = datetime.now(timezone.utc)
         status = {"completed": "completed", "empty": "empty_candidates", "error": "error", "budget_interrupted": "budget_interrupted"}[response.status]
+        candidate_changes = {}
+        for candidate in response.candidates:
+            summary = candidate.metadata.get("change_summary")
+            rationale = candidate.metadata.get("rationale")
+            candidate_changes[candidate.candidate_id] = CandidateChange(target=candidate.target,
+                updated_components=tuple(candidate.artifact_updates),
+                change_summary=summary[:config.evolution.history_max_text_chars] if isinstance(summary, str) else None,
+                generation_rationale=rationale[:config.evolution.history_max_text_chars] if isinstance(rationale, str) else None)
         finished = started.replace(status=status, decision=decision, operator_id=operator_id,
             candidate_ids=[candidate.candidate_id for candidate in response.candidates],
+            candidate_changes=candidate_changes,
             usage=sum_usage([routing_usage, response.usage]).replace(elapsed_seconds=monotonic() - attempt_begin),
             error=response.error, finished_at=finished_at)
         refs.append(storage.experience_store.append(AttemptFinishedEvent(event_id=attempt_id + "/finished", run_id=record.run_id,

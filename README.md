@@ -114,6 +114,8 @@ print(loaded.as_dict())
 
 第二条命令接收已有的完整 ExecutionResult JSON，输出带版本和执行引用的 0/1 分数；答错属于正常评分。两条命令都不执行 Agent。规则、数据格式和 Python 入口见 [本地 Benchmark 与评分](docs/AER_LOCAL_BENCHMARK.md)。
 
+SWE-bench 静态评估另提供 `experiments/configs/v0_1_codex_swebench_three_tasks.yaml`：三个主任务各配一个同类验证和一个回归验证问题，每题最多进化五轮、独立保留状态。顺序运行指令与配套关系见 [SWE-bench 静态评估接入](docs/AER_SWEBENCH_STATIC.md#三个主任务每题最多五轮)。
+
 ## 执行 Agent 与诊断
 
 ```powershell
@@ -221,6 +223,8 @@ runs/run-<时间>/
 ```
 
 ## 测试与后续工作
+
+SWE-bench Lite 的三个实例现可用于 Codex 静态补丁评估，不需要容器。Benchmark、工作区、产物收集器和 Evaluator 均通过插件配置选择；运行指令、评分公式和数据角色见 [SWE-bench 静态接入](docs/AER_SWEBENCH_STATIC.md)。
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v

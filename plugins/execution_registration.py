@@ -3,6 +3,7 @@
 from aer_core.config.models import AgentSettings, ModelProviderSettings, Settings, ToolProviderSettings
 from aer_core.contracts.providers import ModelProvider, ToolProvider
 from aer_core.contracts.storage import ArtifactStore
+from aer_core.contracts.workspace import WorkspaceProvider, ResultCollector
 from aer_core.plugin_registry import API_VERSION, PluginRegistry, ResolvedDependencies
 from aer_core.schemas.plugins import PluginCapabilities, PluginMetadata
 from aer_core.schemas.references import AgentSnapshot
@@ -51,7 +52,8 @@ def build_single(*, config: AgentSettings, dependencies: ResolvedDependencies) -
 
 
 def build_codex(*, config: CodexAgentSettings, dependencies: ResolvedDependencies):
-    return CodexCliAgent(config, dependencies.get("initial_snapshot"), dependencies.get("artifact_store"))
+    return CodexCliAgent(config, dependencies.get("initial_snapshot"), dependencies.get("artifact_store"),
+        workspace_provider=dependencies.get("workspace_provider"), result_collector=dependencies.get("result_collector"))
 
 
 def build_diagnoser(*, config: EmptyConfig, dependencies: ResolvedDependencies) -> LightweightDiagnoser:
@@ -81,9 +83,10 @@ def register_execution_plugins(registry: PluginRegistry) -> None:
                 targets=["prompt"], fixed_max_steps=steps),
             dependencies=tuple(deps)), factory, config_model=LocalAgentSettings, dependency_types=deps,
             snapshot_config=snapshot_config, initial_artifacts=initial_artifacts)
-    codex_deps = {"initial_snapshot": AgentSnapshot, "artifact_store": ArtifactStore}
+    codex_deps = {"initial_snapshot": AgentSnapshot, "artifact_store": ArtifactStore,
+                  "workspace_provider": WorkspaceProvider, "result_collector": ResultCollector}
     registry.register(PluginMetadata(id="codex_cli_agent", category="agent", api_version=API_VERSION,
-        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["prompt", "model"]),
+        plugin_version="0.1.1", capabilities=PluginCapabilities(targets=["prompt", "model"]),
         dependencies=tuple(codex_deps)), build_codex, config_model=CodexAgentSettings, dependency_types=codex_deps,
         snapshot_config=codex.snapshot_config, initial_artifacts=codex.initial_artifacts)
     registry.register(PluginMetadata(id="lightweight_diagnoser", category="diagnoser", api_version=API_VERSION,

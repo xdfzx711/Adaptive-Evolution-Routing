@@ -42,7 +42,7 @@ def validate_semantics(config: ExperimentConfig, catalog: ConfigCatalog) -> list
     agent = reference("agent", config.agent.plugin, "agent.plugin")
     model = reference("model_provider", config.providers.model.plugin, "providers.model.plugin")
     tools = reference("tool_provider", config.providers.tools.plugin, "providers.tools.plugin")
-    reference("evaluator", config.assessment.evaluator, "assessment.evaluator")
+    evaluator = reference("evaluator", config.assessment.evaluator, "assessment.evaluator")
     reference("diagnoser", config.assessment.diagnoser, "assessment.diagnoser")
     reference("validation", config.validation.plugin, "validation.plugin")
     policy = reference("acceptance_policy", config.validation.acceptance_policy, "validation.acceptance_policy")
@@ -68,6 +68,25 @@ def validate_semantics(config: ExperimentConfig, catalog: ConfigCatalog) -> list
             model.config_model.model_validate(config.providers.model.config)
         except ValidationError as error:
             issues.extend(schema_issues(error, "providers.model.config"))
+    for declaration, settings, field in (
+        (benchmark, config.benchmark.config, "benchmark.config"),
+        (evaluator, config.assessment.evaluator_config, "assessment.evaluator_config"),
+    ):
+        if declaration and declaration.config_model:
+            try:
+                declaration.config_model.model_validate(settings)
+            except ValidationError as error:
+                issues.extend(schema_issues(error, field))
+    for name, category in (("workspace", "workspace_provider"), ("collector", "result_collector")):
+        selection = config.agent.config.get(name)
+        if isinstance(selection, dict) and isinstance(selection.get("plugin"), str):
+            field = f"agent.config.{name}"
+            declaration = reference(category, selection["plugin"], field + ".plugin")
+            if declaration and declaration.config_model:
+                try:
+                    declaration.config_model.model_validate(selection.get("config", {}))
+                except ValidationError as error:
+                    issues.extend(schema_issues(error, field + ".config"))
     if tools:
         for index, name in enumerate(config.providers.tools.enabled):
             require(name in tools.tools, f"providers.tools.enabled[{index}]", f"unknown tool {name!r}; declared: {', '.join(tools.tools)}")

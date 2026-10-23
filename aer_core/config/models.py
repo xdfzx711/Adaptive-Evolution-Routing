@@ -39,6 +39,12 @@ class BenchmarkSettings(Settings):
     plugin: NonBlank
     execution_split: Literal["dev", "test"]
     task_ids: Annotated[UniqueStrings, Field(min_length=1)] | None
+    config: dict[str, JsonValue] = Field(default_factory=dict)
+
+
+class ComponentSettings(Settings):
+    plugin: NonBlank
+    config: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 class StateSettings(Settings):
@@ -72,11 +78,14 @@ class ProviderSettings(Settings):
 class AssessmentSettings(Settings):
     evaluator: NonBlank
     diagnoser: NonBlank
+    evaluator_config: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 class EvolutionSettings(Settings):
     mode: Literal["disabled", "fixed", "manual", "llm"]
     max_candidates_per_round: PositiveInt
+    history_max_attempts: NonNegativeInt = 5
+    history_max_text_chars: PositiveInt = 320
 
 
 class ManualDecision(Settings):

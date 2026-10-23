@@ -32,6 +32,10 @@ def create_registry() -> PluginRegistry:
     register_execution_plugins(registry)
     register_evolution_plugins(registry)
     register_validation_plugins(registry)
+    from plugins.workspace.registration import register_workspace_plugins
+    from plugins.benchmarks.swebench import register_swebench
+    register_workspace_plugins(registry)
+    register_swebench(registry)
     return registry
 
 
@@ -69,6 +73,13 @@ def with_providers(config, registry, bindings):
         if "tools" in required - names:
             additions.append(component_binding("tools", "tool_provider", config.providers.tools.plugin,
                              config.providers.tools.model_dump(mode="json"), registry))
+        for name, field, category, default in (
+            ("workspace_provider", "workspace", "workspace_provider", "empty_workspace"),
+            ("result_collector", "collector", "result_collector", "json_result_collector"),
+        ):
+            if name in required - names:
+                selection = config.agent.config.get(field, {"plugin": default})
+                additions.append(component_binding(name, category, selection["plugin"], selection.get("config", {}), registry))
         if not additions:
             return result
         result = additions + result

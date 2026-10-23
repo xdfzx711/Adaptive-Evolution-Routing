@@ -154,7 +154,11 @@ class ControllerTests(unittest.TestCase):
                     if '"prompt_evolution"' in req.messages[-1].content]
         self.assertEqual(payloads[0]["context"]["stable_version_id"], result.initial_version_id)
         self.assertEqual(payloads[1]["context"]["stable_version_id"], result.final_stable_version_id)
-        self.assertTrue(payloads[1]["context"]["history"][0]["candidate_summaries"][0]["committed"])
+        second = payloads[1]["context"]["history"][0]["candidate_summaries"][0]
+        self.assertTrue(second["committed"])
+        self.assertIn("IMPROVED reusable instructions", second["change_summary"])
+        self.assertEqual(second["acceptance_reason"], "improved")
+        self.assertEqual(payloads[1]["routing_decision"]["target"], "prompt")
         self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 0)
         self.assertEqual(result.usage.model_calls, len(model.requests))
 

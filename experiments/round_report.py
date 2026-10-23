@@ -144,8 +144,9 @@ class RoundReport:
         for item in items:
             candidates = []
             for index, candidate in enumerate(item.candidate_summaries, 1):
-                candidates.append({"candidate": index, **fields(candidate, "reward", "delta_score", "delta_similar_score",
-                    "delta_regression_score", "accepted", "selected", "committed", "reason")})
+                candidates.append({"candidate": index, **fields(candidate, "target", "updated_components",
+                    "change_summary", "generation_rationale", "reward", "delta_score", "delta_similar_score",
+                    "delta_regression_score", "accepted", "selected", "committed", "reason", "acceptance_reason")})
             result.append({"task": item.task_id, "round": item.round_id, "decision": fields(item.decision, "target", "rationale"),
                            "diagnosis": diagnosis_view(item.diagnosis), "candidates": candidates})
         return result
@@ -161,7 +162,8 @@ class RoundReport:
                 "execution": execution_view(context.execution), "feedback": plain(context.feedback),
                 "diagnosis": diagnosis_view(context.diagnosis),
                 "stable_components": {name: self.content(component) for name, component in context.stable_snapshot.artifacts.items()},
-                "history": self.history(context.history), "feasible_targets": list(context.feasible_targets),
+                "history": self.history(context.history), "routing_decision": fields(value.decision, "target", "rationale"),
+                "feasible_targets": list(context.feasible_targets),
                 "remaining_budget": plain(context.remaining_budget)}
         self.data["routing"] = {"decision": fields(value.decision, "target", "rationale"), "operator": value.operator_id}
         receipt = routing_record(value, self.artifacts)

@@ -7,7 +7,7 @@ from pathlib import Path
 from aer_core.config.loader import LoadedConfig
 from aer_core.config.partitions import validate_partitions
 from aer_core.errors import ConfigError, ContractError, EvaluationError
-from aer_core.contracts.benchmark import BenchmarkPlugin
+from aer_core.contracts.benchmark import BenchmarkPlugin, TaskValidationProvider
 from aer_core.contracts.evaluator import EvaluatorPlugin
 from aer_core.feedback import PublicFeedbackBuilder
 from aer_core.schemas.feedback import ContextPolicy, TaskFeedbackPolicy
@@ -32,6 +32,23 @@ class PreparedBenchmark:
     regression_tasks: tuple[Task, ...]
     built_plugins: BuiltPlugins
 
+    def validation_groups(self, task: Task) -> tuple[tuple[Task, ...], tuple[Task, ...]]:
+        """Resolve an optional plugin selection without coupling the runner to a dataset."""
+        if task not in self.execution_tasks:
+            raise ContractError("Validation task is outside the configured execution selection", stage="setup")
+        if not isinstance(self.benchmark, TaskValidationProvider):
+            return self.similar_tasks, self.regression_tasks
+        selected = self.benchmark.validation_tasks(task)
+        available = (*self.similar_tasks, *self.regression_tasks)
+        if (not isinstance(selected, tuple) or any(not isinstance(item, Task) or item not in available for item in selected)
+                or len({item.identity for item in selected}) != len(selected)):
+            raise ContractError("Task-specific validation must select unique tasks from the validation partition", stage="setup")
+        similar = tuple(item for item in selected if item in self.similar_tasks)
+        regression = tuple(item for item in selected if item in self.regression_tasks)
+        if not similar or not regression:
+            raise ContractError(f"Task {task.task_id} requires both similar and regression validation tasks", stage="setup")
+        return similar, regression
+
     def as_dict(self) -> dict:
         config = self.loaded_config.config
         index = self.benchmark.index()
@@ -46,6 +63,12 @@ class PreparedBenchmark:
                 config.validation.similar_group: [task.task_id for task in self.similar_tasks],
                 config.validation.regression_group: [task.task_id for task in self.regression_tasks],
             },
+            "validation_tasks_by_execution_task": {
+                task.task_id: {config.validation.similar_group: [item.task_id for item in groups[0]],
+                               config.validation.regression_group: [item.task_id for item in groups[1]]}
+                for task in self.execution_tasks
+                for groups in [self.validation_groups(task)]
+            } if config.evolution.mode != "disabled" else {},
             "index": index.model_dump(mode="json"),
             "public_tasks": [self.benchmark.task_view(task).model_dump(mode="json") for task in self.execution_tasks],
             "assembly_manifest": self.built_plugins.manifest.model_dump(mode="json"),
@@ -105,8 +128,8 @@ def prepare_benchmark(path: str | Path) -> PreparedBenchmark:
     config = loaded.config
     registry = create_registry()
     bindings = with_providers(config, registry, [
-        component_binding("benchmark", "benchmark", config.benchmark.plugin, {}, registry),
-        component_binding("evaluator", "evaluator", config.assessment.evaluator, {}, registry)])
+        component_binding("benchmark", "benchmark", config.benchmark.plugin, config.benchmark.config, registry),
+        component_binding("evaluator", "evaluator", config.assessment.evaluator, config.assessment.evaluator_config, registry)])
     loaded = resolve_model(loaded, required=any(binding.name == "model" for binding in bindings))
     built = PluginManager(registry).build(bindings, dependencies=provider_dependencies(loaded, bindings))
     benchmark = built.instances["benchmark"]
@@ -123,4 +146,8 @@ def prepare_benchmark(path: str | Path) -> PreparedBenchmark:
     independent = benchmark.tasks(validation.split)
     similar = tuple(task for task in independent if task.metadata.get(validation.group_field) == validation.similar_group)
     regression = tuple(task for task in independent if task.metadata.get(validation.group_field) == validation.regression_group)
-    return PreparedBenchmark(loaded, benchmark, evaluator, tasks, similar, regression, built)
+    prepared = PreparedBenchmark(loaded, benchmark, evaluator, tasks, similar, regression, built)
+    if config.evolution.mode != "disabled":
+        for task in tasks:
+            prepared.validation_groups(task)
+    return prepared

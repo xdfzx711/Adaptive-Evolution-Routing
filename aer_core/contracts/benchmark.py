@@ -26,3 +26,14 @@ class BenchmarkPlugin(Protocol):
     def index(self) -> BenchmarkIndex: ...
 
     def feedback_policy(self, task: Task) -> TaskFeedbackPolicy: ...
+
+
+@runtime_checkable
+class TaskValidationProvider(Protocol):
+    """Optional task-specific subset of the benchmark's validation partition.
+
+    Tasks retain the configured group metadata. Benchmarks without this
+    capability continue to use their complete shared validation partition.
+    """
+
+    def validation_tasks(self, task: Task) -> tuple[Task, ...]: ...

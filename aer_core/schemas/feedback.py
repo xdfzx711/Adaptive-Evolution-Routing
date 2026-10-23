@@ -2,7 +2,7 @@
 
 from pydantic import Field
 
-from .base import DomainModel, Identifier, Items, ReadOnlyMap
+from .base import DomainModel, Identifier, Items, NonNegativeInt, PositiveInt, ReadOnlyMap
 from .task import TaskIdentity
 
 
@@ -25,3 +25,5 @@ class ContextPolicy(DomainModel):
     snapshot_config_fields: Items[Identifier] = ("max_steps",)
     allow_evolution: bool = False
     reason_messages: ReadOnlyMap[str] = Field(default_factory=dict)
+    history_max_attempts: NonNegativeInt = 5
+    history_max_text_chars: PositiveInt = 320

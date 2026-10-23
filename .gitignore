@@ -11,3 +11,5 @@ htmlcov/
 .env
 .env.*
 !.env.example
+# Downloaded source caches are reusable execution inputs, not experiment records.
+.aer-cache/

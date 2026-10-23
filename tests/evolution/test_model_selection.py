@@ -34,8 +34,10 @@ class ModelSelectionTests(unittest.TestCase):
                 self.assertEqual(request.context.stable_snapshot, stable)
                 self.assertEqual(result.usage.model_calls, 1)
                 payload = json.loads(model.requests[0][0].messages[1].content)
+                self.assertEqual(payload["routing_decision"]["rationale"], "public evidence")
                 self.assertNotIn("gpt-5.6-sol", payload["allowed_models"])
                 self.assertNotIn("private_parameters", json.dumps(payload))
+                self.assertEqual(candidate.metadata["change_summary"], f"Execution model: gpt-5.6-sol -> {selected}")
 
     def test_invalid_choices_fail_and_no_change_is_empty(self):
         for chosen, status in (("not-allowed", "error"), ("gpt-5.6-sol", "empty"), (None, "empty")):

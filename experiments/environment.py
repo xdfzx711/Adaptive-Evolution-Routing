@@ -48,7 +48,7 @@ def resolve_model(loaded: LoadedConfig, *, required: bool = False) -> LoadedConf
 
 
 def provider_dependencies(loaded: LoadedConfig, bindings, *, supplied: dict | None = None) -> dict:
-    result = {"model_settings": loaded.config.providers.model}
+    result = {"model_settings": loaded.config.providers.model, "config_root": loaded.source_path.parent}
     result.update(supplied or {})
     if not any(binding.category == "model_provider" and binding.plugin_id == "qwen_model" for binding in bindings):
         return result

@@ -14,6 +14,12 @@ from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.task import TaskView
 
 
+PUBLIC_ACCEPTANCE_REASONS = frozenset({
+    "improved", "no_improvement", "insufficient_improvement", "regression_guard",
+    "validation_error", "validation_incomplete", "invalid_candidate",
+})
+
+
 class ContextBuilder:
     def __init__(self, experience_store: ExperienceStore, policy: ContextPolicy):
         self.experience = experience_store
@@ -66,23 +72,31 @@ class ContextBuilder:
             candidates = []
             for candidate_id in attempt.candidate_ids:
                 result = outcomes.get((key, candidate_id))
+                change = attempt.candidate_changes.get(candidate_id)
                 acceptance = result.acceptance if result is not None else None
                 accepted = acceptance is not None and acceptance.accepted
                 selected = result.selected if result is not None else False
                 committed = accepted and selected and ((key, candidate_id) in commits or result.committed)
                 candidates.append(CandidateSummary(candidate_id=candidate_id,
+                    target=change.target if change else None,
+                    updated_components=change.updated_components if change else (),
+                    change_summary=change.change_summary[:self.policy.history_max_text_chars] if change and change.change_summary else None,
+                    generation_rationale=change.generation_rationale[:self.policy.history_max_text_chars] if change and change.generation_rationale else None,
                     reward=acceptance.reward if acceptance else None,
                     delta_score=acceptance.delta_score if acceptance else None,
                     delta_similar_score=acceptance.delta_similar_score if acceptance else None,
                     delta_regression_score=acceptance.delta_regression_score if acceptance else None,
                     accepted=accepted, selected=selected, committed=committed,
-                    reason=result.status.value if result else "not_validated"))
+                    reason=result.status.value if result else "not_validated",
+                    acceptance_reason=(acceptance.reason if acceptance.reason in PUBLIC_ACCEPTANCE_REASONS else "unknown")
+                        if acceptance else None))
             decision = EvolutionDecision(target=attempt.decision.target, rationale="Target recorded in completed history.") if attempt.decision else None
             summaries.append(ExperienceSummary(attempt_id=attempt.attempt_id, run_id=attempt.run_id,
                 episode_id=attempt.episode_id, task_id=attempt.task_id, round_id=attempt.round_id,
                 stable_version_id=attempt.stable_version_id, decision=decision, diagnosis=self._diagnosis(attempt.diagnosis, ()),
                 candidate_summaries=candidates, completed_at=attempt.finished_at))
-        return tuple(sorted(summaries, key=lambda item: (item.completed_at, item.episode_id, item.round_id, item.attempt_id)))
+        ordered = sorted(summaries, key=lambda item: (item.completed_at, item.episode_id, item.round_id, item.attempt_id))
+        return tuple(ordered[-self.policy.history_max_attempts:]) if self.policy.history_max_attempts else ()
 
     def build(self, task: TaskView, record: TaskExecutionRecord, stable: AgentSnapshot,
               run_ctx: RunContext, *, round_id: int, feasible_targets, task_mode="independent",

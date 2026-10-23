@@ -98,6 +98,7 @@ class EvolutionTextReport:
             f"开始：{moment(started_at)}；会话：{context.episode_id}",
             f"模式：{config.evolution.mode}；Router：{config.routing.plugin}；seed：{context.seed}",
             f"Agent：{snapshot.agent_plugin_id}；模型：{config.providers.model.model_id}",
+            f"评分器：{config.assessment.evaluator}；配置：{compact(config.assessment.evaluator_config)}",
             f"工具：{', '.join(config.providers.tools.enabled) or '无'}；Agent 步骤上限：{config.agent.max_steps}",
             f"最大进化轮数：{config.limits.max_evolution_rounds}；单次输出上限：{context.max_output_tokens}",
             f"接受阈值：独立验证分提升至少 {config.validation.min_improvement}；回归分最大下降 {config.validation.max_regression_drop}",
@@ -194,9 +195,16 @@ class EvolutionTextReport:
                 for candidate in item.candidate_summaries:
                     lines.append(f"    {self.candidate_names.get(candidate.candidate_id, '历史候选')}：收益={candidate.reward}；"
                         f"验证分变化={candidate.delta_score}；同类变化={candidate.delta_similar_score}；回归变化={candidate.delta_regression_score}；"
-                        f"accepted={candidate.accepted}；selected={candidate.selected}；committed={candidate.committed}；原因={candidate.reason}")
+                        f"accepted={candidate.accepted}；selected={candidate.selected}；committed={candidate.committed}；"
+                        f"状态={candidate.reason}；接受规则={candidate.acceptance_reason or '未评估'}")
+                    if candidate.change_summary:
+                        lines.append(f"      具体变更：{candidate.change_summary}")
+                    if candidate.generation_rationale:
+                        lines.append(f"      候选理由：{candidate.generation_rationale}")
             if not context.history:
                 lines.append("  无")
+            if value.decision:
+                lines.append(f"本轮提供给 Evolver 的路由理由：{value.decision.rationale}")
             lines.append("过滤后的完整输入与执行轨迹见本节上下文路径。")
             self.block("Evolver 实际收到的反馈", lines)
         if attempt:

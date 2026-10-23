@@ -77,7 +77,9 @@ class PreparedOrchestrator:
         controller = Orchestrator(config=config,
             executor=CachedTaskExecutor(ScoredTaskExecutor(scoped.agent, scoped.benchmark.benchmark, scoped.benchmark.evaluator),
                                         LocalValidationCache(storage.run_root), conditions),
-            diagnoser=scoped.diagnoser, contexts=context_builder(scoped, task),
+            diagnoser=scoped.diagnoser, contexts=context_builder(scoped, task,
+                history_max_attempts=config.evolution.history_max_attempts,
+                history_max_text_chars=config.evolution.history_max_text_chars),
             artifacts=storage.artifact_store, versions=versions, experience=storage.experience_store,
             evolution=evolution, validation=validation, progress=reporter, storage_placement=layout)
         FileRoot(storage.run_root).immutable(layout.episode_path(episode_id), canonical_bytes({

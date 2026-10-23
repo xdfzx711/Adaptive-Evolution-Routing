@@ -21,6 +21,7 @@ from aer_core.contracts.router import RouterPlugin
 from aer_core.contracts.runner import ExperimentRunner
 from aer_core.contracts.storage import ArtifactStore, ExperienceStore, VersionStore
 from aer_core.contracts.validation import AcceptancePolicy, ValidationPlugin
+from aer_core.contracts.workspace import WorkspaceProvider, ResultCollector
 from aer_core.errors import DuplicatePluginError, PluginNotFound, PluginRegistrationError, PluginVersionError
 from aer_core.schemas.plugins import PluginDescriptor, PluginMetadata
 
@@ -34,6 +35,7 @@ CONTRACTS = MappingProxyType({
     "acceptance_policy": AcceptancePolicy, "artifact_store": ArtifactStore,
     "version_store": VersionStore, "experience_store": ExperienceStore,
     "runner": ExperimentRunner,
+    "workspace_provider": WorkspaceProvider, "result_collector": ResultCollector,
 })
 
 
@@ -143,7 +145,7 @@ class PluginRegistry:
                 compatible_agents=caps.compatible_agents, tools=caps.tools,
                 splits=caps.splits, benchmark_id=caps.benchmark_id,
                 policy_versions=caps.policy_versions,
-                config_model=entry.config_model if meta.category in {"agent", "model_provider", "evolution"} else None,
+                config_model=entry.config_model,
                 routing_modes=caps.routing_modes, fixed_max_steps=caps.fixed_max_steps,
             )
         return ConfigCatalog(tuple(declarations.values()))

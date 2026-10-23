@@ -118,4 +118,4 @@ class SingleObservationTests(unittest.TestCase):
             text = report.read_text(encoding="utf-8")
             self.assertEqual(text.count("【初始执行】"), 2)
             self.assertEqual(text.count("[任务记录结束："), 2)
-            self.assertIn("本次新增成本：tokens=0", text)
+            self.assertIn("任务执行：tokens=0", text)

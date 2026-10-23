@@ -47,9 +47,11 @@ class PromptEvolverTests(unittest.TestCase):
             self.assertNotIn("eval_spec_ref", request.model_dump_json())
             self.assertNotIn("private_parameters", request.model_dump_json())
             self.assertIn("old_prompt", payload)
+            self.assertEqual(payload["routing_decision"]["rationale"], "fixed")
             return response('{"candidates":[{"prompt":"Improved reusable instruction."}]}')
         result = SimplePromptEvolver(PromptEvolverConfig(max_candidates=1), artifacts, RecordingModel(generate)).evolve(self.request(state, live))
         self.assertEqual(result.status, "completed")
+        self.assertIn("Improved reusable instruction", result.candidates[0].metadata["change_summary"])
 
     def test_empty_and_identical_prompts_retain_generation_cost_without_new_artifacts(self):
         state, artifacts, live = evolution_context()

@@ -50,6 +50,12 @@ Codex 不接受 `agent.max_steps`。ReAct 的执行上限仍属于其自身配�
 
 ## 版本与候选
 
+Windows 任务输入附带 execution_environment：实际工作区、原生命令路径和绝对路径使用说明。插件对检测到的独立 Git/rg 安装目录仅授予读取权限，继续禁止访问项目、评分数据及运行记录；不依赖受限 Shell 的 PATH 或 PowerShell 当前目录。运行时命令路径进入评测条件记录。
+
+CLI 的 error / turn.failed 标准输出事件会保留在最终异常中，即使 stderr 为空也能看到额度耗尽等实际原因。已启动的任务仍不自动重试。
+
+执行层持续读取 stdout/stderr。收到 turn.completed 或 turn.failed 后给予 2 秒退出宽限时间；CLI 未退出时结束本次进程树，记录 shutdown_after_terminal_event。完整成功事件、最终输出和 usage 仍按原契约校验；未收到终止事件时仍执行原超时限制，自然的非零退出仍报错。这避免将已完成但退出停滞的 CLI 会话误报为任务执行超时。
+
 Snapshot.artifacts 保存 `prompt` 和 `model`。prompt 是可进化的附加 developer_instructions；model 正文为 `{"model_id":"gpt-5.6-sol"}`，执行时唯一映射为 `--model`。运行配置和允许模型列表由 Snapshot.config 冻结，initial_model 只负责创建初始工件。
 
 Prompt Evolver 只更新 prompt；ModelSelectionEvolver 根据允许反馈，用 Qwen 从当前模型之外的配置列表中选择一个模型，只更新 model。选择当前模型或 null 返回空候选；越界选择报错。只有一个允许模型时，model 目标不可行。每轮默认一个候选，接口保留多候选能力。

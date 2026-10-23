@@ -82,10 +82,11 @@ class PreparedValidation:
                 invalid.append((candidate, failure.to_info()))
         # Initial execution and validation share cached, verified observations.
         benchmark = self.execution.benchmark
+        similar, regression = benchmark.validation_groups(task)
         plan = ValidationPlan(current_task=task, baseline_execution=None, baseline_evaluation=None,
-            similar_tasks=benchmark.similar_tasks, regression_tasks=benchmark.regression_tasks,
+            similar_tasks=similar, regression_tasks=regression,
             pair_seeds=[PairSeed(task=item.identity, seed=paired_seed(config.experiment.seed, task.identity, item.identity))
-                        for item in (*benchmark.similar_tasks, *benchmark.regression_tasks)],
+                        for item in (*similar, *regression)],
             policy_id=config.validation.acceptance_policy, policy_version=config.validation.policy_version)
         run_ctx = RunContext(run_id=proposal.run_id, episode_id=proposal.episode_id,
             operation_id=timestamp_id("validation-batch"), stage="local_validation", seed=config.experiment.seed,

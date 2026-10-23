@@ -41,6 +41,51 @@ def fixture(root, mode="model", initial="gpt-5.6-sol", **changes):
 
 
 class CodexTests(unittest.TestCase):
+    def test_completed_turn_does_not_become_a_timeout_when_cli_shutdown_stalls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, snapshot, _ = fixture(Path(directory), mode="completed-hang", timeout_seconds=5.0)
+            benchmark = ToyBenchmark()
+            result = agent.run(benchmark.task_view(benchmark.tasks("dev")[0]), snapshot, context())
+            self.assertEqual(result.status, "completed", result.error)
+            self.assertTrue(result.state_summary["shutdown_after_terminal_event"])
+            self.assertTrue(result.usage.usage_complete)
+            self.assertEqual(result.usage.total_tokens, 25)
+            self.assertLess(result.usage.elapsed_seconds, 5)
+
+    def test_stdout_only_usage_limit_is_preserved_without_retrying_the_task(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, snapshot, _ = fixture(Path(directory), mode="quota")
+            benchmark = ToyBenchmark()
+            result = agent.run(benchmark.task_view(benchmark.tasks("dev")[0]), snapshot, context())
+            self.assertEqual(result.status, "error")
+            self.assertIn("You have hit your usage limit", result.error.message)
+            self.assertEqual(result.state_summary["startup_attempts"], 1)
+            self.assertEqual(sum(event.kind == "model_request" for event in result.trajectory), 1)
+
+    def test_completed_event_does_not_hide_a_natural_nonzero_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, snapshot, _ = fixture(Path(directory), mode="completed-nonzero")
+            benchmark = ToyBenchmark()
+            result = agent.run(benchmark.task_view(benchmark.tasks("dev")[0]), snapshot, context())
+            self.assertEqual(result.status, "error")
+            self.assertFalse(result.state_summary["shutdown_after_terminal_event"])
+
+    def test_runtime_facts_and_tool_read_rules_do_not_expose_benchmark_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            agent, snapshot, _ = fixture(root)
+            benchmark = ToyBenchmark()
+            result = agent.run(benchmark.task_view(benchmark.tasks("dev")[0]), snapshot, context())
+            request = next(event for event in result.trajectory if event.kind == "model_request")
+            public = json.loads(request.payload["request"]["messages"][-1]["content"])
+            self.assertEqual(public["execution_environment"]["workspace"], result.state_summary["workspace"])
+            self.assertNotIn("private_parameters", json.dumps(public))
+            args = agent._arguments(root, None, "gpt-5.6-sol", "instructions", context())
+            rules = [args[index + 1] for index, value in enumerate(args[:-1]) if value == "--config"]
+            profile = tomllib.loads(next(value for value in rules if value.startswith("permissions.aer_task.filesystem=")))
+            self.assertEqual(profile["permissions"]["aer_task"]["filesystem"][str(agent.project_root)], "deny")
+            self.assertTrue(all(not path.is_relative_to(agent.project_root) for path in agent.tool_read_roots))
+
     @unittest.skipUnless(os.name == "nt", "MXC startup recovery")
     def test_transient_startup_failure_retries_but_started_threads_never_do(self):
         for mode, count, status in (("startup-once", 2, "completed"), ("startup-always", 3, "error"),
