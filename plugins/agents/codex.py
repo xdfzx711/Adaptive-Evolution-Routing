@@ -15,14 +15,14 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from aer_core.config.models import AgentSettings, ComponentSettings, NonBlank, NonNegativeInt, PositiveFloat, Settings
+from aer_core.config.models import AgentSettings, ComponentSettings, NonBlank, NonNegativeInt, PositiveFloat
 from aer_core.errors import ExecutionError, PluginConfigurationError, UnsupportedCapability
 from aer_core.identifiers import timestamp_id
 from aer_core.schemas.evolution import AgentCapabilities
 from aer_core.schemas.execution import ExecutionResult
 from aer_core.schemas.usage import ResourceUsage
 from plugins.agents.execution import SessionRecord
-from plugins.agents.model_selection import ModelId, ModelSelection, SUPPORTED_MODELS
+from plugins.agents.model_selection import CodexModelAdapter, CodexModelSpace, ModelId, ModelSelection, ReasoningEffort
 from plugins.agents.output import PublicJsonOutput
 from plugins.workspace.local import EmptyWorkspace
 from plugins.workspace.collectors import JsonResultCollector
@@ -30,10 +30,10 @@ from plugins.agents.codex_runtime import native_tools, task_environment, error_m
 from plugins.agents.codex_process import capture_cli
 
 
-class CodexConfig(Settings):
+class CodexConfig(CodexModelSpace):
     command: list[NonBlank] = Field(default_factory=lambda: ["codex"])
     initial_model: ModelId = "gpt-5.6-sol"
-    allowed_models: list[ModelId] = Field(default_factory=lambda: list(SUPPORTED_MODELS))
+    initial_reasoning_effort: ReasoningEffort | None = None
     workspace_root: NonBlank | None = None
     timeout_seconds: PositiveFloat = 300.0
     profile: NonBlank | None = None
@@ -47,10 +47,10 @@ class CodexConfig(Settings):
     def valid_catalog(self):
         if not self.command:
             raise ValueError("command cannot be empty")
-        if not self.allowed_models or len(set(self.allowed_models)) != len(self.allowed_models):
-            raise ValueError("allowed_models must be nonempty and unique")
         if self.initial_model not in self.allowed_models:
             raise ValueError("initial_model must belong to allowed_models")
+        if ModelSelection(model_id=self.initial_model, reasoning_effort=self.initial_reasoning_effort) not in self.selections():
+            raise ValueError("initial model/reasoning combination must belong to the configured catalog")
         if self.workspace_root is not None and not Path(self.workspace_root).is_absolute():
             raise ValueError("workspace_root must be an absolute path")
         if self.profile is not None and any(char in self.profile for char in ("/", "\\", ":")):
@@ -68,15 +68,22 @@ class CodexAgentSettings(AgentSettings):
 
 
 def snapshot_config(config):
-    settings = CodexConfig.model_validate(config.agent.config).model_dump(mode="json")
-    settings.pop("initial_model")
-    return settings
+    return controlled_config(CodexConfig.model_validate(config.agent.config))
+
+
+def controlled_config(settings):
+    values = settings.model_dump(mode="json", exclude={"initial_model", "initial_reasoning_effort"})
+    # Keep old Snapshot identities and frozen-config comparisons unchanged when not opted in.
+    if not values["allowed_reasoning_efforts"]:
+        values.pop("allowed_reasoning_efforts")
+    return values
 
 
 def initial_artifacts(config):
     settings = CodexConfig.model_validate(config.agent.config)
     return {"prompt": config.agent.initial_prompt.encode("utf-8"),
-            "model": ModelSelection(model_id=settings.initial_model).model_dump_json(indent=2).encode("utf-8")}
+            "model": CodexModelAdapter().encode(ModelSelection(model_id=settings.initial_model,
+                reasoning_effort=settings.initial_reasoning_effort))}
 
 
 def command_prefix(command):
@@ -141,12 +148,12 @@ class CodexCliAgent:
         if result_collector is None and self.settings.collector.plugin != "json_result_collector":
             raise PluginConfigurationError("Selected result collector must be injected by startup", stage="setup", plugin_id=self.plugin_id)
         self.artifacts = artifacts
+        self.model_adapter = CodexModelAdapter()
         self.output_adapter = output_adapter or PublicJsonOutput()
         self.workspace_provider = workspace_provider or EmptyWorkspace()
         self.result_collector = result_collector or JsonResultCollector(self.output_adapter)
         self._snapshot = initial_snapshot
-        self._controlled = {key: value for key, value in self.settings.model_dump(mode="json").items()
-                            if key != "initial_model"}
+        self._controlled = controlled_config(self.settings)
         self.project_root = Path(__file__).resolve().parents[2]
         self.tool_executables, self.tool_read_roots = native_tools(self.project_root)
         self.workspace_root = Path(self.settings.workspace_root or (Path(tempfile.gettempdir()) / "aer-codex-workspaces")).resolve()
@@ -168,28 +175,34 @@ class CodexCliAgent:
     def capabilities(self):
         return AgentCapabilities(supported_targets=["prompt", "model"], supported_artifact_kinds=["prompt", "model"],
             can_rebuild_session=True, snapshot_scope="controlled_config",
-            feedback_state_fields=["agent_plugin", "execution_model", "termination_reason", "fresh_session", "seed_supported",
+            feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "termination_reason", "fresh_session", "seed_supported",
                                    "result_kind", "evaluation_mode"],
-            feedback_config_fields=["allowed_models"],
+            feedback_config_fields=["allowed_models", "allowed_reasoning_efforts"],
             feedback_tool_arguments={"command_execution": ["command"], "file_change": ["changes"],
                 "web_search": ["query"], "mcp_tool_call": ["server", "tool", "arguments"]},
             feedback_tool_outputs={"command_execution": ["text", "exit_code"], "file_change": ["changes"],
                 "web_search": ["query"], "mcp_tool_call": ["result"]})
 
     def _validate_snapshot(self, snapshot):
-        if snapshot.agent_plugin_id != self.plugin_id or snapshot.model_dump(mode="json")["config"] != self._controlled:
+        configuration = dict(snapshot.model_dump(mode="json")["config"])
+        if configuration.get("allowed_reasoning_efforts") == {}:
+            configuration.pop("allowed_reasoning_efforts")
+        if configuration.get("initial_reasoning_effort", "absent") is None:
+            configuration.pop("initial_reasoning_effort")
+        if snapshot.agent_plugin_id != self.plugin_id or configuration != self._controlled:
             raise UnsupportedCapability("Codex Snapshot runtime settings differ from the assembled plugin", stage="setup", plugin_id=self.plugin_id)
         if any(kind not in snapshot.artifacts or snapshot.artifacts[kind].kind != kind for kind in ("prompt", "model")):
             raise UnsupportedCapability("Codex requires prompt and model artifacts", stage="setup", plugin_id=self.plugin_id)
         if set(snapshot.artifacts) - {"prompt", "model"}:
             raise UnsupportedCapability("Codex Snapshot contains unsupported components", stage="setup", plugin_id=self.plugin_id)
-        selection = ModelSelection.model_validate_json(self.artifacts.get(snapshot.artifacts["model"]))
-        if selection.model_id not in self.settings.allowed_models:
-            raise UnsupportedCapability("Snapshot execution model is not allowed", stage="setup", plugin_id=self.plugin_id)
+        try:
+            selection = self.model_adapter.read(snapshot, self.artifacts)
+        except ValueError as failure:
+            raise UnsupportedCapability("Snapshot execution model/reasoning combination is not allowed", stage="setup", plugin_id=self.plugin_id) from failure
         prompt = self.artifacts.get(snapshot.artifacts["prompt"]).decode("utf-8")
         if not prompt.strip():
             raise UnsupportedCapability("Codex prompt cannot be blank", stage="setup", plugin_id=self.plugin_id)
-        return selection.model_id, prompt
+        return selection, prompt
 
     def snapshot(self):
         return self._snapshot
@@ -231,9 +244,10 @@ class CodexCliAgent:
         return servers
 
     def _arguments(self, workspace, schema_path, model_id, prompt, run_ctx):
+        selection = model_id if isinstance(model_id, ModelSelection) else ModelSelection(model_id=model_id)
         servers = self._check_permission_config()
         args = [*self.command, "exec", "--json", "--ephemeral", "--skip-git-repo-check",
-                "--color", "never", "--cd", str(workspace), "--model", model_id]
+                "--color", "never", "--cd", str(workspace), "--model", selection.model_id]
         if self.settings.ignore_user_config:
             args.append("--ignore-user-config")
         if self.settings.profile:
@@ -263,6 +277,8 @@ class CodexCliAgent:
             # The standalone CLI can otherwise select unelevated, which cannot
             # enforce this Agent's split read/write filesystem permissions.
             overrides.append("windows.sandbox=" + json.dumps(self.settings.windows_sandbox))
+        if selection.reasoning_effort is not None:
+            overrides.append("model_reasoning_effort=" + json.dumps(selection.reasoning_effort))
         overrides.extend("mcp_servers." + json.dumps(name) + ".enabled=false" for name in sorted(servers))
         for value in overrides:
             args.extend(["--config", value])
@@ -274,13 +290,14 @@ class CodexCliAgent:
         record = SessionRecord()
         output, error, status, termination = {}, None, "completed", "finish"
         final, turn_usage, process, workspace = None, None, None, None
-        model_id = None
+        model_id, selection = None, None
         tools, completed_tools = set(), set()
         startup_attempts = 0
         session_started, turn_started = False, False
         handle, collected, terminal_shutdown = None, None, False
         try:
-            model_id, prompt = self._validate_snapshot(snapshot)
+            selection, prompt = self._validate_snapshot(snapshot)
+            model_id = selection.model_id
             self.workspace_root.mkdir(parents=True, exist_ok=True)
             workspace = Path(tempfile.mkdtemp(prefix=timestamp_id("task") + "-", dir=self.workspace_root))
             handle = self.workspace_provider.prepare(task, workspace, run_ctx)
@@ -292,7 +309,7 @@ class CodexCliAgent:
             public_data = task.model_dump(mode="json")
             public_data["execution_environment"] = task_environment(workspace, self.tool_executables)
             public_input = json.dumps(public_data, ensure_ascii=False, indent=2)
-            args = self._arguments(workspace, schema_path, model_id, prompt, run_ctx)
+            args = self._arguments(workspace, schema_path, selection, prompt, run_ctx)
             timed_out = False
             deadline = record.start + self.settings.timeout_seconds
             for attempt in range(1, self.settings.startup_retries + 2):
@@ -300,7 +317,8 @@ class CodexCliAgent:
                 if remaining <= 0:
                     raise ExecutionError("Codex execution timed out during startup", stage=run_ctx.stage)
                 startup_attempts = attempt
-                record.event("model_request", {"request": {"model_id": model_id, "messages": [
+                record.event("model_request", {"request": {"model_id": model_id,
+                    "reasoning_effort": selection.reasoning_effort, "messages": [
                     {"role": "developer", "content": prompt}, {"role": "user", "content": public_input}]},
                     "runtime": self.runtime_info(), "workspace": str(workspace), "startup_attempt": startup_attempts})
                 process = subprocess.Popen(args, cwd=workspace, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -404,6 +422,7 @@ class CodexCliAgent:
         return ExecutionResult(task_id=task.task_id, agent_version_id=snapshot.version_id,
             operation_id=run_ctx.operation_id, output=output, trajectory=record.events, usage=usage,
             status=status, error=error, state_summary={"agent_plugin": self.plugin_id, "execution_model": model_id,
+                "execution_reasoning_effort": selection.reasoning_effort if selection else None,
                 "termination_reason": termination, "fresh_session": True, "seed_supported": False,
                 "workspace": str(workspace) if workspace else None, "model_calls_scope": "not_reported",
                 "tool_calls_scope": "visible_cli_items", "startup_attempts": startup_attempts,

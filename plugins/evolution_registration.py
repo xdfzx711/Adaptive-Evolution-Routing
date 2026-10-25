@@ -9,6 +9,7 @@ from aer_core.plugin_registry import API_VERSION, PluginRegistry, ResolvedDepend
 from aer_core.schemas.plugins import PluginCapabilities, PluginMetadata
 from plugins.evolution.prompt import PromptEvolverConfig, SimplePromptEvolver
 from plugins.evolution.model_selection import ModelSelectionEvolverConfig, ModelSelectionEvolver
+from plugins.agents.model_selection import CodexModelAdapter
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
 from plugins.routers.jev import JevRouter, JevRoutingSettings, resolve_jev_credentials
@@ -36,7 +37,8 @@ def build_jev_router(*, config: JevRoutingSettings, dependencies: ResolvedDepend
 
 
 def build_model_selection(*, config: ModelSelectionEvolverConfig, dependencies: ResolvedDependencies):
-    return ModelSelectionEvolver(config, dependencies.get("artifact_store"), dependencies.get("model_provider"))
+    return ModelSelectionEvolver(config, dependencies.get("artifact_store"), dependencies.get("model_provider"),
+        adapter=CodexModelAdapter())
 
 
 def register_evolution_plugins(registry: PluginRegistry) -> None:
@@ -56,6 +58,6 @@ def register_evolution_plugins(registry: PluginRegistry) -> None:
         dependencies=["artifact_store", "config_root"]), build_jev_router, config_model=JevRoutingSettings,
         dependency_types={"artifact_store": ArtifactStore, "config_root": Path})
     registry.register(PluginMetadata(id="model_selection_evolver", category="evolution", api_version=API_VERSION,
-        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["model"], compatible_agents=["codex_cli_agent"]),
+        plugin_version="0.2.0", capabilities=PluginCapabilities(targets=["model"], compatible_agents=["codex_cli_agent"]),
         dependencies=["artifact_store", "model_provider"]), build_model_selection, config_model=ModelSelectionEvolverConfig,
         dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider})

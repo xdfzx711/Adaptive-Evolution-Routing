@@ -1,4 +1,4 @@
-# Codex CLI Agent、提示词与模型选择
+# Codex CLI Agent、提示词与模型／推理强度选择
 
 `codex_cli_agent` 是任务执行插件，实现 AgentPlugin；主控制器没有 Codex 或模型名称分支。Codex 自己完成模型调用、工具选择和执行循环。Router、Diagnoser、Prompt Evolver、ModelSelectionEvolver 使用注入的框架 ModelProvider，示例中仍为 Qwen。执行模型变化不改变这些插件的模型。
 
@@ -32,7 +32,9 @@
 | --- | --- |
 | command | CLI 启动参数列表，默认 `[codex]`；Windows npm 安装通过 Node 启动其 JS 入口，不拼接 Shell 命令 |
 | initial_model | 初始 model 工件的模型标识，默认 gpt-5.6-sol |
+| initial_reasoning_effort | 初始 model 工件的推理强度，默认 null，表示沿用 Codex 后端默认值 |
 | allowed_models | 本实验允许选择的模型，非空、不重复，必须包含初始模型 |
+| allowed_reasoning_efforts | 按模型配置允许的推理强度列表；缺省为 `{}`，未列出的模型仅允许 null（后端默认） |
 | workspace_root | 绝对路径；默认系统临时目录下 aer-codex-workspaces，必须在 AER 项目之外 |
 | timeout_seconds | 一次完整 CLI 执行的超时，默认 300 秒，超时终止进程树 |
 | profile | 可选 Codex Profile 名称 |
@@ -56,9 +58,43 @@ CLI 的 error / turn.failed 标准输出事件会保留在最终异常中，即�
 
 执行层持续读取 stdout/stderr。收到 turn.completed 或 turn.failed 后给予 2 秒退出宽限时间；CLI 未退出时结束本次进程树，记录 shutdown_after_terminal_event。完整成功事件、最终输出和 usage 仍按原契约校验；未收到终止事件时仍执行原超时限制，自然的非零退出仍报错。这避免将已完成但退出停滞的 CLI 会话误报为任务执行超时。
 
-Snapshot.artifacts 保存 `prompt` 和 `model`。prompt 是可进化的附加 developer_instructions；model 正文为 `{"model_id":"gpt-5.6-sol"}`，执行时唯一映射为 `--model`。运行配置和允许模型列表由 Snapshot.config 冻结，initial_model 只负责创建初始工件。
+Snapshot.artifacts 保存 `prompt` 和 `model`。prompt 是可进化的附加 developer_instructions；model 同时保存模型与推理强度，例如：
 
-Prompt Evolver 只更新 prompt；ModelSelectionEvolver 根据允许反馈，用 Qwen 从当前模型之外的配置列表中选择一个模型，只更新 model。选择当前模型或 null 返回空候选；越界选择报错。只有一个允许模型时，model 目标不可行。每轮默认一个候选，接口保留多候选能力。
+```json
+{
+  "model_id": "gpt-5.6-sol",
+  "reasoning_effort": "high"
+}
+```
+
+Codex 将前者映射为 `--model`，后者映射为 `--config model_reasoning_effort="high"`。运行配置和候选组合列表由 Snapshot.config 冻结，initial_model／initial_reasoning_effort 只负责创建初始工件，后续每次执行都读取传入 Snapshot 中的 model 工件。
+
+旧配置、旧 Snapshot 以及仅含 model_id 的工件继续可用。省略 reasoning_effort 或设为 null 时不向 CLI 传递该覆盖项，不自动指定 medium。未配置 allowed_reasoning_efforts 时，原命令仍只进化模型。启用联合进化时，在 agent.config 下配置，例如：
+
+```yaml
+initial_model: gpt-5.6-sol
+initial_reasoning_effort: medium
+allowed_models: [gpt-6.1-sol, gpt-6-sol, gpt-6-luna, gpt-5.6-sol]
+allowed_reasoning_efforts:
+  gpt-6.1-sol: [low, medium, high]
+  gpt-6-sol: [low, medium, high]
+  gpt-6-luna: [low, medium, high]
+  gpt-5.6-sol: [low, medium, high]
+```
+
+档位列表按实验所用 Provider 实际支持的组合填写；配置允许 low、medium、high、xhigh、max、ultra 和 null，具体模型不一定支持全部档位。列表必须非空、不重复，模型键必须属于 allowed_models，初始组合也必须在列表中。如需让 Router 选择恢复后端默认，应将 null 加入对应列表。Provider 拒绝某组合时记录执行错误，不自动降档或切换模型。
+
+也可只在命令行开启，不修改原 YAML。例如沿用已有 Jev 三题配置：
+
+```powershell
+.\.venv\Scripts\python.exe main.py run-task experiments/configs/v0_1_codex_swebench_jev.yaml --task-id psf__requests-1963 --set agent.config.initial_reasoning_effort=medium --set 'agent.config.allowed_reasoning_efforts={gpt-6.1-sol: [low, medium, high], gpt-6-sol: [low, medium, high], gpt-6-luna: [low, medium, high], gpt-5.6-sol: [low, medium, high]}' --output model-reasoning-result.json
+```
+
+任务 ID 应使用该配置实际包含的实例；可在原来的 run-task 命令中追加相同的两个 --set 参数。此处仅覆盖 Agent 配置，不覆盖 Jev／Qwen 的依赖配置。
+
+Prompt Evolver 只更新 prompt；ModelSelectionEvolver 根据允许反馈，用注入的 Qwen Provider 从当前组合之外的列表中选择完整配置，只更新 model。它允许仅换推理强度、仅换模型或同时改变两者。返回完全相同的组合或 model_id=null 时为空候选，越界组合报错。即使只有一个允许模型，只要存在另一推理强度，model 目标仍可行；仅剩当前组合时不可行。每轮默认一个候选，接口保留多候选能力。兼容旧的仅含 model_id 的模型响应，此时保留当前推理强度；如果新模型不允许该强度，拒绝该响应。
+
+通用选择类型与 ExecutionModelAdapter 协议位于 plugins/model_selection.py；CodexModelAdapter 位于 plugins/agents/model_selection.py，负责解释本插件的候选空间、读取和编码工件。model_selection_evolver 的工厂显式注入该适配器，Evolver 本身不依赖 Codex 模型名。接入其他任务 Agent 时，实现其适配器和执行参数映射，并在插件注册中声明兼容关系；可复用同一 Evolver，无须修改主控制器。当前未给 ReAct／SingleCall Agent 新增 model 能力。
 
 候选从当前稳定版本继承其余工件。配对验证使用相同公开任务、初始环境和评分规则；接受策略沿用现有分数提升与回归保护。成本单独记录，不将低成本等同于接受理由。拒绝或验证失败不修改稳定指针；提交后复用候选的当前任务验证结果，不重新执行。
 
@@ -74,7 +110,7 @@ CLI 版本和用户配置文件摘要进入评测条件；模型工件、提示�
 
 turn.completed 的 input_tokens/output_tokens 作为实际用量；cached_input_tokens 已包含在输入总数中，不重复相加。未报告 token 时保持未知，不能进入完整验证缓存。CLI 内部模型请求次数不可见，model_calls=null；工具次数仅统计可见 CLI 工具事件。已知 token 不会因为请求次数未知而变成模拟计费。
 
-沿用 evolution.txt、每轮 record.json 和工件/版本存储，不增加平行日志。执行记录包含实际附加指令、公开输入、执行模型、CLI 版本、轨迹、工作区与成本；Router 提示词继续完整记录。
+沿用 evolution.txt、每轮 record.json 和工件/版本存储，不增加平行日志。执行记录包含实际附加指令、公开输入、执行模型与所选推理强度、CLI 版本、轨迹、工作区与成本；Router 提示词继续完整记录。后端默认值未显式指定时记录 null，不推测其实际档位。
 
 离线测试通过独立 Python 子进程模拟 CLI，覆盖模型与 Prompt 继承、评分、接受、拒绝、空候选、验证失败、CLI 失败、超时、成本、缓存、提交后复用和命令行覆盖。模拟测试不证明账户能够调用指定真实模型。
 

@@ -10,8 +10,8 @@ from unittest.mock import patch
 from aer_core.config.models import AgentSettings
 from aer_core.schemas.references import AgentSnapshot
 from aer_core.usage import sum_usage
-from plugins.agents.codex import CodexCliAgent, CodexConfig, retryable_startup_failure
-from plugins.agents.model_selection import ModelSelection
+from plugins.agents.codex import CodexCliAgent, CodexConfig, controlled_config, retryable_startup_failure
+from plugins.agents.model_selection import CodexModelAdapter, ModelSelection
 from plugins.agents.output import PublicJsonOutput
 from aer_core.schemas.task import TaskView
 from plugins.benchmarks.toy_tasks import ToyBenchmark
@@ -32,15 +32,66 @@ def fixture(root, mode="model", initial="gpt-5.6-sol", **changes):
     settings = AgentSettings(plugin="codex_cli_agent", initial_prompt="Use public evidence", initial_snapshot_ref=None,
                              config=config.model_dump(mode="json"))
     store = MockArtifactStore()
-    controlled = config.model_dump(mode="json")
-    controlled.pop("initial_model")
-    snapshot = AgentSnapshot(version_id="v0", agent_plugin_id="codex_cli_agent", config=controlled,
+    snapshot = AgentSnapshot(version_id="v0", agent_plugin_id="codex_cli_agent", config=controlled_config(config),
         artifacts={"prompt": store.put(b"Use public evidence", "prompt"),
-                   "model": store.put(ModelSelection(model_id=initial).model_dump_json().encode(), "model")})
+                   "model": store.put(CodexModelAdapter().encode(ModelSelection(model_id=initial,
+                       reasoning_effort=config.initial_reasoning_effort)), "model")})
     return CodexCliAgent(settings, snapshot, store), snapshot, store
 
 
 class CodexTests(unittest.TestCase):
+    def test_snapshot_effort_controls_actual_cli_execution_without_mutating_the_agent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, stable, artifacts = fixture(Path(directory), mode="reasoning",
+                allowed_models=["gpt-5.6-sol"], initial_reasoning_effort="medium",
+                allowed_reasoning_efforts={"gpt-5.6-sol": ["medium", "high"]})
+            ref = artifacts.put(CodexModelAdapter().encode(ModelSelection(model_id="gpt-5.6-sol",
+                reasoning_effort="high")), "model")
+            candidate = stable.replace(version_id="v1", parent_version_id="v0",
+                artifacts={**stable.artifacts, "model": ref})
+            benchmark = ToyBenchmark()
+            task = benchmark.tasks("dev")[0]
+            evaluator = DeterministicEvaluator()
+            for snapshot, effort, success in ((stable, "medium", False), (candidate, "high", True), (stable, "medium", False)):
+                result = agent.run(benchmark.task_view(task), snapshot, context())
+                self.assertEqual(result.status, "completed", result.error)
+                self.assertEqual(result.state_summary["execution_reasoning_effort"], effort)
+                self.assertEqual(result.trajectory[0].payload["request"]["reasoning_effort"], effort)
+                self.assertEqual(evaluator.evaluate_record(task, result, benchmark.evaluation_spec(task),
+                    operation_id="effort-eval").success, success)
+            self.assertEqual(agent.snapshot(), stable)
+            self.assertEqual(stable.config, candidate.config)
+            invalid = candidate.replace(artifacts={**candidate.artifacts, "model": artifacts.put(
+                b'{"model_id":"gpt-5.6-sol","reasoning_effort":"low"}', "model")})
+            failed = agent.run(benchmark.task_view(task), invalid, context())
+            self.assertEqual(failed.status, "error")
+            self.assertEqual(failed.usage.model_calls, 0)
+
+    def test_legacy_model_only_snapshots_keep_the_default_and_original_artifact_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, snapshot, artifacts = fixture(Path(directory))
+            self.assertNotIn("allowed_reasoning_efforts", snapshot.config)
+            self.assertNotIn("initial_reasoning_effort", snapshot.config)
+            self.assertEqual(artifacts.get(snapshot.artifacts["model"]), b'{\n  "model_id": "gpt-5.6-sol"\n}')
+            args = agent._arguments(Path(directory), None, ModelSelection(model_id="gpt-5.6-sol"), "prompt", context())
+            self.assertFalse(any(value.startswith("model_reasoning_effort=") for value in args))
+            selected = ModelSelection(model_id="gpt-6-sol", reasoning_effort="high")
+            args = agent._arguments(Path(directory), None, selected, "prompt", context())
+            self.assertEqual(args[args.index("--model") + 1], selected.model_id)
+            overrides = [args[index + 1] for index, value in enumerate(args[:-1]) if value == "--config"]
+            self.assertEqual(tomllib.loads(next(value for value in overrides if value.startswith("model_reasoning_effort="))),
+                {"model_reasoning_effort": "high"})
+
+    def test_reasoning_catalog_and_initial_pair_are_validated_at_configuration_load(self):
+        for change in ({"initial_reasoning_effort": "high"},
+            {"allowed_reasoning_efforts": {"gpt-5.6-sol": []}},
+            {"allowed_reasoning_efforts": {"gpt-5.6-sol": [None, None]}},
+            {"allowed_reasoning_efforts": {"gpt-5.6-sol": ["high", "high"]}},
+            {"allowed_models": ["gpt-5.6-sol"], "allowed_reasoning_efforts": {"gpt-6-sol": ["high"]}},
+            {"allowed_reasoning_efforts": {"gpt-5.6-sol": ["unsupported"]}}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                CodexConfig(**change)
+
     def test_completed_turn_does_not_become_a_timeout_when_cli_shutdown_stalls(self):
         with tempfile.TemporaryDirectory() as directory:
             agent, snapshot, _ = fixture(Path(directory), mode="completed-hang", timeout_seconds=5.0)

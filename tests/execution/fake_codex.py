@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import sys
 import time
+import tomllib
 
 
 def emit(value):
@@ -51,6 +52,8 @@ def main():
     task = json.load(sys.stdin)
     model = sys.argv[sys.argv.index("--model") + 1]
     config = [sys.argv[index + 1] for index, value in enumerate(sys.argv[:-1]) if value == "--config"]
+    effort = next((tomllib.loads(value)["model_reasoning_effort"] for value in config
+                   if value.startswith("model_reasoning_effort=")), None)
     prompt = next(value for value in config if value.startswith("developer_instructions="))
     is_dev = task.get("public_metadata", {}).get("split") == "dev"
     emit({"type": "thread.started", "thread_id": "fixture-thread"})
@@ -80,7 +83,8 @@ def main():
         answer = {"name": re.search(r"Name:\s*([A-Za-z]+)", data["text"]).group(1),
                   "count": int(re.search(r"Count:\s*(\d+)", data["text"]).group(1))}
     is_similar = task.get("public_metadata", {}).get("validation_group") == "similar"
-    if mode == "reject" or (model == "gpt-5.6-sol" and (is_dev or is_similar)) or (is_dev and mode == "local-failure" and "IMPROVED" not in prompt):
+    weak_selection = effort != "high" if mode.startswith("reasoning") else model == "gpt-5.6-sol"
+    if mode == "reject" or (weak_selection and (is_dev or is_similar)) or (is_dev and mode in {"local-failure", "reasoning-local-failure"} and "IMPROVED" not in prompt):
         answer = {"answer": -999}
     emit({"type": "item.started", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "status": "in_progress"}})
     emit({"type": "item.completed", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "aggregated_output": "checked public input", "exit_code": 1 if mode == "tool-error" else 0, "status": "completed"}})

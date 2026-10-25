@@ -33,7 +33,7 @@ def config(root, mode="model", rounds=1):
     return path
 
 
-def attach(task, choices=("model",), selected="gpt-6-sol"):
+def attach(task, choices=("model",), selected="gpt-6-sol", effort=None):
     decisions = iter(choices)
     scripted = ScriptedModel(MODEL)
     def generate(request, ctx):
@@ -42,7 +42,8 @@ def attach(task, choices=("model",), selected="gpt-6-sol"):
         if operation == "evolution_routing":
             return response(json.dumps({"target": next(decisions), "rationale": "根据公开轨迹选择组件"}))
         if operation == "model_selection":
-            return response(json.dumps({"model_id": selected, "rationale": "验证另一执行模型"}))
+            return response(json.dumps({"model_id": selected, "rationale": "验证另一执行模型",
+                **({"reasoning_effort": effort} if effort is not None else {})}))
         if operation == "prompt_evolution":
             return response(json.dumps({"candidates": [{"prompt": "IMPROVED reusable instructions", "rationale": "format and strategy"}]}))
         return scripted.generate(request, ctx)
@@ -55,6 +56,47 @@ def attach(task, choices=("model",), selected="gpt-6-sol"):
 
 
 class CodexRoutingIntegrationTests(unittest.TestCase):
+    def test_effort_only_evolution_is_validated_committed_and_inherited_by_the_next_round(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = config(root, mode="reasoning-local-failure", rounds=2)
+            # This fixture retains current-task failure until a subsequent prompt change,
+            # while the model/effort candidate improves the independent validation tasks.
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data["agent"]["config"].update(allowed_models=["gpt-5.6-sol"], initial_reasoning_effort="medium",
+                allowed_reasoning_efforts={"gpt-5.6-sol": ["medium", "high"]})
+            path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            startup = prepare_orchestrator(path, run_id="effort-test", console=False)
+            task = startup.prepare_task("dev-001")
+            initial = task.execution.storage.version_store.stable()
+            original_config = task.execution.benchmark.loaded_config.config.model_dump(mode="json")
+            model = attach(task, choices=("model", "prompt"), selected="gpt-5.6-sol", effort="high")
+            result = task.run()
+            self.assertEqual(result.stop_reason, "max_evolution_rounds_reached")
+            self.assertEqual(result.evolution_rounds_used, 2)
+            stable = task.execution.storage.version_store.stable()
+            selected = ModelSelection.model_validate_json(task.execution.storage.artifact_store.get(stable.artifacts["model"]))
+            self.assertEqual(selected, ModelSelection(model_id="gpt-5.6-sol", reasoning_effort="high"))
+            self.assertEqual(stable.artifacts["prompt"], initial.artifacts["prompt"])
+            self.assertEqual(stable.config, initial.config)
+            self.assertEqual(result.final_execution.state_summary["execution_reasoning_effort"], "high")
+            record = json.loads(next(startup.execution.storage.run_root.glob("rounds/*/round-001/record.json")).read_text(encoding="utf-8"))
+            self.assertTrue(record["candidates"][0]["committed"])
+            self.assertEqual(record["candidates"][0]["components"]["model"], selected.model_dump(mode="json"))
+            pairs = record["candidates"][0]["validation"]["tasks"]
+            self.assertTrue(all(pair["baseline"]["execution"]["state_summary"]["execution_reasoning_effort"] == "medium" for pair in pairs))
+            self.assertTrue(all(pair["candidate"]["execution"]["state_summary"]["execution_reasoning_effort"] == "high" for pair in pairs))
+            self.assertTrue(all(not pair["candidate_cached"] for pair in pairs))
+            selection_request = next(request for request, ctx in model.requests
+                if json.loads(request.messages[-1].content).get("operation") == "model_selection")
+            payload = json.loads(selection_request.messages[-1].content)
+            self.assertEqual(payload["current_selection"]["reasoning_effort"], "medium")
+            self.assertEqual(payload["allowed_selections"], [{"model_id": "gpt-5.6-sol", "reasoning_effort": "high"}])
+            second = json.loads(next(startup.execution.storage.run_root.glob("rounds/*/round-002/record.json")).read_text(encoding="utf-8"))
+            self.assertEqual(second["input_to_evolver"]["stable_components"]["model"], selected.model_dump(mode="json"))
+            self.assertTrue(all(pair["baseline_cached"] for pair in second["candidates"][0]["validation"]["tasks"]))
+            self.assertEqual(task.execution.benchmark.loaded_config.config.model_dump(mode="json"), original_config)
+
     def test_cli_overrides_are_used_by_the_entire_run_without_editing_yaml(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -67,6 +109,17 @@ class CodexRoutingIntegrationTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             result = json.loads(output.read_text(encoding="utf-8"))["record"]
             self.assertEqual(result["final_execution"]["state_summary"]["execution_model"], "gpt-6-luna")
+            self.assertEqual(result["evolution_rounds_used"], 0)
+            self.assertEqual(path.read_bytes(), original)
+            completed = subprocess.run([sys.executable, "main.py", "run-task", str(path), "--task-id", "dev-001",
+                "--set", "agent.config.initial_model=gpt-6-luna",
+                "--set", "agent.config.initial_reasoning_effort=high",
+                "--set", "agent.config.allowed_reasoning_efforts={gpt-6-luna: [medium, high]}",
+                "--quiet", "--output", str(output)],
+                cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=30)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))["record"]
+            self.assertEqual(result["final_execution"]["state_summary"]["execution_reasoning_effort"], "high")
             self.assertEqual(result["evolution_rounds_used"], 0)
             self.assertEqual(path.read_bytes(), original)
 

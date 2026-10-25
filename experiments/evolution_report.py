@@ -157,6 +157,8 @@ class EvolutionTextReport:
             f"得分：{score(scored)}；终止：{termination(scored)}；完整记录：{source}"]
         if execution and execution.state_summary.get("execution_model"):
             lines.append("执行模型：" + execution.state_summary["execution_model"])
+            if execution.state_summary.get("execution_reasoning_effort") is not None:
+                lines.append("推理强度：" + execution.state_summary["execution_reasoning_effort"])
         if scored.error:
             lines.append(f"执行/评分异常：{scored.error.code}；{scored.error.message}")
         if scored.cache_hit:

@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from aer_core.config.models import AgentSettings
 from aer_core.schemas.references import AgentSnapshot
 from aer_core.schemas.task import TaskView
-from plugins.agents.codex import CodexCliAgent, CodexConfig
+from plugins.agents.codex import CodexCliAgent, CodexConfig, controlled_config
 from plugins.agents.model_selection import ModelSelection
 from plugins.mocks import MockArtifactStore
 from tests.execution.helpers import context
@@ -22,7 +22,7 @@ from tests.execution.helpers import context
                      and shutil.which("codex"), "opt in with AER_TEST_REAL_CODEX=1 on Windows")
 class NativeCodexTests(unittest.TestCase):
     def test_real_exec_creates_session_and_returns_structured_output_through_local_responses(self):
-        models = []
+        models, requests = [], []
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *_):
@@ -39,6 +39,7 @@ class NativeCodexTests(unittest.TestCase):
             def do_POST(self):
                 request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 models.append(request["model"])
+                requests.append(request)
                 text = '{"ok":true}'
                 message = {"id": "msg_probe", "type": "message", "role": "assistant",
                     "phase": "final_answer", "status": "completed",
@@ -74,12 +75,10 @@ class NativeCodexTests(unittest.TestCase):
             with tempfile.TemporaryDirectory(prefix="aer-native-session-") as directory:
                 root = Path(directory)
                 config = CodexConfig(workspace_root=str(root / "workspaces"), timeout_seconds=30.0,
-                                     startup_retries=0)
-                controlled = config.model_dump(mode="json")
-                controlled.pop("initial_model")
+                                     startup_retries=0, allowed_reasoning_efforts={"gpt-5.6-sol": [None, "high"]})
                 store = MockArtifactStore()
                 snapshot = AgentSnapshot(version_id="native-probe", agent_plugin_id="codex_cli_agent",
-                    config=controlled, artifacts={"prompt": store.put(b"Return the publicly requested JSON object", "prompt"),
+                    config=controlled_config(config), artifacts={"prompt": store.put(b"Return the publicly requested JSON object", "prompt"),
                         "model": store.put(ModelSelection(model_id="gpt-5.6-sol").model_dump_json().encode(), "model")})
                 agent = CodexCliAgent(AgentSettings(plugin="codex_cli_agent", initial_prompt="public probe",
                     initial_snapshot_ref=None, config=config.model_dump(mode="json")), snapshot, store)
@@ -98,10 +97,14 @@ class NativeCodexTests(unittest.TestCase):
                     "output_schema": {"type": "object", "properties": {"ok": {"type": "boolean"}},
                                       "required": ["ok"], "additionalProperties": False}})
                 logical = agent.project_root / "runs" / root.name / "workspaces" / "episode" / "initial_execution"
-                for index, run_path in enumerate((root / "run", logical), start=1):
+                for index, (run_path, effort) in enumerate(((root / "run", None), (logical, None),
+                                                           (root / "explicit-effort", "high")), start=1):
                     with self.subTest(run_path=str(run_path)):
                         self.assertFalse(run_path.exists())
-                        result = agent.run(task, snapshot, context(workspace_ref=str(run_path)))
+                        selected = snapshot if effort is None else snapshot.replace(version_id="native-high",
+                            parent_version_id=snapshot.version_id, artifacts={**snapshot.artifacts, "model": store.put(
+                                ModelSelection(model_id="gpt-5.6-sol", reasoning_effort=effort).model_dump_json().encode(), "model")})
+                        result = agent.run(task, selected, context(workspace_ref=str(run_path)))
                         self.assertEqual(result.status, "completed", result.error)
                         self.assertEqual(result.output, {"ok": True})
                         self.assertEqual(models, ["gpt-5.6-sol"] * index)
@@ -109,6 +112,9 @@ class NativeCodexTests(unittest.TestCase):
                         self.assertTrue(result.usage.usage_complete)
                         self.assertEqual(result.usage.total_tokens, 4)
                         self.assertFalse(run_path.exists())
+                        if effort is not None:
+                            self.assertEqual(requests[-1]["reasoning"]["effort"], effort)
+                            self.assertEqual(result.state_summary["execution_reasoning_effort"], effort)
         finally:
             server.shutdown()
             server.server_close()
