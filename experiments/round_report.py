@@ -9,6 +9,7 @@ import json
 from datetime import datetime
 
 from aer_core.schemas.diagnosis import DiagnosisRecord
+from aer_core.schemas.routing import JevRoutingRecord
 from aer_core.schemas.paired import ValidationEvidence
 from plugins.storage._files import FileRoot, readable_json
 from plugins.storage.layout import episode_directory
@@ -94,6 +95,7 @@ class RoundReport:
         self.latest_diagnosis = None
         self.candidates = {}
         self.readable_sources = {}
+        self.version_names = {}
 
     @property
     def relative_path(self):
@@ -146,9 +148,17 @@ class RoundReport:
             for index, candidate in enumerate(item.candidate_summaries, 1):
                 candidates.append({"candidate": index, **fields(candidate, "target", "updated_components",
                     "change_summary", "generation_rationale", "reward", "delta_score", "delta_similar_score",
-                    "delta_regression_score", "accepted", "selected", "committed", "reason", "acceptance_reason")})
+                    "delta_regression_score", "accepted", "selected", "committed", "reason", "acceptance_reason",
+                    "actual_changes", "changes_truncated", "changes_unavailable", "change_summary_truncated",
+                    "generation_rationale_truncated", "validation")})
             result.append({"task": item.task_id, "round": item.round_id, "decision": fields(item.decision, "target", "rationale"),
-                           "diagnosis": diagnosis_view(item.diagnosis), "candidates": candidates})
+                "parent_version": self.version_names.get(item.stable_version_id, "historical_parent"),
+                "stable_version_after": self.version_names.get(item.stable_version_after,
+                    "historical_parent" if item.stable_version_after == item.stable_version_id else "historical_commit"
+                    if item.stable_version_after is not None else None),
+                "attempt_status": plain(item.attempt_status), "error_code": item.error_code,
+                "routing_rationale_truncated": item.routing_rationale_truncated,
+                "diagnosis": diagnosis_view(item.diagnosis), "candidates": candidates})
         return result
 
     def proposal(self, value, ref):
@@ -168,7 +178,7 @@ class RoundReport:
         self.data["routing"] = {"decision": fields(value.decision, "target", "rationale"), "operator": value.operator_id}
         receipt = routing_record(value, self.artifacts)
         if receipt is not None:
-            self.data["routing"]["model_call"] = routing_view(receipt)
+            self.data["routing"]["decision_call" if isinstance(receipt, JevRoutingRecord) else "model_call"] = routing_view(receipt)
         response = value.response
         self.data["generation"] = {"status": response.status.value if response else value.status,
             "usage": plain(value.attempt.usage) if value.attempt else None,
@@ -224,7 +234,9 @@ class RoundReport:
         self.data["status"] = "validation_incomplete" if any(item.status != "complete" for item in batch.reports) else "selected" if batch.selected_candidate_id else "no_candidate_selected"
 
     def record(self, kind, value, ref=None):
-        if kind == "round_start":
+        if kind == "episode_start":
+            self.version_names[value.version_id] = "V0"
+        elif kind == "round_start":
             self.start(value)
         elif kind == "controller_execution":
             self.latest_execution = scored_view(value)
@@ -247,6 +259,8 @@ class RoundReport:
         elif kind == "commit_outcome" and self.data is not None:
             entry = self.candidates[value.candidate_id]
             entry.update(status=value.status.value, committed=value.committed, commit_error=error_view(value.commit_error))
+            if value.committed and value.candidate_version_id not in self.version_names:
+                self.version_names[value.candidate_version_id] = f"V{len(self.version_names)}"
             self.data["status"] = "committed" if value.committed else "commit_failed"
         elif kind == "run_result" and self.data is not None:
             self.data["run_result"] = {**fields(value, "status", "stop_reason", "stop_stage", "final_evaluation_status", "usage"),

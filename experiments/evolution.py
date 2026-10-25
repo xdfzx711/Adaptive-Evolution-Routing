@@ -9,6 +9,7 @@ from aer_core.identifiers import timestamp_id
 
 from aer_core.contracts.router import RouterPlugin
 from aer_core.errors import AERError, BudgetExceeded, ContractError, EvolutionError, RoutingError
+from aer_core.history import component_edits
 from aer_core.plugin_manager import BuiltPlugins, PluginManager
 from aer_core.schemas.assessment import TaskExecutionRecord
 from aer_core.schemas.evolution import EvolutionDecision, EvolutionRequest, EvolutionResponse
@@ -89,7 +90,8 @@ class PreparedEvolution:
         public_task = self.execution.benchmark.benchmark.task_view(task)
         builder = context_builder(self.execution, task,
             history_max_attempts=config.evolution.history_max_attempts,
-            history_max_text_chars=config.evolution.history_max_text_chars)
+            history_max_text_chars=config.evolution.history_max_text_chars,
+            history_max_change_chars=config.evolution.history_max_change_chars)
         context = builder.build(public_task, record, stable, run_ctx, round_id=round_id,
             feasible_targets=availability.targets, task_mode=config.state.task_mode,
             allowed_history_task_ids=[item.task_id for item in self.execution.benchmark.benchmark.tasks("dev")])
@@ -157,10 +159,23 @@ class PreparedEvolution:
         for candidate in response.candidates:
             summary = candidate.metadata.get("change_summary")
             rationale = candidate.metadata.get("rationale")
+            edits, unavailable = [], False
+            # Read only component kinds disclosed in the public Snapshot, never scorer artifacts.
+            for kind, ref in candidate.artifact_updates.items():
+                if kind not in context.stable_snapshot.artifacts:
+                    continue
+                try:
+                    previous = storage.artifact_store.get(context.stable_snapshot.artifacts[kind]).decode("utf-8")
+                    updated = storage.artifact_store.get(ref).decode("utf-8")
+                    edits.extend(component_edits(kind, previous, updated))
+                except (AERError, UnicodeError, KeyError):
+                    # Invalid candidates still reach validation and receive their normal outcome.
+                    unavailable = True
             candidate_changes[candidate.candidate_id] = CandidateChange(target=candidate.target,
                 updated_components=tuple(candidate.artifact_updates),
-                change_summary=summary[:config.evolution.history_max_text_chars] if isinstance(summary, str) else None,
-                generation_rationale=rationale[:config.evolution.history_max_text_chars] if isinstance(rationale, str) else None)
+                change_summary=summary if isinstance(summary, str) else None,
+                generation_rationale=rationale if isinstance(rationale, str) else None,
+                actual_changes=edits, changes_unavailable=unavailable)
         finished = started.replace(status=status, decision=decision, operator_id=operator_id,
             candidate_ids=[candidate.candidate_id for candidate in response.candidates],
             candidate_changes=candidate_changes,
@@ -193,7 +208,8 @@ def assemble_evolution(execution: PreparedExecution) -> PreparedEvolution:
     config = execution.benchmark.loaded_config.config
     registry = create_registry()
     bindings = evolution_bindings(config, registry)
-    deps = {"artifact_store": execution.storage.artifact_store}
+    deps = {"artifact_store": execution.storage.artifact_store,
+            "config_root": execution.benchmark.loaded_config.source_path.parent}
     for name in ("model", "tools"):
         if name in execution.built_plugins.instances:
             deps[name] = execution.built_plugins.instances[name]

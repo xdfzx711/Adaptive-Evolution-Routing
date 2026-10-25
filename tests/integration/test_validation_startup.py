@@ -76,6 +76,10 @@ class ValidationStartupTests(unittest.TestCase):
                 self.assertTrue(historical.accepted)
                 self.assertTrue(historical.selected)
                 self.assertFalse(historical.committed)
+                self.assertEqual(historical.validation.independent.before, 0)
+                self.assertEqual(historical.validation.independent.after, 1)
+                self.assertEqual(historical.validation.current_task.after, 1)
+                self.assertEqual(second.context.history[0].stable_version_after, stable.version_id)
 
     def test_multicandidate_id_join_accepted_vs_selected_and_cost(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -88,6 +92,9 @@ class ValidationStartupTests(unittest.TestCase):
             self.assertEqual(result.usage.model_calls, 26)
             self.assertEqual(sum(outcome.selected for outcome in result.outcomes), 1)
             self.assertTrue(all(outcome.acceptance.accepted for outcome in result.outcomes))
+            reports = {report.candidate_id: report for report in result.reports}
+            for outcome in result.outcomes:
+                self.assertEqual(outcome.validation.independent.after, reports[outcome.candidate_id].candidate_metrics.score)
             self.assertEqual(result.selected_candidate_id, min(item.candidate_id for item in proposal.response.candidates))
 
     def test_incomplete_validation_persists_failure_and_does_not_reward(self):

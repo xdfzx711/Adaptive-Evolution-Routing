@@ -6,6 +6,7 @@ from pathlib import Path
 from aer_core.identifiers import timestamp_id
 
 from aer_core.errors import AERError, ContractError, ValidationError
+from aer_core.history import validation_summary
 from aer_core.plugin_manager import BuiltPlugins, PluginManager
 from aer_core.schemas.experience import AttemptFinishedEvent, CandidateEvaluatedEvent, CandidateEvaluation
 from aer_core.schemas.paired import ValidationBatchResult, ValidationEvidence
@@ -117,7 +118,8 @@ class PreparedValidation:
             status = "selected" if chosen else "accepted" if acceptance.accepted else "incomplete" if report.status != "complete" else "rejected"
             outcomes.append(CandidateEvaluation(attempt_id=proposal.attempt.attempt_id, candidate_id=report.candidate_id,
                 candidate_version_id=report.candidate_version_id, validation_ref=validation_ref, acceptance=acceptance,
-                status=status, selected=chosen, committed=False, commit_error=None, final_recorded_at=now))
+                status=status, selected=chosen, committed=False, commit_error=None, final_recorded_at=now,
+                validation=validation_summary(report)))
         for candidate, error in invalid:
             acceptance = AcceptanceResult(candidate_id=candidate.candidate_id, accepted=False, reward=None,
                 delta_score=None, delta_similar_score=None, delta_regression_score=None, reason="invalid_candidate",

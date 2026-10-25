@@ -6,6 +6,7 @@ from aer_core.errors import ContractError, NoFeasibleTargets
 from aer_core.schemas.evolution import EvolutionDecision
 from aer_core.schemas.execution import TraceEvent
 from aer_core.schemas.experience import AttemptFinishedEvent, CandidateChange, CandidateEvaluatedEvent, CandidateEvaluation, TaskFinishedEvent
+from aer_core.schemas.history import ComponentEdit
 from tests.domain_helpers import NOW, acceptance, run_result
 from tests.evolution.helpers import MemoryExperience, fixture
 from tests.storage.helpers import attempt
@@ -111,7 +112,7 @@ class ContextTests(unittest.TestCase):
 
     def test_failed_empty_and_rejected_history_retains_unknown_and_actual_rewards(self):
         _, stable, _, task, record, live, policy = fixture()
-        rejected = attempt(attempt_id="rejected").replace(decision=EvolutionDecision(target="prompt", rationale=CANARY),
+        rejected = attempt(attempt_id="rejected").replace(decision=EvolutionDecision(target="prompt", rationale="Use the public failure evidence"),
             diagnosis=record.diagnosis.replace(explanation=CANARY))
         empty = attempt(status="empty_candidates", candidate_ids=[], attempt_id="empty")
         policy_result = acceptance(False).replace(reason=CANARY)
@@ -131,6 +132,9 @@ class ContextTests(unittest.TestCase):
         self.assertFalse(summary.candidate_summaries[0].accepted)
         self.assertEqual(summary.candidate_summaries[0].acceptance_reason, "unknown")
         self.assertEqual(next(item for item in state.history if item.attempt_id == "empty").candidate_summaries, ())
+        self.assertEqual(summary.stable_version_after, summary.stable_version_id)
+        self.assertEqual(summary.decision.rationale, "Use the public failure evidence")
+        self.assertEqual(next(item for item in state.history if item.attempt_id == "empty").attempt_status, "empty_candidates")
 
     def test_history_includes_candidate_change_and_policy_reason_with_configured_limits(self):
         _, stable, _, task, record, live, policy = fixture()
@@ -154,3 +158,27 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(candidate.change_summary, "Execution model: gpt-5.6-sol -> gpt")
         self.assertEqual(candidate.generation_rationale, "Try a stronger model after repeated")
         self.assertEqual(candidate.acceptance_reason, "regression_guard")
+        self.assertTrue(candidate.change_summary_truncated)
+        self.assertTrue(candidate.generation_rationale_truncated)
+
+    def test_actual_changes_have_independent_limits_and_exclude_private_components(self):
+        _, stable, _, task, record, live, policy = fixture()
+        instruction = "Keep caller contracts. " * 25 + "Catch at the outermost CLI boundary."
+        previous = attempt().replace(candidate_changes={"candidate-1": CandidateChange(target="prompt",
+            updated_components=["prompt", "evaluation_spec"], generation_rationale="A" * 50,
+            actual_changes=[ComponentEdit(component="prompt", operation="insert", before="", after=instruction),
+                            ComponentEdit(component="evaluation_spec", operation="insert", before="", after=CANARY)])})
+        builder = ContextBuilder(MemoryExperience([terminal(previous)]),
+            policy.replace(history_max_text_chars=20, history_max_change_chars=1000))
+        state = builder.build(task, record, stable, live, round_id=2, feasible_targets=["prompt"], as_of=NOW)
+        candidate = state.history[0].candidate_summaries[0]
+        self.assertEqual(candidate.actual_changes[0].after, instruction)
+        self.assertFalse(candidate.changes_truncated)
+        self.assertTrue(candidate.generation_rationale_truncated)
+        self.assertNotIn(CANARY, state.model_dump_json())
+        limited = ContextBuilder(builder.experience, builder.policy.replace(history_max_change_chars=90)).build(
+            task, record, stable, live, round_id=2, feasible_targets=["prompt"], as_of=NOW)
+        clipped = limited.history[0].candidate_summaries[0]
+        self.assertEqual(clipped.actual_changes[0].after, instruction[:90])
+        self.assertTrue(clipped.actual_changes[0].truncated)
+        self.assertTrue(clipped.changes_truncated)

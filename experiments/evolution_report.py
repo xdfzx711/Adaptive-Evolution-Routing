@@ -164,6 +164,7 @@ class EvolutionTextReport:
         self.block(title, lines)
 
     def proposal(self, value, ref):
+        from aer_core.schemas.routing import JevRoutingRecord
         from .routing_report import routing_record
         attempt, context = value.attempt, value.context
         if attempt:
@@ -179,7 +180,9 @@ class EvolutionTextReport:
             f"Operator：{value.operator_id or '未选择'}；生成状态：{value.response.status.value if value.response else value.status}"])
         receipt = routing_record(value, self.artifacts)
         if receipt is not None:
-            lines = ["完整提示词与原始响应：" + proposal_source + " / routing.model_call",
+            jev = isinstance(receipt, JevRoutingRecord)
+            lines = [("完整决策请求与原始响应：" if jev else "完整提示词与原始响应：") + proposal_source +
+                     (" / routing.decision_call" if jev else " / routing.model_call"),
                      "路由调用成本：" + self.usage_line(receipt.usage)]
             if receipt.error:
                 lines.append("路由异常：" + receipt.error.message)
@@ -192,15 +195,41 @@ class EvolutionTextReport:
                 "当轮历史尝试摘要（实际输入内容，长编号使用下方别名）："]
             for item in context.history:
                 lines.append(f"  第 {item.round_id} 轮 / {item.task_id}；目标={item.decision.target if item.decision else '未记录'}")
+                parent_name = self.version_names.get(item.stable_version_id, '历史父版本')
+                after_name = self.version_names.get(item.stable_version_after,
+                    parent_name if item.stable_version_after == item.stable_version_id else '历史提交版本'
+                    if item.stable_version_after is not None else '未记录')
+                lines.append(f"    父稳定版本={parent_name}；本轮结束后的稳定版本={after_name}；生成状态={item.attempt_status or '未记录'}")
+                if item.error_code:
+                    lines.append(f"    生成异常：{item.error_code}")
                 for candidate in item.candidate_summaries:
                     lines.append(f"    {self.candidate_names.get(candidate.candidate_id, '历史候选')}：收益={candidate.reward}；"
                         f"验证分变化={candidate.delta_score}；同类变化={candidate.delta_similar_score}；回归变化={candidate.delta_regression_score}；"
                         f"accepted={candidate.accepted}；selected={candidate.selected}；committed={candidate.committed}；"
                         f"状态={candidate.reason}；接受规则={candidate.acceptance_reason or '未评估'}")
-                    if candidate.change_summary:
-                        lines.append(f"      具体变更：{candidate.change_summary}")
+                    if candidate.actual_changes:
+                        for edit in candidate.actual_changes:
+                            lines.append(f"      实际修改 [{edit.component}/{edit.operation}]" + ('（已截断）' if edit.truncated else ''))
+                            if edit.before:
+                                lines.append(f"        删除／替换前：{edit.before}")
+                            if edit.after:
+                                lines.append(f"        新增／替换后：{edit.after}")
+                        if candidate.changes_truncated:
+                            lines.append("      实际修改已达到历史输入长度上限，存在截断或省略。")
+                    elif candidate.change_summary:
+                        lines.append(f"      变更摘要：{candidate.change_summary}" + ('（已截断）' if candidate.change_summary_truncated else ''))
+                    if candidate.changes_unavailable:
+                        lines.append("      部分组件无法读取为文本，实际修改未完整提取。")
                     if candidate.generation_rationale:
-                        lines.append(f"      候选理由：{candidate.generation_rationale}")
+                        lines.append(f"      候选理由：{candidate.generation_rationale}" + ('（已截断）' if candidate.generation_rationale_truncated else ''))
+                    if candidate.validation:
+                        for field, label in (("current_task", "当前任务"), ("independent", "独立验证"),
+                                             ("similar", "同类任务"), ("regression", "回归任务")):
+                            observed = getattr(candidate.validation, field)
+                            if observed:
+                                lines.append(f"      {label}：{observed.before:.3f} → {observed.after:.3f}（{observed.delta:+.3f}）")
+                    if not candidate.committed:
+                        lines.append("      该候选修改未提交到稳定版本。")
             if not context.history:
                 lines.append("  无")
             if value.decision:

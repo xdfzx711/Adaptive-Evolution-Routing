@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from aer_core.contracts.storage import ExperienceStore
 from aer_core.errors import ContractError, NoFeasibleTargets
+from aer_core.history import limit_edits
 from aer_core.schemas.assessment import TaskExecutionRecord
 from aer_core.schemas.evolution import CandidateSummary, EvolutionContext, EvolutionDecision, ExperienceSummary
 from aer_core.schemas.feedback import ContextPolicy
@@ -57,7 +58,7 @@ class ContextBuilder:
             elif (attempt.episode_id, attempt.task_id) not in finished_episodes:
                 continue
             terminals[(attempt.episode_id, attempt.attempt_id)] = attempt
-        outcomes, commits = {}, set()
+        outcomes, commits = {}, {}
         for event in events:
             key = (event.episode_id, event.payload.attempt_id) if isinstance(event, (CandidateEvaluatedEvent, VersionCommittedEvent)) else None
             if key not in terminals:
@@ -66,10 +67,11 @@ class ContextBuilder:
                 if event.payload.final_recorded_at <= as_of:
                     outcomes[(key, event.payload.candidate_id)] = event.payload
             elif isinstance(event, VersionCommittedEvent) and event.payload.committed_at <= as_of:
-                commits.add((key, event.payload.candidate_id))
+                commits[(key, event.payload.candidate_id)] = event.payload
         summaries = []
         for key, attempt in terminals.items():
             candidates = []
+            stable_after = attempt.stable_version_id
             for candidate_id in attempt.candidate_ids:
                 result = outcomes.get((key, candidate_id))
                 change = attempt.candidate_changes.get(candidate_id)
@@ -77,11 +79,23 @@ class ContextBuilder:
                 accepted = acceptance is not None and acceptance.accepted
                 selected = result.selected if result is not None else False
                 committed = accepted and selected and ((key, candidate_id) in commits or result.committed)
+                receipt = commits.get((key, candidate_id))
+                candidate_version = result.candidate_version_id if result else None
+                if committed:
+                    stable_after = receipt.committed_version_id if receipt else candidate_version
+                changes, truncated = limit_edits(
+                    [edit for edit in change.actual_changes if edit.component in self.policy.artifact_kinds]
+                    if change else (), self.policy.history_max_change_chars)
                 candidates.append(CandidateSummary(candidate_id=candidate_id,
                     target=change.target if change else None,
                     updated_components=change.updated_components if change else (),
                     change_summary=change.change_summary[:self.policy.history_max_text_chars] if change and change.change_summary else None,
                     generation_rationale=change.generation_rationale[:self.policy.history_max_text_chars] if change and change.generation_rationale else None,
+                    actual_changes=changes, changes_truncated=truncated,
+                    changes_unavailable=change.changes_unavailable if change else False,
+                    change_summary_truncated=bool(change and change.change_summary and len(change.change_summary) > self.policy.history_max_text_chars),
+                    generation_rationale_truncated=bool(change and change.generation_rationale and len(change.generation_rationale) > self.policy.history_max_text_chars),
+                    validation=result.validation if result else None, candidate_version_id=candidate_version,
                     reward=acceptance.reward if acceptance else None,
                     delta_score=acceptance.delta_score if acceptance else None,
                     delta_similar_score=acceptance.delta_similar_score if acceptance else None,
@@ -90,11 +104,15 @@ class ContextBuilder:
                     reason=result.status.value if result else "not_validated",
                     acceptance_reason=(acceptance.reason if acceptance.reason in PUBLIC_ACCEPTANCE_REASONS else "unknown")
                         if acceptance else None))
-            decision = EvolutionDecision(target=attempt.decision.target, rationale="Target recorded in completed history.") if attempt.decision else None
+            decision = EvolutionDecision(target=attempt.decision.target,
+                rationale=attempt.decision.rationale[:self.policy.history_max_text_chars]) if attempt.decision else None
             summaries.append(ExperienceSummary(attempt_id=attempt.attempt_id, run_id=attempt.run_id,
                 episode_id=attempt.episode_id, task_id=attempt.task_id, round_id=attempt.round_id,
                 stable_version_id=attempt.stable_version_id, decision=decision, diagnosis=self._diagnosis(attempt.diagnosis, ()),
-                candidate_summaries=candidates, completed_at=attempt.finished_at))
+                candidate_summaries=candidates, completed_at=attempt.finished_at,
+                stable_version_after=stable_after, attempt_status=attempt.status,
+                error_code=attempt.error.code if attempt.error else None,
+                routing_rationale_truncated=bool(attempt.decision and len(attempt.decision.rationale) > self.policy.history_max_text_chars)))
         ordered = sorted(summaries, key=lambda item: (item.completed_at, item.episode_id, item.round_id, item.attempt_id))
         return tuple(ordered[-self.policy.history_max_attempts:]) if self.policy.history_max_attempts else ()
 

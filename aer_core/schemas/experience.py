@@ -7,6 +7,7 @@ from pydantic import Field, model_validator
 from .base import DomainModel, Identifier, Items, PositiveInt, ReadOnlyMap, UtcTimestamp
 from .evolution import EvolutionDecision
 from .execution import Diagnosis, ErrorInfo
+from .history import ComponentEdit, ValidationSummary
 from .experiment import RunResult, TaskFinishedSummary
 from .references import AgentSnapshot, ArtifactRef, RecordRef
 from .states import AttemptStatus, AttemptStatusValue, CandidateStatus, CandidateStatusValue
@@ -21,6 +22,8 @@ class CandidateChange(DomainModel):
     updated_components: Items[Identifier]
     change_summary: str | None = None
     generation_rationale: str | None = None
+    actual_changes: Items[ComponentEdit] = ()
+    changes_unavailable: bool = False
 
 
 class EvolutionAttempt(DomainModel):
@@ -84,6 +87,7 @@ class CandidateEvaluation(DomainModel):
     commit_error: ErrorInfo | None
     final_recorded_at: UtcTimestamp
     validation_error: ErrorInfo | None = None
+    validation: ValidationSummary | None = None
 
     @model_validator(mode="after")
     def candidate_lifecycle(self):

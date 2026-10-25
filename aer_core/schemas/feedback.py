@@ -27,3 +27,4 @@ class ContextPolicy(DomainModel):
     reason_messages: ReadOnlyMap[str] = Field(default_factory=dict)
     history_max_attempts: NonNegativeInt = 5
     history_max_text_chars: PositiveInt = 320
+    history_max_change_chars: PositiveInt = 4000

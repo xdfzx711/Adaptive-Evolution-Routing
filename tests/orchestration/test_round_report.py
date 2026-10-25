@@ -50,6 +50,10 @@ class RoundReportTests(unittest.TestCase):
                 self.assertIsNotNone(pairs[0]["input"])
             second = json.loads(paths[1].read_text(encoding="utf-8"))
             self.assertEqual(second["input_to_evolver"]["history"][0]["round"], 1)
+            history = second["input_to_evolver"]["history"][0]
+            self.assertEqual((history["parent_version"], history["stable_version_after"]), ("V0", "V0"))
+            self.assertTrue(history["candidates"][0]["actual_changes"])
+            self.assertEqual(history["candidates"][0]["validation"]["independent"]["delta"], 0)
             self.assertEqual(second["run_result"]["stop_reason"], "max_evolution_rounds_reached")
             text_report = (root / "evolution.txt").read_text(encoding="utf-8")
             self.assertIn(str(paths[0]), text_report)

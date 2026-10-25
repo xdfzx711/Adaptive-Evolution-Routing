@@ -1,5 +1,7 @@
 """Explicit router and Prompt Evolver factories with minimal dependencies."""
 
+from pathlib import Path
+
 from aer_core.config.models import RoutingSettings
 from aer_core.contracts.providers import ModelProvider
 from aer_core.contracts.storage import ArtifactStore
@@ -9,6 +11,7 @@ from plugins.evolution.prompt import PromptEvolverConfig, SimplePromptEvolver
 from plugins.evolution.model_selection import ModelSelectionEvolverConfig, ModelSelectionEvolver
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
+from plugins.routers.jev import JevRouter, JevRoutingSettings, resolve_jev_credentials
 
 
 def build_fixed(*, config: RoutingSettings, dependencies: ResolvedDependencies) -> FixedRouter:
@@ -27,6 +30,11 @@ def build_llm_router(*, config: RoutingSettings, dependencies: ResolvedDependenc
     return LLMRouter(config, dependencies.get("model_provider"), dependencies.get("artifact_store"))
 
 
+def build_jev_router(*, config: JevRoutingSettings, dependencies: ResolvedDependencies):
+    credentials = resolve_jev_credentials(config.config, dependencies.get("config_root"))
+    return JevRouter(config, dependencies.get("artifact_store"), credentials)
+
+
 def build_model_selection(*, config: ModelSelectionEvolverConfig, dependencies: ResolvedDependencies):
     return ModelSelectionEvolver(config, dependencies.get("artifact_store"), dependencies.get("model_provider"))
 
@@ -43,6 +51,10 @@ def register_evolution_plugins(registry: PluginRegistry) -> None:
         plugin_version="0.1.0", capabilities=PluginCapabilities(routing_modes=["llm"]),
         dependencies=["model_provider", "artifact_store"]), build_llm_router, config_model=RoutingSettings,
         dependency_types={"model_provider": ModelProvider, "artifact_store": ArtifactStore})
+    registry.register(PluginMetadata(id="jev_router", category="router", api_version=API_VERSION,
+        plugin_version="0.1.0", capabilities=PluginCapabilities(routing_modes=["llm"]),
+        dependencies=["artifact_store", "config_root"]), build_jev_router, config_model=JevRoutingSettings,
+        dependency_types={"artifact_store": ArtifactStore, "config_root": Path})
     registry.register(PluginMetadata(id="model_selection_evolver", category="evolution", api_version=API_VERSION,
         plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["model"], compatible_agents=["codex_cli_agent"]),
         dependencies=["artifact_store", "model_provider"]), build_model_selection, config_model=ModelSelectionEvolverConfig,

@@ -52,6 +52,11 @@ def validate_semantics(config: ExperimentConfig, catalog: ConfigCatalog) -> list
     router = None
     if config.routing.plugin is not None:
         router = reference("router", config.routing.plugin, "routing.plugin")
+    if router and router.config_model:
+        try:
+            router.config_model.model_validate(config.routing.model_dump(mode="json"))
+        except ValidationError as error:
+            issues.extend(schema_issues(error, "routing"))
 
     if benchmark:
         require(config.benchmark.execution_split in benchmark.splits, "benchmark.execution_split", "split is not declared by the Benchmark")

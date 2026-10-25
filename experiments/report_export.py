@@ -132,6 +132,7 @@ def export_saved_run(path: Path) -> Path:
         records.sort(key=lambda item: (item[0], item[1]))
         report = EvolutionTextReport(buffer.write, artifacts, versions, root=root)
         rounds = RoundReport(root, tasks[result.task_id], context, artifacts, config=config)
+        rounds.record("episode_start", snapshot)
         report.readable_sources = rounds.readable_sources
         report.begin(tasks[result.task_id], snapshot, config, context,
             started_at=records[0][0] if records else None)

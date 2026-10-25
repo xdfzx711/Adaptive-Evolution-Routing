@@ -107,7 +107,11 @@ score   = changed_lines_weight × line_f1 + (1 − changed_lines_weight) × file
 
 EvaluationResult.metrics 保存 changed_line_f1、changed_file_f1、patch_valid、syntax_valid、tests_executed=0。接受策略继续比较验证集静态均分及回归分数。Router 与 Evolver 只收到公开代码产物、过滤反馈和验证摘要，不收到参考补丁。
 
-后续轮次的历史尝试会附带候选变更摘要、生成理由、分数变化、接受规则原因和提交状态；本轮 Router 的目标及理由也会传给 Evolver 模型。Prompt 历史只保留有限的文本差异，模型选择历史记录旧模型与新模型。`evolution.history_max_attempts` 控制最多保留多少次历史尝试，`evolution.history_max_text_chars` 限制每条变更摘要和候选理由的长度；当前三题配置分别为 5 和 320。旧运行记录没有候选变更字段时仍可加载，相关摘要为空。
+后续轮次的历史尝试包含实际组件差异、生成理由、修改前后评分、接受规则原因及提交状态。`actual_changes` 从父版本和候选的公开组件工件提取，记录完整的新增、删除、替换内容；Prompt 无须重复保存整篇文本，Model 则显示旧模型与新模型。历史还包含父稳定版本、该轮结束后的稳定版本以及生成状态，可以区分未提交的候选、已提交的修改和空候选／生成异常。历史路由理由保留公开原文，不包含调用凭证或原始请求引用。
+
+`validation` 只包含当前任务、独立验证、同类和回归四组的修改前分数、修改后分数及差值，不传入独立验证任务的输入、输出或隐藏答案。接受、选中和实际提交仍分别记录；通过验证但尚未提交的候选不会被表述为稳定版本。
+
+历史长度由配置控制：`evolution.history_max_attempts` 默认 5；`history_max_text_chars` 默认 320，限制摘要和理由长度；`history_max_change_chars` 默认 4000，单独限制每个候选实际差异中修改前后文本的总字符数。截断通过 `changes_truncated`、每段差异的 `truncated`、`change_summary_truncated` 和 `generation_rationale_truncated` 明确标记。Jev Router 直接使用已经限长的历史，避免再次截断指令内容；整体请求仍受其 `max_state_chars` 配置限制。新记录会在 `evolution.txt` 和各轮 `record.json` 中展示这些信息。旧运行记录仍可加载，但缺失的实际差异和评分不会被补造。
 
 ## 数据与扩展
 

@@ -86,6 +86,7 @@ class EvolutionSettings(Settings):
     max_candidates_per_round: PositiveInt
     history_max_attempts: NonNegativeInt = 5
     history_max_text_chars: PositiveInt = 320
+    history_max_change_chars: PositiveInt = 4000
 
 
 class ManualDecision(Settings):
@@ -98,6 +99,7 @@ class RoutingSettings(Settings):
     plugin: NonBlank | None
     fixed_target: NonBlank | None
     manual_decisions: list[ManualDecision]
+    config: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 class TargetSettings(Settings):

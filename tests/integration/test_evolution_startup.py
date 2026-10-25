@@ -87,6 +87,27 @@ class EvolutionStartupTests(unittest.TestCase):
             with self.assertRaises(ContractError):
                 prepared.propose(record, round_id=2)
 
+    def test_next_round_model_receives_complete_actual_prompt_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prepared = prepare_evolution(self.config(Path(directory)), run_id="history-changes")
+            record = prepared.execution.run_task("dev-001")
+            storage = prepared.execution.storage
+            stable = storage.version_store.stable()
+            original = storage.artifact_store.get(stable.artifacts["prompt"]).decode("utf-8")
+            added = "Inspect each calling path before choosing a repair. " * 8 + "Keep the CLI boundary explicit."
+            model = RecordingModel(lambda *_: response(json.dumps({"candidates": [{"prompt": original + "\n" + added}]})))
+            prepared.resolver.resolve("prompt").operator.model = model
+            first = prepared.propose(record, round_id=1)
+            second = prepared.propose(record, round_id=2)
+            stored = first.attempt.candidate_changes[first.response.candidates[0].candidate_id]
+            self.assertIn(added, "".join(edit.after for edit in stored.actual_changes))
+            history = json.loads(model.requests[-1][0].messages[-1].content)["context"]["history"][0]
+            candidate = history["candidate_summaries"][0]
+            self.assertIn(added, "".join(edit["after"] for edit in candidate["actual_changes"]))
+            self.assertFalse(candidate["changes_truncated"])
+            self.assertEqual(history["stable_version_after"], stable.version_id)
+            self.assertEqual(second.context.history[0].attempt_status, "completed")
+
     def test_success_disabled_limit_manual_exhaustion_and_no_targets_stop_before_attempt(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -7,9 +7,10 @@ from pydantic import Field, model_validator
 
 from .base import DomainModel, Identifier, Items, JsonObject, PositiveInt, ReadOnlyMap, Reward, UtcTimestamp
 from .execution import Diagnosis, ErrorInfo, ExecutionView, FeedbackView
+from .history import ComponentEdit, ValidationSummary
 from .references import AgentSnapshot, ArtifactRef
 from .runtime import RunContext, RunContextRecord
-from .states import CandidateStatus, CandidateStatusValue, EvolutionResponseStatus, ResponseStatusValue
+from .states import AttemptStatusValue, CandidateStatus, CandidateStatusValue, EvolutionResponseStatus, ResponseStatusValue
 from .task import TaskView
 from .usage import BudgetRemaining, ResourceUsage
 
@@ -47,6 +48,13 @@ class CandidateSummary(DomainModel):
     updated_components: Items[Identifier] = ()
     change_summary: str | None = None
     generation_rationale: str | None = None
+    actual_changes: Items[ComponentEdit] = ()
+    changes_truncated: bool = False
+    changes_unavailable: bool = False
+    change_summary_truncated: bool = False
+    generation_rationale_truncated: bool = False
+    validation: ValidationSummary | None = None
+    candidate_version_id: Identifier | None = None
     reward: Reward | None
     delta_score: Reward | None
     delta_similar_score: Reward | None
@@ -83,6 +91,10 @@ class ExperienceSummary(DomainModel):
     diagnosis: Diagnosis | None
     candidate_summaries: Items[CandidateSummary]
     completed_at: UtcTimestamp
+    stable_version_after: Identifier | None = None
+    attempt_status: AttemptStatusValue | None = None
+    error_code: Identifier | None = None
+    routing_rationale_truncated: bool = False
 
 
 class EvolutionContext(DomainModel):

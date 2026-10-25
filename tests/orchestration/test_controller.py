@@ -158,6 +158,11 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(second["committed"])
         self.assertIn("IMPROVED reusable instructions", second["change_summary"])
         self.assertEqual(second["acceptance_reason"], "improved")
+        history = payloads[1]["context"]["history"][0]
+        self.assertEqual(history["stable_version_id"], result.initial_version_id)
+        self.assertEqual(history["stable_version_after"], result.final_stable_version_id)
+        self.assertEqual(second["validation"]["independent"]["after"], 1)
+        self.assertEqual(second["validation"]["current_task"]["after"], 0)
         self.assertEqual(payloads[1]["routing_decision"]["target"], "prompt")
         self.assertEqual(sum(ctx.stage == "post_commit_execution" for _, ctx in model.requests), 0)
         self.assertEqual(result.usage.model_calls, len(model.requests))

@@ -1,0 +1,140 @@
+# Three independent main tasks, each with its own similar/regression tasks.
+schema_version: aer.v0.1
+experiment:
+  id: aer-swebench-static-three-tasks
+  seed: 42
+  runner: aer
+benchmark:
+  plugin: swebench_adapter
+  execution_split: dev
+  task_ids:
+  - psf__requests-1963
+  - pytest-dev__pytest-7373
+  - pylint-dev__pylint-6506
+  config:
+    dataset_path: ../data/swebench_lite_three_tasks.json
+    roles:
+      psf__requests-1963: dev
+      psf__requests-2148: similar
+      psf__requests-2317: regression
+      pytest-dev__pytest-7373: dev
+      pytest-dev__pytest-11143: similar
+      pytest-dev__pytest-7220: regression
+      pylint-dev__pylint-6506: dev
+      pylint-dev__pylint-7228: similar
+      pylint-dev__pylint-7993: regression
+    validation_sets:
+      psf__requests-1963:
+        similar:
+        - psf__requests-2148
+        regression:
+        - psf__requests-2317
+      pytest-dev__pytest-7373:
+        similar:
+        - pytest-dev__pytest-11143
+        regression:
+        - pytest-dev__pytest-7220
+      pylint-dev__pylint-6506:
+        similar:
+        - pylint-dev__pylint-7228
+        regression:
+        - pylint-dev__pylint-7993
+state:
+  task_mode: independent
+agent:
+  plugin: codex_cli_agent
+  initial_prompt: 'Fix the reported repository issue with focused source edits. Inspect
+    the relevant code before editing. This is a static-only experiment: do not install
+    dependencies or execute tests. Leave the changes in the working tree and end with
+    a brief plain-text summary.'
+  initial_snapshot_ref: null
+  config:
+    windows_sandbox: mxc
+    initial_model: gpt-5.6-sol
+    allowed_models:
+    - gpt-6.1-sol
+    - gpt-6-sol
+    - gpt-6-luna
+    - gpt-5.6-sol
+    timeout_seconds: 300.0
+    workspace:
+      plugin: local_repo_workspace
+      config:
+        cache_root: ../../.aer-cache/repos
+        git_timeout_seconds: 120.0
+    collector:
+      plugin: git_patch_collector
+      config: {}
+providers:
+  model:
+    plugin: qwen_model
+    model_id: ${QWEN_MODEL}
+    config:
+      dotenv_path: ../../.env
+      api_key_env: QWEN_API_KEY
+      base_url_env: QWEN_BASE_URL
+      temperature: 0.0
+      enable_thinking: false
+      send_seed: false
+      response_format: null
+  tools:
+    plugin: deterministic_tools
+    enabled: []
+assessment:
+  evaluator: static_patch_evaluator
+  diagnoser: llm_diagnoser
+  evaluator_config:
+    changed_lines_weight: 0.8
+    success_threshold: 1.0
+evolution:
+  mode: llm
+  max_candidates_per_round: 1
+  history_max_attempts: 5
+  history_max_text_chars: 320
+  history_max_change_chars: 4000
+routing:
+  plugin: jev_router
+  fixed_target: null
+  manual_decisions: []
+  config:
+    dotenv_path: ../../.env
+    api_key_env: JEV_API_KEY
+    base_url_env: JEV_BASE_URL
+    model_env: JEV_MODEL
+    max_trace_events: 8
+    max_field_chars: 1000
+    max_state_chars: 30000
+targets:
+  allowed:
+  - prompt
+  - model
+  default_operators:
+    prompt: simple_prompt_evolver
+    model: model_selection_evolver
+  operator_configs: {}
+validation:
+  plugin: paired_validation
+  split: validation
+  group_field: validation_group
+  similar_group: similar
+  regression_group: regression
+  acceptance_policy: improvement_with_regression_guard
+  policy_version: v0.1
+  min_improvement: 0.01
+  max_regression_drop: 0.0
+feedback:
+  policy: dev_feedback_and_validation_summary
+limits:
+  max_evolution_rounds: 5
+  max_tokens: 80000
+  max_tool_calls: 100
+  max_elapsed_seconds: 600.0
+  model_call_timeout_seconds: 30.0
+  tool_call_timeout_seconds: 5.0
+  max_output_tokens_per_call: 2048
+  max_consecutive_no_commit_rounds: null
+storage:
+  root: ../../runs
+  experience: jsonl
+  artifacts: local_files
+  versions: local_manifest

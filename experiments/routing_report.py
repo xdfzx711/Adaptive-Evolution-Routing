@@ -2,7 +2,7 @@
 
 import json
 
-from aer_core.schemas.routing import RoutingRecord
+from aer_core.schemas.routing import JevRoutingRecord, RoutingRecord
 
 
 def routing_record(proposal, artifacts):
@@ -10,10 +10,22 @@ def routing_record(proposal, artifacts):
     error = proposal.response.error if proposal.response else None
     if ref is None and error is not None and error.stage == "routing":
         ref = error.evidence_ref
-    return RoutingRecord.model_validate_json(artifacts.get(ref)) if ref is not None and ref.kind == "routing_record" else None
+    if ref is None:
+        return None
+    if ref.kind == "routing_record":
+        return RoutingRecord.model_validate_json(artifacts.get(ref))
+    if ref.kind == "jev_routing_record":
+        return JevRoutingRecord.model_validate_json(artifacts.get(ref))
+    return None
 
 
 def routing_view(record):
+    if isinstance(record, JevRoutingRecord):
+        data = record.model_dump(mode="json")
+        return {"provider": "jev", "source": record.source,
+                "request": data["request"], "response": data["response"],
+                "usage": record.usage.model_dump(mode="json"),
+                "error": {"code": record.error.code, "message": record.error.message} if record.error else None}
     messages = []
     for message in record.request.messages:
         content = message.content

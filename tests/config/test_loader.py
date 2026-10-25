@@ -54,10 +54,11 @@ class ConfigLoaderTests(unittest.TestCase):
                 self.assertEqual(self.load().config.limits.max_evolution_rounds, rounds)
 
     def test_history_limits_are_configurable_and_validated(self):
-        self.config["evolution"].update(history_max_attempts=0, history_max_text_chars=640)
+        self.config["evolution"].update(history_max_attempts=0, history_max_text_chars=640, history_max_change_chars=8000)
         loaded = self.load().config.evolution
         self.assertEqual((loaded.history_max_attempts, loaded.history_max_text_chars), (0, 640))
-        for field, value in (("history_max_attempts", -1), ("history_max_text_chars", 0)):
+        self.assertEqual(loaded.history_max_change_chars, 8000)
+        for field, value in (("history_max_attempts", -1), ("history_max_text_chars", 0), ("history_max_change_chars", 0)):
             invalid = copy.deepcopy(self.config)
             invalid["evolution"][field] = value
             self.assert_issue(f"evolution.{field}", invalid)
