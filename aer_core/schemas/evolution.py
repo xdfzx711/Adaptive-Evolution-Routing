@@ -1,11 +1,11 @@
 """Target decisions, public evolution context and candidate generation DTOs."""
 
 from dataclasses import dataclass
-from math import isclose
 
 from pydantic import Field, model_validator
 
 from .base import DomainModel, Identifier, Items, JsonObject, PositiveInt, ReadOnlyMap, Reward, UtcTimestamp
+from .acceptance import WeightedGain, validate_reward
 from .execution import Diagnosis, ErrorInfo, ExecutionView, FeedbackView
 from .history import ComponentEdit, ValidationSummary
 from .references import AgentSnapshot, ArtifactRef
@@ -64,6 +64,10 @@ class CandidateSummary(DomainModel):
     committed: bool
     reason: str
     acceptance_reason: Identifier | None = None
+    policy_id: Identifier | None = None
+    policy_version: Identifier | None = None
+    delta_current_task_score: Reward | None = None
+    weighted_gain: WeightedGain | None = None
 
     @model_validator(mode="after")
     def decision_flags(self):
@@ -71,12 +75,8 @@ class CandidateSummary(DomainModel):
             raise ValueError("committed implies selected; selected implies accepted")
         if self.accepted and (self.reward is None or self.reward <= 0):
             raise ValueError("accepted candidates require a known positive reward")
-        deltas = (self.delta_score, self.delta_similar_score, self.delta_regression_score)
-        if self.reward is None:
-            if any(value is not None for value in deltas):
-                raise ValueError("unknown reward requires null deltas")
-        elif any(value is None for value in deltas) or not isclose(self.reward, self.delta_score, abs_tol=1e-12):
-            raise ValueError("known reward must match delta_score and include all deltas")
+        validate_reward(self.reward, self.delta_score, self.delta_similar_score, self.delta_regression_score,
+                        self.delta_current_task_score, self.weighted_gain)
         return self
 
 

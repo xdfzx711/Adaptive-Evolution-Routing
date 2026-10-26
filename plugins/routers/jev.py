@@ -143,6 +143,10 @@ class JevRouter:
                     "delta_score": candidate.delta_score,
                     "delta_similar_score": candidate.delta_similar_score,
                     "delta_regression_score": candidate.delta_regression_score,
+                    "delta_current_task_score": candidate.delta_current_task_score,
+                    "reward": candidate.reward,
+                    "weighted_gain": candidate.weighted_gain.model_dump(mode="json") if candidate.weighted_gain else None,
+                    "policy_id": candidate.policy_id, "policy_version": candidate.policy_version,
                     "accepted": candidate.accepted, "selected": candidate.selected, "committed": candidate.committed,
                     "status": candidate.reason, "acceptance_reason": candidate.acceptance_reason}
                     for candidate in item.candidate_summaries]})

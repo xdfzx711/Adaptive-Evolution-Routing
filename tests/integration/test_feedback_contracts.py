@@ -184,7 +184,7 @@ def native_registry(model):
 
 
 class FeedbackContractTests(unittest.TestCase):
-    def setup_native(self, directory, stack):
+    def setup_native(self, directory, stack, *, weighted=False):
         model = RecordingModel(lambda *_: response("{}"))
         registry = native_registry(model)
         for module in ("configuration", "benchmark", "execution", "storage", "evolution", "orchestration", "validation"):
@@ -198,6 +198,10 @@ class FeedbackContractTests(unittest.TestCase):
                                "tools": {"plugin": "native_tools", "enabled": ["uppercase"]}}
         config["targets"]["default_operators"]["prompt"] = "native_evolver"
         config["limits"]["max_evolution_rounds"] = 1
+        if weighted:
+            config["validation"].update(acceptance_policy="weighted_improvement", max_regression_drop=None,
+                weights={"current_task": 0.5, "similar": 0.25, "regression": 0.25})
+            config["limits"]["max_evolution_rounds"] = 2
         path = directory / "native.yaml"
         path.write_text(yaml.safe_dump(config), encoding="utf-8")
         return path, model
@@ -308,6 +312,56 @@ class FeedbackContractTests(unittest.TestCase):
             committed = [event.payload for event in events if event.record_type == "candidate_evaluated" and event.payload.committed]
             self.assertEqual(len(committed), 1)
             self.assertEqual(committed[0].acceptance.delta_score, 0.5)
+
+    def test_weighted_commit_history_and_success_condition_are_independent(self):
+        for solved in (False, True):
+            with self.subTest(solved=solved), tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+                path, model = self.setup_native(Path(directory), stack, weighted=True)
+                startup = prepare_orchestrator(path)
+                task = startup.prepare_task("dev")
+                initial_id = task.execution.storage.version_store.stable().version_id
+                evaluator = task.execution.benchmark.evaluator
+                original = evaluator.evaluate
+
+                def tradeoff(public, execution, spec, run_ctx):
+                    result = original(public, execution, spec, run_ctx)
+                    changed = execution.agent_version_id != initial_id
+                    score = ((1.0 if solved else 0.52) if changed else 0.0) if public.task_id == "dev" else (
+                        (0.3 if public.task_id == "similar" else 0.2) if changed else 0.4)
+                    return result.replace(score=score, success=bool(solved and public.task_id == "dev" and changed),
+                                          reason_code="correct" if solved and public.task_id == "dev" and changed else "needs_revision")
+
+                evaluator.evaluate = tradeoff
+                result = task.run()
+                self.assertIsNone(result.error)
+                self.assertNotEqual(result.final_stable_version_id, initial_id)
+                self.assertEqual(result.stop_reason, "task_succeeded" if solved else "max_evolution_rounds_reached")
+                self.assertEqual(result.evolution_rounds_used, 1 if solved else 2)
+                self.assertEqual(result.final_evaluation.success, solved)
+                events = task.execution.storage.experience_store.events()
+                committed = [event.payload for event in events if event.record_type == "candidate_evaluated" and event.payload.committed]
+                self.assertEqual(len(committed), 1)
+                decision = committed[0].acceptance
+                self.assertLess(decision.delta_score, 0)
+                self.assertAlmostEqual(decision.reward, 0.425 if solved else 0.185)
+                root = task.execution.storage.run_root
+                text = (root / "evolution.txt").read_text(encoding="utf-8")
+                self.assertIn("回归硬限制关闭", text)
+                self.assertIn("当前任务贡献", text)
+                self.assertIn("综合收益", text)
+                self.assertNotIn("报告异常", text)
+                records = sorted(root.glob("rounds/*/round-*/record.json"))
+                first = json.loads(records[0].read_text(encoding="utf-8"))
+                self.assertEqual(first["candidates"][0]["acceptance"]["weighted_gain"]["total"], decision.reward)
+                if not solved:
+                    second = json.loads(records[1].read_text(encoding="utf-8"))
+                    history = second["input_to_evolver"]["history"][0]["candidates"][0]
+                    self.assertEqual(history["weighted_gain"]["total"], decision.reward)
+                    self.assertEqual(history["policy_id"], "weighted_improvement")
+                    evolver_inputs = [json.loads(request.messages[-1].content) for request, _ in model.requests
+                                      if '"stable_snapshot"' in request.messages[-1].content]
+                    self.assertEqual(evolver_inputs[-1]["history"][0]["candidate_summaries"][0]["reward"], decision.reward)
+                    self.assertNotIn(PRIVATE, json.dumps(evolver_inputs[-1]))
 
     def test_model_evaluator_shares_provider_and_charges_once_through_validation_and_reuse(self):
         class ModelEvaluator(NativeEvaluator):

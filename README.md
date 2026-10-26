@@ -226,6 +226,8 @@ runs/run-<时间>/
 
 SWE-bench Lite 的三个实例现可用于 Codex 静态补丁评估，不需要容器。Benchmark、工作区、产物收集器和 Evaluator 均通过插件配置选择；运行指令、评分公式和数据角色见 [SWE-bench 静态接入](docs/AER_SWEBENCH_STATIC.md)。
 
+三题配置现采用可替换的加权接受策略：当前任务、同类、回归收益权重为 0.5 / 0.25 / 0.25。权重、阈值及可选回归上限由配置控制，日志展开各项贡献；任务成功仍由当前任务的 Evaluator 判定。字段和兼容规则见 [加权接受策略](docs/AER_WEIGHTED_ACCEPTANCE.md)。
+
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```

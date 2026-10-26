@@ -12,6 +12,8 @@ from aer_core.schemas.references import AgentSnapshot
 from aer_core.usage import sum_usage
 from plugins.agents.codex import CodexCliAgent, CodexConfig, controlled_config, retryable_startup_failure
 from plugins.agents.model_selection import CodexModelAdapter, ModelSelection
+from plugins.agents.tool_selection import CodexToolAdapter
+from plugins.tool_selection import ToolSelection
 from plugins.agents.output import PublicJsonOutput
 from aer_core.schemas.task import TaskView
 from plugins.benchmarks.toy_tasks import ToyBenchmark
@@ -32,14 +34,45 @@ def fixture(root, mode="model", initial="gpt-5.6-sol", **changes):
     settings = AgentSettings(plugin="codex_cli_agent", initial_prompt="Use public evidence", initial_snapshot_ref=None,
                              config=config.model_dump(mode="json"))
     store = MockArtifactStore()
-    snapshot = AgentSnapshot(version_id="v0", agent_plugin_id="codex_cli_agent", config=controlled_config(config),
-        artifacts={"prompt": store.put(b"Use public evidence", "prompt"),
+    artifacts = {"prompt": store.put(b"Use public evidence", "prompt"),
                    "model": store.put(CodexModelAdapter().encode(ModelSelection(model_id=initial,
-                       reasoning_effort=config.initial_reasoning_effort)), "model")})
+                       reasoning_effort=config.initial_reasoning_effort)), "model")}
+    if config.tooling is not None:
+        artifacts["tool"] = store.put(CodexToolAdapter().encode(ToolSelection(enabled_tools=config.initial_tools or [])), "tool")
+    snapshot = AgentSnapshot(version_id="v0", agent_plugin_id="codex_cli_agent", config=controlled_config(config), artifacts=artifacts)
     return CodexCliAgent(settings, snapshot, store), snapshot, store
 
 
 class CodexTests(unittest.TestCase):
+    def test_selected_tools_must_be_discovered_but_do_not_have_to_be_called(self):
+        from tests.tools.helpers import LOCAL_CATALOG
+        for mode, expected in (("tools-ignored", "error"), ("tools-unused", "completed")):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                agent, snapshot, _ = fixture(Path(directory), mode=mode,
+                    tooling={"catalog": LOCAL_CATALOG}, initial_tools=["python_syntax_check"])
+                benchmark = ToyBenchmark()
+                result = agent.run(benchmark.task_view(benchmark.tasks("dev")[0]), snapshot, context())
+                self.assertEqual(result.status, expected, result.error)
+                self.assertEqual(result.state_summary["tool_invocations"], ())
+                if mode == "tools-unused":
+                    self.assertEqual(result.state_summary["available_tools"], ("python_syntax_check",))
+                else:
+                    self.assertIn("not available", result.error.message)
+                    self.assertEqual(result.state_summary["tool_setup_status"], "not_started")
+                    self.assertEqual(result.state_summary["tool_setup_error"], "bridge_did_not_start")
+
+    def test_unknown_snapshot_tool_is_rejected_before_launching_codex(self):
+        from tests.tools.helpers import LOCAL_CATALOG
+        with tempfile.TemporaryDirectory() as directory:
+            agent, snapshot, store = fixture(Path(directory), tooling={"catalog": LOCAL_CATALOG})
+            bad = snapshot.replace(artifacts={**snapshot.artifacts,
+                "tool": store.put(b'{"enabled_tools":["unknown"]}', "tool")})
+            benchmark = ToyBenchmark()
+            result = agent.run(benchmark.task_view(benchmark.tasks("dev")[0]), bad, context())
+            self.assertEqual(result.status, "error")
+            self.assertEqual(result.usage.model_calls, 0)
+            self.assertEqual(agent.snapshot(), snapshot)
+
     def test_snapshot_effort_controls_actual_cli_execution_without_mutating_the_agent(self):
         with tempfile.TemporaryDirectory() as directory:
             agent, stable, artifacts = fixture(Path(directory), mode="reasoning",

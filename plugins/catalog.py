@@ -44,6 +44,7 @@ def v0_1_catalog() -> ConfigCatalog:
         PluginDeclaration("evolution", "model_selection_evolver", targets=("model",), compatible_agents=("codex_cli_agent",)),
         PluginDeclaration("validation", "paired_validation"),
         PluginDeclaration("acceptance_policy", "improvement_with_regression_guard", policy_versions=("v0.1",)),
+        PluginDeclaration("acceptance_policy", "weighted_improvement", policy_versions=("v0.1",)),
         PluginDeclaration("experience_store", "jsonl"),
         PluginDeclaration("artifact_store", "local_files"),
         PluginDeclaration("version_store", "local_manifest"),

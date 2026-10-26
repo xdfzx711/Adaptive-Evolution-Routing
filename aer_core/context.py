@@ -17,7 +17,7 @@ from aer_core.schemas.task import TaskView
 
 PUBLIC_ACCEPTANCE_REASONS = frozenset({
     "improved", "no_improvement", "insufficient_improvement", "regression_guard",
-    "validation_error", "validation_incomplete", "invalid_candidate",
+    "validation_error", "validation_incomplete", "invalid_candidate", "missing_local_metrics",
 })
 
 
@@ -100,6 +100,10 @@ class ContextBuilder:
                     delta_score=acceptance.delta_score if acceptance else None,
                     delta_similar_score=acceptance.delta_similar_score if acceptance else None,
                     delta_regression_score=acceptance.delta_regression_score if acceptance else None,
+                    delta_current_task_score=acceptance.delta_current_task_score if acceptance else None,
+                    weighted_gain=acceptance.weighted_gain if acceptance else None,
+                    policy_id=acceptance.policy_id if acceptance else None,
+                    policy_version=acceptance.policy_version if acceptance else None,
                     accepted=accepted, selected=selected, committed=committed,
                     reason=result.status.value if result else "not_validated",
                     acceptance_reason=(acceptance.reason if acceptance.reason in PUBLIC_ACCEPTANCE_REASONS else "unknown")

@@ -72,7 +72,7 @@ ArtifactRef 标识不可变工件；RecordRef 用 record_id、uri 标识结构�
 - 候选 ID 不重复；artifact_updates 是通用非空工件映射，key 匹配 kind，具体更新范围由 Agent/Evolver 能力约束。
 - ValidationPlan 携带 current_task，旧版执行/评分同时提供或同时为 null；独立两组任务非空、互斥，每个独立任务恰好一个配对 seed。
 - 验证总体分数按任务数加权；完整报告包含 Local/独立证据、旧版/候选指标和已知候选用量。
-- 首版 reward 等于独立验证 delta_score；未知收益和对应 delta 为 null。
+- 原接受策略的 reward 等于独立验证 delta_score；加权策略的 reward 等于 weighted_gain.total，并另存 delta_current_task_score 和三项加权贡献。未知收益和对应 delta 为 null；旧记录仍可加载。
 - CandidateEvaluation 的接受、选择、提交标记与状态相符；commit_error 表示已选中但未提交。
 - CommitRequest 的父版本匹配预期稳定版本，接受结果对应同一候选。
 - RunResult 的最终评分匹配最终稳定版本及执行操作；未评估的新版本不能使用旧分数。已评估最终版本时，last_evaluated_* 与最终结果一致；否则可保留上一版本的最近评分。
@@ -105,7 +105,7 @@ Agent 和 Diagnoser 接收公开 TaskView；Evaluator 接收私有评分规格�
 
 独立评分、任务执行和配对验证统一调用 EvaluatorPlugin.evaluate；通用代码不再调用某个评分器特有的 evaluate_record 或 feedback_view。EvaluationResult.usage 可选：本地无调用的评分器可省略；使用模型、工具或外部服务的评分器报告实际 ResourceUsage，成功及异常成本计入 ScoredExecution 一次，私有评分自由文本不进入公开反馈。返回值同时核对任务、版本、执行操作及评分操作。
 
-成本归属分别为 ExecutionResult.usage（Agent）、EvaluationResult.usage（评分器）和 TaskExecutionRecord.assessment_usage（诊断）。ScoredExecution 汇总执行与评分，RunResult 再累计诊断、生成和验证；独立执行入口也按相同归属汇总，不重复累计嵌套记录。评分分数与 success 分开，标准接口支持 0–1 范围的连续分数，接受规则继续使用独立验证 delta_score。
+成本归属分别为 ExecutionResult.usage（Agent）、EvaluationResult.usage（评分器）和 TaskExecutionRecord.assessment_usage（诊断）。ScoredExecution 汇总执行与评分，RunResult 再累计诊断、生成和验证；独立执行入口也按相同归属汇总，不重复累计嵌套记录。评分分数与 success 分开，标准接口支持 0–1 范围的连续分数，接受目标由配置选择，见 [加权接受策略](AER_WEIGHTED_ACCEPTANCE.md)。
 
 TaskFeedbackPolicy 必须绑定具体 TaskIdentity，声明允许公开的输出字段、元数据字段、静态反馈模板以及是否允许构建进化上下文。权限来自 Benchmark，不依赖公开 metadata 中是否存在 split。ToolSpec 新增 feedback_arguments、feedback_outputs，默认不公开工具载荷；执行参数 Schema 不等于反馈权限声明。AgentCapabilities 声明 feedback_state_fields、feedback_config_fields，控制状态摘要和 Snapshot 配置投影。
 

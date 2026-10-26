@@ -116,7 +116,7 @@ class RoundReport:
                      "diagnosis": self.latest_diagnosis, "candidates": []}
         if self.config is not None:
             self.data["acceptance_policy"] = fields(self.config.validation, "acceptance_policy", "policy_version",
-                                                   "min_improvement", "max_regression_drop")
+                                                   "min_improvement", "max_regression_drop", "weights")
 
     def publish(self):
         if self.data is not None:
@@ -149,6 +149,7 @@ class RoundReport:
                 candidates.append({"candidate": index, **fields(candidate, "target", "updated_components",
                     "change_summary", "generation_rationale", "reward", "delta_score", "delta_similar_score",
                     "delta_regression_score", "accepted", "selected", "committed", "reason", "acceptance_reason",
+                    "delta_current_task_score", "weighted_gain", "policy_id", "policy_version",
                     "actual_changes", "changes_truncated", "changes_unavailable", "change_summary_truncated",
                     "generation_rationale_truncated", "validation")})
             result.append({"task": item.task_id, "round": item.round_id, "decision": fields(item.decision, "target", "rationale"),
@@ -205,7 +206,7 @@ class RoundReport:
             entry = self.candidates[outcome.candidate_id]
             entry.update(status=outcome.status.value, selected=outcome.selected,
                 acceptance=fields(outcome.acceptance, "accepted", "reward", "reason", "delta_score", "delta_similar_score",
-                                  "delta_regression_score", "policy_id", "policy_version"),
+                                  "delta_regression_score", "delta_current_task_score", "weighted_gain", "policy_id", "policy_version"),
                 validation_error=error_view(outcome.validation_error))
             report = reports.get(outcome.candidate_id)
             if report is None:

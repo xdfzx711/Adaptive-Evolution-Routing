@@ -141,6 +141,24 @@ class LocalStorageTests(unittest.TestCase):
             self.versions.commit(request.replace(acceptance=false_gain))
         self.assertEqual(self.versions.stable().version_id, "v1")
 
+    def test_weighted_current_task_gain_must_match_persisted_metrics(self):
+        from aer_core.schemas.validation import LocalValidationMetrics
+        from plugins.validation.acceptance import WeightedImprovement
+        from tests.validation.helpers import settings
+        request, report = commit_request(self.artifacts, self.versions, self.stable)
+        report = report.replace(validation_id="weighted-validation", candidate_metrics=report.baseline_metrics,
+            local_metrics=LocalValidationMetrics(baseline_score=0, candidate_score=0.52, baseline_success=False,
+                candidate_success=False, delta_score=0.52, repaired=False))
+        ref = self.versions.save_validation(report)
+        policy = WeightedImprovement(settings(acceptance_policy="weighted_improvement", max_regression_drop=None))
+        forged = report.replace(local_metrics=report.local_metrics.replace(candidate_score=1, candidate_success=True,
+            delta_score=1, repaired=True))
+        with self.assertRaises(CommitError):
+            self.versions.commit(request.replace(validation_ref=ref, acceptance=policy.evaluate(forged)))
+        self.assertEqual(self.versions.stable().version_id, "v1")
+        self.versions.commit(request.replace(validation_ref=ref, acceptance=policy.evaluate(report)))
+        self.assertEqual(self.versions.stable().version_id, "v2")
+
     def test_pointer_write_failure_leaves_old_stable_and_retry_uses_saved_intent(self):
         request, _ = commit_request(self.artifacts, self.versions, self.stable)
         publish = self.versions.files.replace

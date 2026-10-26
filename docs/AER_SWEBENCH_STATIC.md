@@ -105,7 +105,7 @@ score   = changed_lines_weight × line_f1 + (1 − changed_lines_weight) × file
 
 默认 changed_lines_weight=0.8，success_threshold=1.0。空补丁、不支持或结构不完整的补丁、已检查文件存在语法错误时得 0 分。其他补丁输出连续分数，达到配置阈值时 success=true。分数完全一致只代表静态比较达到阈值；不同位置的相同行改动也可能得到相同分数，语义等价的其他解法也可能得低分。
 
-EvaluationResult.metrics 保存 changed_line_f1、changed_file_f1、patch_valid、syntax_valid、tests_executed=0。接受策略继续比较验证集静态均分及回归分数。Router 与 Evolver 只收到公开代码产物、过滤反馈和验证摘要，不收到参考补丁。
+EvaluationResult.metrics 保存 changed_line_f1、changed_file_f1、patch_valid、syntax_valid、tests_executed=0。三题批量配置使用 [加权接受策略](AER_WEIGHTED_ACCEPTANCE.md)，同时考虑当前任务、同类与回归分数变化；原独立验证接受策略仍可配置选择。Router 与 Evolver 只收到公开代码产物、过滤反馈和验证摘要，不收到参考补丁。
 
 后续轮次的历史尝试包含实际组件差异、生成理由、修改前后评分、接受规则原因及提交状态。`actual_changes` 从父版本和候选的公开组件工件提取，记录完整的新增、删除、替换内容；Prompt 无须重复保存整篇文本，Model 则显示旧模型与新模型。历史还包含父稳定版本、该轮结束后的稳定版本以及生成状态，可以区分未提交的候选、已提交的修改和空候选／生成异常。历史路由理由保留公开原文，不包含调用凭证或原始请求引用。
 

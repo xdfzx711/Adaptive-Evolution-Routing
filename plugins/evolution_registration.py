@@ -10,6 +10,8 @@ from aer_core.schemas.plugins import PluginCapabilities, PluginMetadata
 from plugins.evolution.prompt import PromptEvolverConfig, SimplePromptEvolver
 from plugins.evolution.model_selection import ModelSelectionEvolverConfig, ModelSelectionEvolver
 from plugins.agents.model_selection import CodexModelAdapter
+from plugins.agents.tool_selection import CodexToolAdapter
+from plugins.evolution.tool_selection import ToolSelectionEvolver, ToolSelectionEvolverConfig
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
 from plugins.routers.jev import JevRouter, JevRoutingSettings, resolve_jev_credentials
@@ -41,6 +43,11 @@ def build_model_selection(*, config: ModelSelectionEvolverConfig, dependencies: 
         adapter=CodexModelAdapter())
 
 
+def build_tool_selection(*, config: ToolSelectionEvolverConfig, dependencies: ResolvedDependencies):
+    return ToolSelectionEvolver(config, dependencies.get("artifact_store"), dependencies.get("model_provider"),
+        adapter=CodexToolAdapter())
+
+
 def register_evolution_plugins(registry: PluginRegistry) -> None:
     for plugin_id, mode, factory in [("fixed_router", "fixed", build_fixed), ("manual_router", "manual", build_manual)]:
         registry.register(PluginMetadata(id=plugin_id, category="router", api_version=API_VERSION,
@@ -60,4 +67,8 @@ def register_evolution_plugins(registry: PluginRegistry) -> None:
     registry.register(PluginMetadata(id="model_selection_evolver", category="evolution", api_version=API_VERSION,
         plugin_version="0.2.0", capabilities=PluginCapabilities(targets=["model"], compatible_agents=["codex_cli_agent"]),
         dependencies=["artifact_store", "model_provider"]), build_model_selection, config_model=ModelSelectionEvolverConfig,
+        dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider})
+    registry.register(PluginMetadata(id="tool_selection_evolver", category="evolution", api_version=API_VERSION,
+        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["tool"], compatible_agents=["codex_cli_agent"]),
+        dependencies=["artifact_store", "model_provider"]), build_tool_selection, config_model=ToolSelectionEvolverConfig,
         dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider})

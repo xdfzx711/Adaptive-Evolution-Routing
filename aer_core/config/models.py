@@ -2,7 +2,9 @@
 
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, model_validator
+
+from aer_core.schemas.acceptance import AcceptanceWeights
 
 
 def _not_blank(value: str) -> str:
@@ -117,7 +119,14 @@ class ValidationSettings(Settings):
     acceptance_policy: NonBlank
     policy_version: NonBlank
     min_improvement: UnitFloat
-    max_regression_drop: UnitFloat
+    max_regression_drop: UnitFloat | None = None
+    weights: AcceptanceWeights = Field(default_factory=AcceptanceWeights)
+
+    @model_validator(mode="after")
+    def legacy_regression_guard(self):
+        if self.acceptance_policy == "improvement_with_regression_guard" and self.max_regression_drop is None:
+            raise ValueError("max_regression_drop is required for improvement_with_regression_guard")
+        return self
 
 
 class FeedbackSettings(Settings):

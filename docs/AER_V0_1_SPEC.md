@@ -160,6 +160,8 @@ continual 的任务顺序来自固定 Benchmark 清单并写入 manifest；不�
 
 ## 7. 验证、接受、选择与提交
 
+2026-10-26 扩展：新增 `weighted_improvement` 接受插件。下文的独立验证收益仍保留原始含义；加权策略的 reward、选择顺序及可选回归限制见本节和 [加权接受策略](AER_WEIGHTED_ACCEPTANCE.md)。当前三题批量配置已切换至加权策略，旧策略仍可配置选择。
+
 ### 7.1 指标
 
 Evaluator 输出有限分数 `score ∈ [0,1]`；二元任务使用 0/1。success 由 Benchmark 定义，不能从 Agent 自报获得。不同量纲原始指标由 Adapter 转为标准化 score，其规则写入 manifest。
@@ -179,15 +181,17 @@ S_B(s)=\frac{1}{|B|}\sum_{q\in B}\mathrm{score}(q,s).
 
 统一指标是 V 的任务平均分，不是两组平均分再平均。额外记录成功率、回归中原成功现失败的任务数和各阶段成本。回归门槛作用于组平均分，不承诺每个任务均无下降。
 
-Local Validation 记录当前失败任务的旧版与候选表现，旧版可复用当前任务结果；候选使用独立会话执行。它不进入 V、不计 reward，也不是首版接受的硬条件。因此候选可以改善独立任务但未修复当前任务，提交后仍会继续当前任务闭环。
+Local Validation 记录当前失败任务的旧版与候选表现，旧版可复用当前任务结果；候选使用独立会话执行。它不进入 V。原策略不将其计入 reward；加权策略将其作为单独一项收益。候选被接受后，若当前任务仍未成功，提交后继续当前任务闭环。
 
 ### 7.2 接受和奖励
 
-通过条件全部满足：工件有效、parent_version_id 匹配当前稳定版本、Local 与两组独立验证完整结束、`ΔS > 0`、`ΔS >= min_improvement`、`ΔS_B >= -max_regression_drop`。空验证集、缺失任务结果或无穷/NaN 分数不能形成有效对照，不用 0 分填补基础设施错误。
+原策略 `improvement_with_regression_guard` 的通过条件全部满足：工件有效、parent_version_id 匹配当前稳定版本、Local 与两组独立验证完整结束、`ΔS > 0`、`ΔS >= min_improvement`、`ΔS_B >= -max_regression_drop`。空验证集、缺失任务结果或无穷/NaN 分数不能形成有效对照，不用 0 分填补基础设施错误。
 
-有效独立对照的 `reward=ΔS`，即使候选被回归门槛拒绝或未选中，也保存该值及具体原因。没有完整独立对照时 reward 为 null，不把未知收益作为零收益训练样本。初版奖励不含 Local 分数和成本惩罚。
+原策略有效独立对照的 `reward=ΔS`，即使候选被回归门槛拒绝或未选中，也保存该值及具体原因。没有完整独立对照时 reward 为 null，不把未知收益作为零收益训练样本。原策略奖励不含 Local 分数和成本惩罚。
 
-多个候选通过规则时按 candidate 的 S 降序、candidate_validation_tokens 升序、candidate_id 字典序升序选择一个。candidate_validation_tokens 仅计该候选 Local 与独立验证的模型输入加输出，不计共用的旧版验证或候选生成成本；所有实际发生的成本仍计入 episode 预算。该用量不完整的候选验证不能认定完整。candidate_id 必须唯一，选择结果按 ID 关联，不依赖列表 zip 顺序。
+加权策略使用 `U = w_L ΔL + w_A ΔS_A + w_B ΔS_B`，默认权重 0.5/0.25/0.25，配置要求非负且和为 1。完整验证且当前任务指标齐全时，`reward=U`；只有 `U > 0` 且 `U >= min_improvement` 才接受。`max_regression_drop=null` 默认关闭回归硬限制，数值则启用附加上限。`delta_score` 仍为独立验证变化，`delta_current_task_score` 记录当前任务变化，`weighted_gain` 记录权重、三项贡献及总收益。缺少 Local 指标时拒绝并记录未知收益。任务成功仍单独由当前稳定版本的 Evaluator.success 判断。
+
+多个候选通过规则时，原策略按 candidate 的 S 降序，加权策略按 U 降序；同分时按 candidate_validation_tokens 升序、candidate_id 字典序升序选择一个。candidate_validation_tokens 仅计该候选 Local 与独立验证的模型输入加输出，不计共用的旧版验证或候选生成成本；所有实际发生的成本仍计入 episode 预算。该用量不完整的候选验证不能认定完整。candidate_id 必须唯一，选择结果按 ID 关联，不依赖列表 zip 顺序。
 
 ### 7.3 提交状态
 
@@ -244,10 +248,11 @@ Version Manager 在验证前创建不可变候选 Snapshot，验证始终使用�
 | `validation.group_field` | 非空 string，示例 `validation_group` | 公开分组元数据字段，实际归属在任务索引/Benchmark setup 检查 |
 | `validation.similar_group` | 非空 string，示例 `similar` | 同类组值 |
 | `validation.regression_group` | 非空 string，示例 `regression` | 回归组值，不能与 similar 相同 |
-| `validation.acceptance_policy` | string，`improvement_with_regression_guard` | 可替换策略标识 |
+| `validation.acceptance_policy` | string，`improvement_with_regression_guard` 或 `weighted_improvement` | 可替换策略标识 |
 | `validation.policy_version` | string，`v0.1` | 策略语义版本，修改策略时更新 |
-| `validation.min_improvement` | float，范围 [0,1] | 正提升的最小阈值；即使为 0 也拒绝 ΔS=0 |
-| `validation.max_regression_drop` | float，范围 [0,1] | 回归组平均分允许下降幅度 |
+| `validation.min_improvement` | float，范围 [0,1] | 所选策略收益的最小阈值；即使为 0 也要求收益为正 |
+| `validation.max_regression_drop` | float?，范围 [0,1] | 回归组平均分允许下降幅度；加权策略默认 null 关闭，原策略必须提供数值 |
+| `validation.weights` | object，可选 | current_task/similar/regression 默认 0.5/0.25/0.25，各值 [0,1] 且和为 1；加权策略使用 |
 | `feedback.policy` | string，`dev_feedback_and_validation_summary` | 第 5 节允许字段规则；只支持该策略 |
 
 disabled 配置仍保留完整验证字段以便对照追踪，加载时校验字段类型和策略版本，但不加载验证任务或插件。启用进化时必须检查分组非空、划分互斥和目标/Operator/Agent 兼容性。加载既有 Snapshot 时检查 agent.plugin 和运行配置与冻结版本兼容；不以 YAML 的另一个 Prompt 覆盖冻结版本，不迁移或重写版本内容。

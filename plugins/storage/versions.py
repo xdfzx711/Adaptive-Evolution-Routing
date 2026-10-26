@@ -203,6 +203,10 @@ class LocalVersionStore:
                 supplied = (request.acceptance.delta_score, request.acceptance.delta_similar_score, request.acceptance.delta_regression_score)
                 if any(not isclose(actual, claimed, abs_tol=1e-12) for actual, claimed in zip(gains, supplied)):
                     raise CommitError("acceptance gains do not match the saved validation report", stage="commit")
+                local_delta = request.acceptance.delta_current_task_score
+                if local_delta is not None and (report.local_metrics is None or
+                        not isclose(local_delta, report.local_metrics.delta_score, abs_tol=1e-12)):
+                    raise CommitError("acceptance current task gain does not match the saved validation report", stage="commit")
                 intent_path = self._journal_path(key, committed=False)
                 if self.files.path(intent_path).exists():
                     journal = self._read_model(intent_path, CommitJournal)

@@ -18,6 +18,19 @@ def compact(value):
     return json.dumps(plain(value), ensure_ascii=False, separators=(",", ":"))
 
 
+def weighted_gain_lines(value):
+    gain = value.weighted_gain if value else None
+    if gain is None:
+        return []
+    lines = []
+    for name, label, delta in (("current_task", "当前任务", value.delta_current_task_score),
+                               ("similar", "同类迁移", value.delta_similar_score),
+                               ("regression", "回归变化", value.delta_regression_score)):
+        lines.append(f"{label}贡献：{getattr(gain.weights, name):g} × ({delta:+.4f}) = {getattr(gain, name):+.4f}")
+    lines.append(f"综合收益：{gain.total:+.4f}（独立验证变化另行记录）")
+    return lines
+
+
 def moment(value=None):
     value = value or datetime.now().astimezone()
     return value.astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
@@ -93,6 +106,14 @@ class EvolutionTextReport:
         self.current_time = self.started_at
         self.episode_id = context.episode_id
         self.version_names[snapshot.version_id] = "V0"
+        validation = config.validation
+        if validation.acceptance_policy == "weighted_improvement":
+            weights = validation.weights
+            acceptance_rule = (f"接受策略：weighted_improvement；当前任务/同类/回归权重="
+                f"{weights.current_task:g}/{weights.similar:g}/{weights.regression:g}；综合收益须为正且至少 {validation.min_improvement}；"
+                + ("回归硬限制关闭" if validation.max_regression_drop is None else f"回归分最大下降 {validation.max_regression_drop}"))
+        else:
+            acceptance_rule = f"接受阈值：独立验证分提升至少 {validation.min_improvement}；回归分最大下降 {validation.max_regression_drop}"
         self.write("\n" + "=" * 72 + "\n任务进化记录\n" + "=" * 72 + "\n")
         self.block("任务与运行条件", [f"任务：{task.task_id}；Benchmark：{task.benchmark_id}",
             f"开始：{moment(started_at)}；会话：{context.episode_id}",
@@ -101,7 +122,8 @@ class EvolutionTextReport:
             f"评分器：{config.assessment.evaluator}；配置：{compact(config.assessment.evaluator_config)}",
             f"工具：{', '.join(config.providers.tools.enabled) or '无'}；Agent 步骤上限：{config.agent.max_steps}",
             f"最大进化轮数：{config.limits.max_evolution_rounds}；单次输出上限：{context.max_output_tokens}",
-            f"接受阈值：独立验证分提升至少 {config.validation.min_improvement}；回归分最大下降 {config.validation.max_regression_drop}",
+            acceptance_rule,
+            "成功结束条件：稳定版本在当前任务上的 Evaluator.success 为 true；接受候选不等于任务成功。",
             "总资源预算：当前 MVP 未强制执行；下文记录实际消耗。",
             "本报告展示进化决策与评测汇总；执行轨迹、输出和原始模型响应见对应详细记录。",
             "公开任务输入（完整，仅在此展示一次）：", json.dumps(task.model_dump(mode="json"), ensure_ascii=False, indent=2)])
@@ -151,6 +173,19 @@ class EvolutionTextReport:
             lines.append(self.usage_line(value.usage))
         self.block("诊断器输出", lines)
 
+    @staticmethod
+    def tool_lines(execution):
+        lines = []
+        if execution and "selected_tools" in execution.state_summary:
+            state = execution.state_summary
+            lines.append("附加工具：" + (", ".join(state["selected_tools"]) or "无"))
+            lines.append("工具装配：" + state["tool_setup_status"] + "；实际可用：" + (", ".join(state["available_tools"]) or "无"))
+            if state.get("tool_setup_error"):
+                lines.append("工具装配失败原因：" + state["tool_setup_error"])
+            calls = state.get("tool_invocations", ())
+            lines.append("工具调用：" + (", ".join(item["tool"] + "=" + item["status"] for item in calls[-6:]) or "未调用附加工具"))
+        return lines
+
     def execution(self, scored, title, source):
         execution = scored.execution
         lines = [f"版本：{self.version_names.get(scored.version_id, '未命名版本')}；seed：{scored.seed}",
@@ -159,6 +194,7 @@ class EvolutionTextReport:
             lines.append("执行模型：" + execution.state_summary["execution_model"])
             if execution.state_summary.get("execution_reasoning_effort") is not None:
                 lines.append("推理强度：" + execution.state_summary["execution_reasoning_effort"])
+        lines.extend(self.tool_lines(execution))
         if scored.error:
             lines.append(f"执行/评分异常：{scored.error.code}；{scored.error.message}")
         if scored.cache_hit:
@@ -209,6 +245,7 @@ class EvolutionTextReport:
                         f"验证分变化={candidate.delta_score}；同类变化={candidate.delta_similar_score}；回归变化={candidate.delta_regression_score}；"
                         f"accepted={candidate.accepted}；selected={candidate.selected}；committed={candidate.committed}；"
                         f"状态={candidate.reason}；接受规则={candidate.acceptance_reason or '未评估'}")
+                    lines.extend("      " + line for line in weighted_gain_lines(candidate))
                     if candidate.actual_changes:
                         for edit in candidate.actual_changes:
                             lines.append(f"      实际修改 [{edit.component}/{edit.operation}]" + ('（已截断）' if edit.truncated else ''))
@@ -280,6 +317,9 @@ class EvolutionTextReport:
                     delta = f"{new.evaluation.score - old.evaluation.score:+.3f}" if old.evaluation and new.evaluation else "未知"
                     self.write(f"{pair.group} | {old.task.task_id} | {score(old)} → {score(new)} | {delta} | {termination(new)} | {new.seed} | {'命中' if pair.baseline_cached else '未命中'} | {'命中' if pair.candidate_cached else '未命中'}\n")
                 lines = [f"状态：{report.status.value}；完整批次：{batch_label}"]
+                local = next((pair for pair, _ in pairs if pair.group == "local"), None)
+                if local:
+                    lines.extend(self.tool_lines(local.candidate.execution))
                 if report.baseline_metrics and report.candidate_metrics:
                     old, new = report.baseline_metrics, report.candidate_metrics
                     lines += [f"独立验证分：{old.score:.3f} → {new.score:.3f}（不包含当前任务）",
@@ -290,6 +330,7 @@ class EvolutionTextReport:
             acceptance = outcome.acceptance
             self.block(alias + " 接受与选择", [f"通过接受规则：{acceptance.accepted if acceptance else '未评估'}；"
                 f"原因：{acceptance.reason if acceptance else '未记录'}；收益：{acceptance.reward if acceptance else '未知'}",
+                *weighted_gain_lines(acceptance),
                 f"选中：{outcome.selected}；此时尚未提交；候选状态：{outcome.status.value}",
                 f"候选约束异常：{outcome.validation_error.message if outcome.validation_error else '无'}"])
             self.round_rows[outcome.candidate_id] = (f"{alias}：{outcome.status.value}；收益={acceptance.reward if acceptance else '未知'}；"

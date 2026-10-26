@@ -86,7 +86,7 @@ def register_execution_plugins(registry: PluginRegistry) -> None:
     codex_deps = {"initial_snapshot": AgentSnapshot, "artifact_store": ArtifactStore,
                   "workspace_provider": WorkspaceProvider, "result_collector": ResultCollector}
     registry.register(PluginMetadata(id="codex_cli_agent", category="agent", api_version=API_VERSION,
-        plugin_version="0.2.0", capabilities=PluginCapabilities(targets=["prompt", "model"]),
+        plugin_version="0.3.0", capabilities=PluginCapabilities(targets=["prompt", "model", "tool"]),
         dependencies=tuple(codex_deps)), build_codex, config_model=CodexAgentSettings, dependency_types=codex_deps,
         snapshot_config=codex.snapshot_config, initial_artifacts=codex.initial_artifacts)
     registry.register(PluginMetadata(id="lightweight_diagnoser", category="diagnoser", api_version=API_VERSION,

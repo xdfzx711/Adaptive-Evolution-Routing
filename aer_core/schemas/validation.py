@@ -5,6 +5,7 @@ from math import isclose
 from pydantic import model_validator
 
 from .base import DomainModel, Identifier, Items, NonNegativeInt, PositiveInt, Reward, Score
+from .acceptance import WeightedGain, validate_reward
 from .execution import ErrorInfo, EvaluationResult, ExecutionResult
 from .references import ArtifactRef
 from .states import ValidationStatus, ValidationStatusValue
@@ -142,15 +143,15 @@ class AcceptanceResult(DomainModel):
     delta_regression_score: Reward | None
     policy_id: Identifier
     policy_version: Identifier
+    delta_current_task_score: Reward | None = None
+    weighted_gain: WeightedGain | None = None
 
     @model_validator(mode="after")
-    def reward_matches_independent_gain(self):
-        deltas = (self.delta_score, self.delta_similar_score, self.delta_regression_score)
-        if self.reward is None:
-            if any(value is not None for value in deltas) or self.accepted:
-                raise ValueError("unknown reward requires null deltas and cannot be accepted")
-        elif any(value is None for value in deltas) or not isclose(self.reward, self.delta_score, abs_tol=1e-12):
-            raise ValueError("known reward must equal delta_score with all deltas available")
-        if self.accepted and self.reward <= 0:
-            raise ValueError("accepted candidates require a positive independent gain")
+    def reward_matches_objective(self):
+        validate_reward(self.reward, self.delta_score, self.delta_similar_score, self.delta_regression_score,
+                        self.delta_current_task_score, self.weighted_gain)
+        if self.policy_id == "weighted_improvement" and self.reward is not None and self.weighted_gain is None:
+            raise ValueError("weighted_improvement requires a weighted gain breakdown")
+        if self.accepted and (self.reward is None or self.reward <= 0):
+            raise ValueError("accepted candidates require a known positive reward")
         return self

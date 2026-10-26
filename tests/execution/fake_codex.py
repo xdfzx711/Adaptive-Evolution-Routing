@@ -28,6 +28,28 @@ def calculate(node):
     raise ValueError("unsupported fixture expression")
 
 
+async def exercise_tools(config, workspace, *, call=True):
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    selected = next((tomllib.loads(value)["mcp_servers"]["aer_tools"] for value in config
+                     if value.startswith("mcp_servers.aer_tools=")), None)
+    if selected is None:
+        return []
+    (workspace / "analysis_sample.py").write_text("def example():\n return 1\n", encoding="utf-8")
+    async with stdio_client(StdioServerParameters(command=selected["command"], args=selected["args"])) as streams:
+        async with ClientSession(*streams) as session:
+            await session.initialize()
+            tools = (await session.list_tools()).tools
+            if call:
+                for index, tool in enumerate(tools):
+                    arguments = {"path": "analysis_sample.py"}
+                    result = await session.call_tool(tool.name, arguments)
+                    emit({"type": "item.completed", "item": {"id": f"mcp-{index}", "type": "mcp_tool_call",
+                        "server": "aer_tools", "tool": tool.name, "arguments": arguments,
+                        "result": result.model_dump(mode="json"), "status": "failed" if result.isError else "completed"}})
+            return [tool.name for tool in tools]
+
+
 def main():
     if "--version" in sys.argv:
         print("fake-codex 0.162.1")
@@ -57,6 +79,18 @@ def main():
     prompt = next(value for value in config if value.startswith("developer_instructions="))
     is_dev = task.get("public_metadata", {}).get("split") == "dev"
     emit({"type": "thread.started", "thread_id": "fixture-thread"})
+    available = []
+    if mode.startswith("tools") and mode != "tools-ignored":
+        import asyncio
+        try:
+            available = asyncio.run(exercise_tools(config, Path(sys.argv[sys.argv.index("--cd") + 1]),
+                call=mode != "tools-unused"))
+        except Exception:
+            emit({"type": "turn.failed", "error": {"message": "fixture tool setup failed"}})
+            return 1
+        if mode == "tools-validation-error" and available and not is_dev:
+            emit({"type": "turn.failed", "error": {"message": "fixture validation interruption"}})
+            return 1
     if mode == "quota":
         emit({"type": "error", "message": "You have hit your usage limit."})
         emit({"type": "turn.failed", "error": {"message": "You have hit your usage limit."}})
@@ -83,8 +117,9 @@ def main():
         answer = {"name": re.search(r"Name:\s*([A-Za-z]+)", data["text"]).group(1),
                   "count": int(re.search(r"Count:\s*(\d+)", data["text"]).group(1))}
     is_similar = task.get("public_metadata", {}).get("validation_group") == "similar"
-    weak_selection = effort != "high" if mode.startswith("reasoning") else model == "gpt-5.6-sol"
-    if mode == "reject" or (weak_selection and (is_dev or is_similar)) or (is_dev and mode in {"local-failure", "reasoning-local-failure"} and "IMPROVED" not in prompt):
+    weak_selection = (not available if mode.startswith("tools") else
+                      effort != "high" if mode.startswith("reasoning") else model == "gpt-5.6-sol")
+    if mode in {"reject", "tools-reject"} or (weak_selection and (is_dev or is_similar)) or (is_dev and mode in {"local-failure", "reasoning-local-failure"} and "IMPROVED" not in prompt):
         answer = {"answer": -999}
     emit({"type": "item.started", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "status": "in_progress"}})
     emit({"type": "item.completed", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "aggregated_output": "checked public input", "exit_code": 1 if mode == "tool-error" else 0, "status": "completed"}})

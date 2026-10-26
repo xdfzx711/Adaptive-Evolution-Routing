@@ -2,6 +2,8 @@
 
 `codex_cli_agent` 是任务执行插件，实现 AgentPlugin；主控制器没有 Codex 或模型名称分支。Codex 自己完成模型调用、工具选择和执行循环。Router、Diagnoser、Prompt Evolver、ModelSelectionEvolver 使用注入的框架 ModelProvider，示例中仍为 Qwen。执行模型变化不改变这些插件的模型。
 
+可选的附加工具进化支持本地插件和已有 MCP 服务，配置与启动命令见 [工具选择进化](AER_TOOL_EVOLUTION.md)。原配置省略 tooling 时保持现有行为。
+
 ## 启动
 
 先安装并配置 Codex CLI 0.162.1 或更新版本的认证，确保终端能运行 `codex --version`。Qwen 的 API、URL 和模型继续放在 `.env`。本次接入采用 CLI 的非交互协议，不安装另一套 Agent SDK。

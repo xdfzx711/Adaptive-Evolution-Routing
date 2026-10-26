@@ -110,10 +110,14 @@ validation:
   group_field: validation_group
   similar_group: similar
   regression_group: regression
-  acceptance_policy: improvement_with_regression_guard
+  acceptance_policy: weighted_improvement
   policy_version: v0.1
   min_improvement: 0.01
-  max_regression_drop: 0.0
+  max_regression_drop: null
+  weights:
+    current_task: 0.5
+    similar: 0.25
+    regression: 0.25
 feedback:
   policy: dev_feedback_and_validation_summary
 limits:
