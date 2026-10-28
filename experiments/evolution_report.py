@@ -123,7 +123,9 @@ class EvolutionTextReport:
             f"工具：{', '.join(config.providers.tools.enabled) or '无'}；Agent 步骤上限：{config.agent.max_steps}",
             f"最大进化轮数：{config.limits.max_evolution_rounds}；单次输出上限：{context.max_output_tokens}",
             acceptance_rule,
-            "成功结束条件：稳定版本在当前任务上的 Evaluator.success 为 true；接受候选不等于任务成功。",
+            ("成功结束条件：稳定版本在当前任务上的 Evaluator.success 为 true；接受候选不等于任务成功。"
+             if config.evolution.stop_on_success else
+             "成功后继续进化：运行至配置轮数上限；任务成功仍由 Evaluator.success 独立记录。"),
             "总资源预算：当前 MVP 未强制执行；下文记录实际消耗。",
             "本报告展示进化决策与评测汇总；执行轨迹、输出和原始模型响应见对应详细记录。",
             "公开任务输入（完整，仅在此展示一次）：", json.dumps(task.model_dump(mode="json"), ensure_ascii=False, indent=2)])
@@ -216,6 +218,44 @@ class EvolutionTextReport:
             f"选择目标：{value.decision.target if value.decision else '未选择'}",
             f"路由理由：{value.decision.rationale if value.decision else '未记录'}",
             f"Operator：{value.operator_id or '未选择'}；生成状态：{value.response.status.value if value.response else value.status}"])
+        from .optimization_report import optimization_record
+        optimization = optimization_record(value, self.artifacts)
+        if optimization is not None:
+            lines = [f"优化器：{optimization.optimizer}；版本：{optimization.engine_version}；"
+                f"状态：{optimization.status}；原因：{optimization.reason}；停止原因：{optimization.stop_reason}",
+                "内部搜索选择与 AER 接受、提交分开记录；下列分数为内部选择集评分。",
+                f"试跑：{len(optimization.trials)} 次；反思：{len(optimization.reflections)} 次；"
+                f"候选：{len(optimization.candidates)} 个；内部选择集与训练集重用：{optimization.config.get('selection_reuses_training')}",
+                "完整输入、响应、候选和执行轨迹：" + proposal_source + " / generation.internal_optimization",
+                "内部候选 | 父候选 | 选择集得分 | 内部选中"]
+            for item in optimization.candidates:
+                lines.append(f"C{item.candidate} | {', '.join('C' + str(parent) for parent in item.parents) or '起始提示词'} | "
+                    f"{f'{item.score:.3f}' if item.score is not None else '未完成选择集评测'} | {item.selected}")
+            if "samples_per_evaluation" in optimization.config:
+                lines.append(f"每个提示词/任务固定采样 {optimization.config['samples_per_evaluation']} 次，取平均分；"
+                    "同次搜索内初筛、反思与选择集排名复用相同条件下的采样结果。")
+            lines.append("内部轮次 | 决策 | 候选 | 结果")
+            labels = {"selected_parent": "选择父候选", "generated": "生成候选",
+                      "accepted_in_search": "内部接受", "rejected_in_search": "内部拒绝", "optimizer_message": "优化器提示",
+                      "sampled_evaluation": "采样汇总", "evaluation_reused": "复用评测"}
+            for item in optimization.decisions:
+                result = item.get("reason", "") or ("得分=" + str(item["score"]) if "score" in item else "")
+                if item.get("message"):
+                    result = item["message"].splitlines()[0]
+                lines.append(f"{item.get('iteration', '')} | {labels.get(item['event'], item['event'])} | "
+                    f"{('C' + str(item['candidate'])) if item.get('candidate') else ''} | {result}")
+            lines.append("内部试跑 | 时间 | 候选 | 任务 | 得分 | 状态")
+            for item in optimization.trials:
+                observation = item.observation
+                lines.append(f"{item.trial} | {moment(item.started_at)} | C{item.candidate} | {observation.task.task_id} | "
+                    f"{f'{observation.feedback.score:.3f}' if observation.feedback else '未评测'} | "
+                    f"{observation.error.code if observation.error else 'completed'}")
+            lines.append("内部反思 | 时间 | tokens | 状态")
+            for item in optimization.reflections:
+                lines.append(f"{item.call} | {moment(item.started_at)} | {item.usage.total_tokens} | "
+                    f"{item.error.code if item.error else 'completed'}")
+            lines.append(self.usage_line(optimization.usage))
+            self.block("Evolver 内部优化", lines)
         receipt = routing_record(value, self.artifacts)
         if receipt is not None:
             jev = isinstance(receipt, JevRoutingRecord)

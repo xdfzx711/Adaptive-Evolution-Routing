@@ -185,6 +185,11 @@ class RoundReport:
             "usage": plain(value.attempt.usage) if value.attempt else None,
             "evolver_usage": plain(response.usage) if response else None,
             "error": error_view(response.error) if response else None}
+        from .optimization_report import optimization_record, optimization_view
+        optimization = optimization_record(value, self.artifacts)
+        if optimization is not None:
+            self.link(response.record_ref)
+            self.data["generation"]["internal_optimization"] = optimization_view(optimization)
         if value.attempt:
             self.link(value.attempt.pre_state_ref)
         if response:

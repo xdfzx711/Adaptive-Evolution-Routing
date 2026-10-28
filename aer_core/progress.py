@@ -1,10 +1,16 @@
 """Optional progress output independent of storage, CLI and model SDKs."""
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class ProgressReporter(Protocol):
     def emit(self, stage: str, message: str, *, detail: bool = False) -> None: ...
+
+
+class NullProgressReporter:
+    def emit(self, stage: str, message: str, *, detail: bool = False) -> None:
+        pass
 
 
 def report_progress(reporter: ProgressReporter | None, stage: str, message: str, *, detail: bool = False) -> None:

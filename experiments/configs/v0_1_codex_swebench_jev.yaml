@@ -50,7 +50,7 @@ agent:
   initial_snapshot_ref: null
   config:
     windows_sandbox: mxc
-    initial_model: gpt-5.6-sol
+    initial_model: gpt-6.1-sol
     allowed_models:
     - gpt-6.1-sol
     - gpt-6-sol

@@ -5,6 +5,8 @@ from pathlib import Path
 from aer_core.config.models import RoutingSettings
 from aer_core.contracts.providers import ModelProvider
 from aer_core.contracts.storage import ArtifactStore
+from aer_core.contracts.optimization import CandidateTrialService, ModelProviderFactory
+from aer_core.progress import ProgressReporter
 from aer_core.plugin_registry import API_VERSION, PluginRegistry, ResolvedDependencies
 from aer_core.schemas.plugins import PluginCapabilities, PluginMetadata
 from plugins.evolution.prompt import PromptEvolverConfig, SimplePromptEvolver
@@ -12,6 +14,7 @@ from plugins.evolution.model_selection import ModelSelectionEvolverConfig, Model
 from plugins.agents.model_selection import CodexModelAdapter
 from plugins.agents.tool_selection import CodexToolAdapter
 from plugins.evolution.tool_selection import ToolSelectionEvolver, ToolSelectionEvolverConfig
+from plugins.evolution.gepa.config import GEPAPromptConfig
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
 from plugins.routers.jev import JevRouter, JevRoutingSettings, resolve_jev_credentials
@@ -48,6 +51,14 @@ def build_tool_selection(*, config: ToolSelectionEvolverConfig, dependencies: Re
         adapter=CodexToolAdapter())
 
 
+def build_gepa(*, config: GEPAPromptConfig, dependencies: ResolvedDependencies):
+    from plugins.evolution.gepa.evolver import GEPAPromptEvolver, require_gepa
+    require_gepa()
+    model = dependencies.get("model_factory").create(config.reflection_model)
+    return GEPAPromptEvolver(config, dependencies.get("artifact_store"), model,
+                            dependencies.get("candidate_trials"), dependencies.get("optimization_progress"))
+
+
 def register_evolution_plugins(registry: PluginRegistry) -> None:
     for plugin_id, mode, factory in [("fixed_router", "fixed", build_fixed), ("manual_router", "manual", build_manual)]:
         registry.register(PluginMetadata(id=plugin_id, category="router", api_version=API_VERSION,
@@ -56,6 +67,13 @@ def register_evolution_plugins(registry: PluginRegistry) -> None:
         plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["prompt"], compatible_agents=["react_agent", "single_call_agent", "codex_cli_agent"]),
         dependencies=["artifact_store", "model_provider"]), build_prompt, config_model=PromptEvolverConfig,
         dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider})
+    registry.register(PluginMetadata(id="gepa_prompt_evolver", category="evolution", api_version=API_VERSION,
+        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["prompt"],
+            compatible_agents=["react_agent", "single_call_agent", "codex_cli_agent"]),
+        dependencies=["artifact_store", "model_factory", "candidate_trials", "optimization_progress"]),
+        build_gepa, config_model=GEPAPromptConfig,
+        dependency_types={"artifact_store": ArtifactStore, "model_factory": ModelProviderFactory,
+                          "candidate_trials": CandidateTrialService, "optimization_progress": ProgressReporter})
     registry.register(PluginMetadata(id="llm_router", category="router", api_version=API_VERSION,
         plugin_version="0.1.0", capabilities=PluginCapabilities(routing_modes=["llm"]),
         dependencies=["model_provider", "artifact_store"]), build_llm_router, config_model=RoutingSettings,

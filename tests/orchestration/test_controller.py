@@ -47,6 +47,20 @@ class ControllerTests(unittest.TestCase):
         self.assertFalse(result.final_evaluation.success)
         self.assertEqual(result.evolution_rounds_used, 0)
 
+    def test_success_can_continue_through_all_configured_rounds(self):
+        for initial_success in (False, True):
+            with self.subTest(initial_success=initial_success), tempfile.TemporaryDirectory() as root:
+                _, startup = configured(Path(root), rounds=5, stop_on_success=False)
+                task = startup.prepare_task("dev-001")
+                attach_model(task, initial_success=initial_success)
+                result = task.run()
+                self.assertEqual(result.stop_reason, "max_evolution_rounds_reached")
+                self.assertEqual(result.evolution_rounds_used, 5)
+                self.assertTrue(result.final_evaluation.success)
+                self.assertEqual([event.payload.round_id for event in self.events(task, AttemptStartedEvent)],
+                                 [1, 2, 3, 4, 5])
+                self.assertEqual(len(self.events(task, VersionCommittedEvent)), 0 if initial_success else 1)
+
     def test_initial_provider_failure_stops_without_diagnosis_or_attempt(self):
         _, task = self.setup_task()
         model, _ = attach_model(task)

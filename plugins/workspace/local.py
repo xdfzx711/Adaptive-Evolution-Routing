@@ -82,14 +82,18 @@ class LocalRepoWorkspace(EmptyWorkspace):
                 or any(part in {".", ".."} for part in repo.split("/"))
                 or not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)):
             raise ExecutionError("Repository workspace requires public repo and full base_commit", stage="initial_execution")
-        cache = self.cache_root / (repo.replace("/", "__") + "-" + revision)
+        cache_name = repo.replace("/", "__") + "-" + revision
+        source_cache = self.cache_root / cache_name
+        cache = (Path(run_ctx.execution_workspace_root).parent / "repository-cache" / cache_name
+                 if run_ctx.execution_workspace_root else source_cache)
         cache.mkdir(parents=True, exist_ok=True)
         timeout = self.settings.git_timeout_seconds
         git(cache, "init", "--quiet", timeout=timeout)
         try:
             git(cache, "cat-file", "-e", revision + "^{commit}", timeout=timeout)
         except ExecutionError:
-            source = self.settings.repositories.get(repo, "https://github.com/" + repo + ".git")
+            source = (str(source_cache) if run_ctx.execution_workspace_root and (source_cache / ".git").is_dir()
+                      else self.settings.repositories.get(repo, "https://github.com/" + repo + ".git"))
             if not source.startswith(("https://", "http://", "ssh://", "git@")):
                 path = Path(source).expanduser()
                 source = str((self.config_root / path).resolve() if not path.is_absolute() else path.resolve())

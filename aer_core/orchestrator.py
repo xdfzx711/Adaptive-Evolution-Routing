@@ -183,7 +183,7 @@ class Orchestrator:
             if error:
                 return self._finish(task, context, state, self._stop_reason(error, state.stage), error)
             while True:
-                if state.record.evaluation.success:
+                if state.record.evaluation.success and self.config.evolution.stop_on_success:
                     return self._finish(task, context, state, "task_succeeded")
                 state.stage, state.charged = "routing", True
                 if self.config.evolution.mode == "disabled":

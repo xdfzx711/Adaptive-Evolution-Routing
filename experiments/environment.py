@@ -1,6 +1,7 @@
 """Load provider credentials at the composition boundary, without global writes."""
 
 import os
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -23,6 +24,19 @@ def env_file_path(loaded: LoadedConfig) -> Path | None:
     return (loaded.source_path.parent / path).resolve() if not path.is_absolute() else path.resolve()
 
 
+def env_file_paths(loaded: LoadedConfig) -> tuple[Path, ...]:
+    """All declared provider env inputs, including operator-owned providers."""
+    paths = {path for path in (env_file_path(loaded),) if path is not None}
+    for config in loaded.config.targets.operator_configs.values():
+        model = config.get("reflection_model")
+        if isinstance(model, dict) and model.get("plugin") == "qwen_model":
+            path = QwenModelConfig.model_validate(model.get("config", {})).dotenv_path
+            if path is not None:
+                value = Path(path).expanduser()
+                paths.add((loaded.source_path.parent / value).resolve() if not value.is_absolute() else value.resolve())
+    return tuple(sorted(paths))
+
+
 def _environment_values(loaded: LoadedConfig) -> dict:
     path = env_file_path(loaded)
     try:
@@ -34,13 +48,15 @@ def _environment_values(loaded: LoadedConfig) -> dict:
 def resolve_model(loaded: LoadedConfig, *, required: bool = False) -> LoadedConfig:
     """Resolve the model name before creating controlled Snapshots or providers."""
     model = loaded.config.providers.model
-    if model.plugin != "qwen_model" or model.model_id != "${QWEN_MODEL}":
+    match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", model.model_id)
+    if model.plugin != "qwen_model" or match is None:
         return loaded
+    variable = match.group(1)
     values = _environment_values(loaded)
-    name = os.environ.get("QWEN_MODEL", values.get("QWEN_MODEL"))
+    name = os.environ.get(variable, values.get(variable))
     if not name or not name.strip():
         if required:
-            raise PluginConfigurationError("Missing Qwen environment variable: QWEN_MODEL", stage="setup", plugin_id="qwen_model")
+            raise PluginConfigurationError("Missing Qwen environment variable: " + variable, stage="setup", plugin_id="qwen_model")
         return loaded
     data = loaded.config.model_dump(mode="json")
     data["providers"]["model"]["model_id"] = name.strip()

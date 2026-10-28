@@ -15,7 +15,9 @@
 .\.venv\Scripts\python.exe main.py run-task experiments/configs/v0_1_codex_router.yaml --task-id hard-dev-001 --output codex-result.json
 ```
 
-默认执行模型为 `gpt-5.6-sol`，可选列表为 `gpt-6.1-sol`、`gpt-6-sol`、`gpt-6-luna`、`gpt-5.6-sol`。名称按实验配置保留；实际可用性取决于本机 Codex Provider 和账户。调用不支持的模型时记录执行错误，不自行回退。
+默认执行模型为 `gpt-6.1-sol`，可选列表为 `gpt-6.1-sol`、`gpt-6-sol`、`gpt-6-luna`、`gpt-5.6-sol`。名称按实验配置保留；实际可用性取决于本机 Codex Provider 和账户。调用不支持的模型时记录执行错误，不自行回退。
+
+当前实验基准：Codex 使用 `gpt-6.1-sol` 执行任务并生成代码补丁；GEPA 内部三次采样与外层验证均读取同一 Snapshot 的执行模型。诊断、Prompt 生成和 GEPA 反思使用独立 Qwen Provider，`.env` 中设置 `QWEN_MODEL=qwen3.8-max`；Jev Router 继续使用其单独配置。显式启动模型选择进化实验时，模型候选仍可从配置的 allowed_models 中选择。
 
 命令行直接调整启动参数，不用修改代码或 YAML：
 
@@ -33,7 +35,7 @@
 | 字段 | 含义 |
 | --- | --- |
 | command | CLI 启动参数列表，默认 `[codex]`；Windows npm 安装通过 Node 启动其 JS 入口，不拼接 Shell 命令 |
-| initial_model | 初始 model 工件的模型标识，默认 gpt-5.6-sol |
+| initial_model | 初始 model 工件的模型标识，默认 gpt-6.1-sol |
 | initial_reasoning_effort | 初始 model 工件的推理强度，默认 null，表示沿用 Codex 后端默认值 |
 | allowed_models | 本实验允许选择的模型，非空、不重复，必须包含初始模型 |
 | allowed_reasoning_efforts | 按模型配置允许的推理强度列表；缺省为 `{}`，未列出的模型仅允许 null（后端默认） |
@@ -64,7 +66,7 @@ Snapshot.artifacts 保存 `prompt` 和 `model`。prompt 是可进化的附加 de
 
 ```json
 {
-  "model_id": "gpt-5.6-sol",
+  "model_id": "gpt-6.1-sol",
   "reasoning_effort": "high"
 }
 ```
@@ -74,7 +76,7 @@ Codex 将前者映射为 `--model`，后者映射为 `--config model_reasoning_e
 旧配置、旧 Snapshot 以及仅含 model_id 的工件继续可用。省略 reasoning_effort 或设为 null 时不向 CLI 传递该覆盖项，不自动指定 medium。未配置 allowed_reasoning_efforts 时，原命令仍只进化模型。启用联合进化时，在 agent.config 下配置，例如：
 
 ```yaml
-initial_model: gpt-5.6-sol
+initial_model: gpt-6.1-sol
 initial_reasoning_effort: medium
 allowed_models: [gpt-6.1-sol, gpt-6-sol, gpt-6-luna, gpt-5.6-sol]
 allowed_reasoning_efforts:
@@ -102,6 +104,8 @@ Prompt Evolver 只更新 prompt；ModelSelectionEvolver 根据允许反馈，用
 
 ## 工作区与输出
 
+任务权限从 `:read-only` 继承，以 `:root=deny`、`:minimal=read` 和本次工作区的显式 write 授权组成；不会继承 `:workspace` 对共享临时目录的写入权限。不能再把 `:tmpdir` 整体标记 deny：Windows MXC 会同时阻止位于 TEMP 内的任务目录句柄，导致 PowerShell 工作目录落到 C:/，启动 Git/rg 时出现 DriveNotFoundException。Git 仅通过任务 shell 的环境配置将当前仓库加入 safe.directory，并跳过宿主全局配置；不修改宿主 Git 设置。公开运行事实明确使用原生 Windows/PowerShell。
+
 每次实际执行创建独立目录和新会话，使用 `--ephemeral`，不 resume。任务通过 stdin 输入；工作区只生成公开输出 Schema，Codex 产生的文件保留在该工作区。CLI 被配置为无需交互审批、限制文件访问，并拒绝读取 AER 源码目录和当前 run 目录，避免工作区外的评分数据与历史报告进入执行。CLI 配置或受管策略不兼容时记录错误，不自动放宽权限。隔离的实际执行效果仍需在目标系统进行真实 CLI 联调。
 
 PublicJsonOutput 根据公开 output_schema 或 output_format 生成约束，并严格解析最终 JSON 对象，交给原 Evaluator；不读取隐藏答案，不修补答案，不从自由文本中猜测结果。Codex 事件转换为通用 model_response/tool_call/tool_result/finish 等 TraceEvent。Agent 声明允许披露的工具参数与输出字段，供诊断、路由和进化使用。
@@ -117,5 +121,7 @@ turn.completed 的 input_tokens/output_tokens 作为实际用量；cached_input_
 离线测试通过独立 Python 子进程模拟 CLI，覆盖模型与 Prompt 继承、评分、接受、拒绝、空候选、验证失败、CLI 失败、超时、成本、缓存、提交后复用和命令行覆盖。模拟测试不证明账户能够调用指定真实模型。
 
 还可在 Windows 下设置 AER_TEST_REAL_CODEX=1，运行 tests.integration.test_codex_native。该测试启动实际 Codex CLI，并连接本地模拟 Responses 服务，覆盖完整会话初始化、模型参数传递、流式响应和输出解析；不会调用远端模型服务。启用该检查可发现普通假 CLI 和单条沙箱命令无法覆盖的原生启动问题。
+
+设置 `AER_TEST_CODEX_SANDBOX=1` 后运行 `tests.execution.test_codex_sandbox`，直接检查原生 MXC 中的工作目录、Git、rg、读写，以及其他任务文件和 AER 项目文件的读取隔离；无需模型调用。
 
 官方协议：[非交互模式](https://learn.chatgpt.com/docs/non-interactive-mode)、[CLI 参数](https://learn.chatgpt.com/docs/cli/reference)、[配置参考](https://learn.chatgpt.com/docs/config-file/config-reference)。

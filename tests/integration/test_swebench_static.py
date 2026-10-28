@@ -49,7 +49,7 @@ def fixture(root):
     data["benchmark"]["config"] = {"dataset_path": "data.json", "roles": {
         "dev-issue": "dev", "similar-issue": "similar", "regression-issue": "regression"}}
     data["agent"]["config"].update(command=[sys.executable, str(FAKE), "--fixture-mode", "patch"],
-                                     workspace_root=str(root / "workspaces"))
+                                     initial_model="gpt-5.6-sol", workspace_root=str(root / "workspaces"))
     data["agent"]["config"]["workspace"]["config"] = {
         "cache_root": str(root / "cache"), "repositories": {"fixture/repo": str(source)}}
     data["storage"]["root"] = str(root / "runs")
@@ -204,6 +204,26 @@ class SwebenchStaticTests(unittest.TestCase):
             result = collector.collect(task, first, "", context())
             self.assertFalse(result.output["syntax_valid"])
             self.assertEqual(tuple(result.output["syntax_error_files"]), ("module.py",))
+
+    def test_internal_workspace_uses_a_separate_repository_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path, source, _ = fixture(root)
+            prepared = prepare_benchmark(path)
+            task = prepared.benchmark.task_view(prepared.execution_tasks[0])
+            provider = LocalRepoWorkspace(LocalRepoSettings(cache_root=str(root / "cache"),
+                repositories={"fixture/repo": str(source)}), root)
+            provider.prepare(task, root / "outer", context())
+            before = {file.relative_to(root / "cache"): file.read_bytes()
+                      for file in (root / "cache").rglob("*") if file.is_file()}
+            inner = root / "internal"
+            handle = provider.prepare(task, inner / "workspaces" / "task",
+                context(execution_workspace_root=str(inner / "workspaces")))
+            self.assertEqual((handle.path / "module.py").read_text(), "answer = 1\n")
+            self.assertTrue((inner / "repository-cache").is_dir())
+            after = {file.relative_to(root / "cache"): file.read_bytes()
+                     for file in (root / "cache").rglob("*") if file.is_file()}
+            self.assertEqual(before, after)
 
     def test_static_scores_reference_partial_empty_invalid_and_wrong_identity(self):
         from tests.domain_helpers import execution

@@ -64,7 +64,7 @@ class PreparedOrchestrator:
         initial = storage.version_store.load(storage.initial_snapshot_ref.record_id)
         versions.initialize(initial)
         scoped = replace(base, storage=replace(storage, version_store=versions))
-        evolution = assemble_evolution(scoped) if config.evolution.mode != "disabled" else None
+        evolution = assemble_evolution(scoped, progress=reporter) if config.evolution.mode != "disabled" else None
         conditions = validation_conditions(scoped)
         validation = assemble_validation(scoped, progress=reporter, conditions=conditions) if config.evolution.mode != "disabled" else None
         context = RunContext(run_id=storage.run_id, episode_id=episode_id, operation_id=episode_id,

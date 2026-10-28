@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from aer_core.errors import ConfigIssue
 
 from .catalog import ConfigCatalog, PluginDeclaration
-from .models import ExperimentConfig
+from .models import ExperimentConfig, ModelProviderSettings
 
 
 def field_path(location: tuple[str | int, ...]) -> str:
@@ -154,7 +154,16 @@ def validate_semantics(config: ExperimentConfig, catalog: ConfigCatalog) -> list
             if operator.config_model:
                 settings = {**targets.operator_configs.get(target, {}), "max_candidates": config.evolution.max_candidates_per_round}
                 try:
-                    operator.config_model.model_validate(settings)
+                    validated = operator.config_model.model_validate(settings)
+                    reflection = getattr(validated, "reflection_model", None)
+                    if isinstance(reflection, ModelProviderSettings):
+                        nested_field = f"targets.operator_configs.{target}.reflection_model"
+                        provider = reference("model_provider", reflection.plugin, nested_field + ".plugin")
+                        if provider and provider.config_model:
+                            try:
+                                provider.config_model.model_validate(reflection.config)
+                            except ValidationError as error:
+                                issues.extend(schema_issues(error, nested_field + ".config"))
                 except ValidationError as error:
                     issues.extend(schema_issues(error, f"targets.operator_configs.{target}"))
         require("max_candidates" not in targets.operator_configs.get(target, {}), f"targets.operator_configs.{target}", "set candidate count with evolution.max_candidates_per_round")

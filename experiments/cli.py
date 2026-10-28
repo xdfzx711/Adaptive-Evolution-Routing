@@ -181,9 +181,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         try:
             input_paths = {loaded.source_path}
-            dotenv_path = env_file_path(loaded)
-            if dotenv_path is not None:
-                input_paths.add(dotenv_path)
+            from .environment import env_file_paths
+            input_paths.update(env_file_paths(loaded))
             if loaded.benchmark_index_path is not None:
                 input_paths.add(loaded.benchmark_index_path)
             if loaded.config.agent.initial_snapshot_ref is not None:

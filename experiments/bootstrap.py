@@ -162,6 +162,11 @@ def assemble_experiment(
     if (not isinstance(snapshot, AgentSnapshot) or snapshot.agent_plugin_id != config.agent.plugin
         or snapshot.model_dump(mode="json")["config"] != controlled_snapshot_config(config, registry)):
         raise DependencyError("Snapshot controlled configuration does not match the selected Agent", stage="setup", plugin_id=config.agent.plugin)
+    from .optimization import ConfiguredModelFactory, IsolatedCandidateTrials
+    from aer_core.progress import NullProgressReporter
+    external.setdefault("model_factory", ConfiguredModelFactory(loaded, registry))
+    external.setdefault("candidate_trials", IsolatedCandidateTrials(loaded, registry, external.get("artifact_store"), ()))
+    external.setdefault("optimization_progress", NullProgressReporter())
     built = PluginManager(registry).build(bindings, dependencies=external)
     bundle = ControllerPlugins(agent=built.instances["agent"], router=built.instances.get("router"), operators={target: built.instances[f"operator:{target}"] for target in config.targets.default_operators})
     return AssembledExperiment(loaded, bundle, built)

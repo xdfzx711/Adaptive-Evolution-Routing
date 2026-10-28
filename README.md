@@ -138,13 +138,13 @@ Qwen Provider 支持兼容 Chat Completions、工具调用、实际 token usage 
 
 Qwen 示例配置现在使用 `assessment.diagnoser: llm_diagnoser`，复用相同的 ModelProvider 和 .env 模型设置。失败诊断返回观察事实、可能原因和轨迹证据，实际调用成本计入结果；稳定版本的同一次失败执行不重复诊断。本地 scripted 示例仍保留规则诊断器，可通过配置替换。
 
-新增 [Codex CLI 与双组件进化](docs/AER_CODEX_AGENT.md)：`codex_cli_agent` 执行任务，Qwen 负责诊断、路由和进化。Router 选择 `prompt` 或 `model`，默认执行模型为 `gpt-5.6-sol`。旧步数进化组件已移除；ReAct 仍可作为对照插件。`evolution.txt` 展示路由决策，分轮 `record.json` 保存路由模型的实际输入与原始响应。
+新增 [Codex CLI 与双组件进化](docs/AER_CODEX_AGENT.md)：`codex_cli_agent` 执行任务，Qwen 负责诊断、路由和进化。Router 选择 `prompt` 或 `model`，默认执行模型为 `gpt-6.1-sol`，文本生成基准为 `.env` 中的 `QWEN_MODEL=qwen3.8-max`。旧步数进化组件已移除；ReAct 仍可作为对照插件。`evolution.txt` 展示路由决策，分轮 `record.json` 保存路由模型的实际输入与原始响应。
 
 ```powershell
 .\.venv\Scripts\python.exe main.py run-task experiments/configs/v0_1_codex_router.yaml --task-id hard-dev-001 --output codex-result.json
 ```
 
-命令行支持重复的 `--set 路径=YAML值`，例如 `--set agent.config.initial_model=gpt-6-sol`、`--set limits.max_evolution_rounds=5`。覆盖值先经过完整配置检查，再用于装配、Snapshot、验证及日志，原 YAML 不变。Codex 使用本机 CLI 认证，默认跳过用户 config.toml，Provider 继承方式见接入文档；Qwen 继续使用 `.env`。
+命令行支持重复的 `--set 路径=YAML值`，例如 `--set agent.config.initial_model=gpt-6-sol`、`--set limits.max_evolution_rounds=5`。`evolution.stop_on_success` 默认是 `true`；设为 `false` 可在任务成功后继续进化至轮数上限，其他错误与不可行目标仍会停止运行。覆盖值先经过完整配置检查，再用于装配、Snapshot、验证及日志，原 YAML 不变。Codex 使用本机 CLI 认证，默认跳过用户 config.toml，Provider 继承方式见接入文档；Qwen 继续使用 `.env`。
 
 ## 较难本地任务
 
@@ -227,6 +227,8 @@ runs/run-<时间>/
 SWE-bench Lite 的三个实例现可用于 Codex 静态补丁评估，不需要容器。Benchmark、工作区、产物收集器和 Evaluator 均通过插件配置选择；运行指令、评分公式和数据角色见 [SWE-bench 静态接入](docs/AER_SWEBENCH_STATIC.md)。
 
 三题配置现采用可替换的加权接受策略：当前任务、同类、回归收益权重为 0.5 / 0.25 / 0.25。权重、阈值及可选回归上限由配置控制，日志展开各项贡献；任务成功仍由当前任务的 Evaluator 判定。字段和兼容规则见 [加权接受策略](docs/AER_WEIGHTED_ACCEPTANCE.md)。
+
+Prompt 可选用官方 GEPA 优化器插件，内部试跑使用独立执行实例和工作区，反思模型单独配置；路由插件和运行组合由实验配置决定。安装、字段和内部日志见 [GEPA Prompt Evolver](docs/AER_GEPA_PROMPT_EVOLUTION.md)。`v0_1_codex_swebench_jev_tools.yaml` 现选择 GEPA Prompt 与 Tool 两个目标，其他配置保留原 Operator。
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v

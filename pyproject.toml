@@ -17,6 +17,9 @@ dependencies = [
     "jsonschema>=4.26,<5",
 ]
 
+[project.optional-dependencies]
+gepa = ["gepa==0.1.4"]
+
 [project.scripts]
 aer = "experiments.cli:main"
 

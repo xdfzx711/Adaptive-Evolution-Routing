@@ -26,7 +26,10 @@ def config(root, mode="model", rounds=1):
     data["storage"]["root"] = str(root / "runs")
     data["benchmark"]["plugin"] = "toy_tasks"
     data["providers"]["model"] = MODEL.model_dump(mode="json")
-    data["agent"]["config"].update(command=[sys.executable, str(FAKE), "--fixture-mode", mode], workspace_root=str(root / "workspaces"))
+    # This protocol fixture deliberately treats 5.6 as the failing baseline;
+    # production defaults can change without changing its branch coverage.
+    data["agent"]["config"].update(command=[sys.executable, str(FAKE), "--fixture-mode", mode],
+        initial_model="gpt-5.6-sol", workspace_root=str(root / "workspaces"))
     data["limits"]["max_evolution_rounds"] = rounds
     path = root / "config.yaml"
     path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")

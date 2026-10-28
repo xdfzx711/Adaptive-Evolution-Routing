@@ -217,6 +217,7 @@ class EvolutionResponse(DomainModel):
     usage: ResourceUsage
     status: ResponseStatusValue
     error: ErrorInfo | None = None
+    record_ref: ArtifactRef | None = None
 
     @model_validator(mode="after")
     def response_matches_candidates(self):

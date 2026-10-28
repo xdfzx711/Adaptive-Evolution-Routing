@@ -41,6 +41,7 @@ def v0_1_catalog() -> ConfigCatalog:
         PluginDeclaration("router", "llm_router", routing_modes=("llm",)),
         PluginDeclaration("router", "jev_router", routing_modes=("llm",)),
         PluginDeclaration("evolution", "simple_prompt_evolver", targets=("prompt",), compatible_agents=("react_agent", "single_call_agent", "codex_cli_agent")),
+        PluginDeclaration("evolution", "gepa_prompt_evolver", targets=("prompt",), compatible_agents=("react_agent", "single_call_agent", "codex_cli_agent")),
         PluginDeclaration("evolution", "model_selection_evolver", targets=("model",), compatible_agents=("codex_cli_agent",)),
         PluginDeclaration("validation", "paired_validation"),
         PluginDeclaration("acceptance_policy", "improvement_with_regression_guard", policy_versions=("v0.1",)),

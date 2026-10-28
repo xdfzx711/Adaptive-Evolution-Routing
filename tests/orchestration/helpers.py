@@ -11,7 +11,8 @@ from tests.execution.helpers import MODEL, RecordingModel, response
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def configured(root, *, mode="fixed", rounds=2, task_mode="independent", single=False, candidates=1):
+def configured(root, *, mode="fixed", rounds=2, task_mode="independent", single=False, candidates=1,
+               stop_on_success=True):
     filename = "v0_1_no_evolution.yaml" if mode == "disabled" else "v0_1_manual_prompt.yaml" if mode == "manual" else "v0_1_fixed_prompt.yaml"
     config = yaml.safe_load((ROOT / "experiments/configs" / filename).read_text(encoding="utf-8"))
     config["storage"]["root"] = str(root / "runs")
@@ -19,6 +20,7 @@ def configured(root, *, mode="fixed", rounds=2, task_mode="independent", single=
     config["agent"]["max_steps"] = 1
     config["state"]["task_mode"] = task_mode
     config["evolution"]["max_candidates_per_round"] = candidates
+    config["evolution"]["stop_on_success"] = stop_on_success
     if single:
         config["agent"]["plugin"] = "single_call_agent"
     if mode == "manual":

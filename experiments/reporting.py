@@ -52,7 +52,7 @@ class RunReporter:
         now = datetime.now().astimezone()
         message = " ".join(str(message).split())
         line = f"[{now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} {now.strftime('%z')}] [{stage}] {message}\n"
-        if not detail and (stage in {"进化", "验证", "报告异常"} or stage == "生成" and "正在" in message):
+        if not detail and (stage in {"进化", "验证", "报告异常", "内部搜索", "内部反思", "内部试跑"} or stage == "生成" and "正在" in message):
             self._write(line)
         if self.console:
             self.stream.write(line)

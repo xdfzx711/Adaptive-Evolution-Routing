@@ -86,6 +86,7 @@ class AssessmentSettings(Settings):
 class EvolutionSettings(Settings):
     mode: Literal["disabled", "fixed", "manual", "llm"]
     max_candidates_per_round: PositiveInt
+    stop_on_success: bool = True
     history_max_attempts: NonNegativeInt = 5
     history_max_text_chars: PositiveInt = 320
     history_max_change_chars: PositiveInt = 4000

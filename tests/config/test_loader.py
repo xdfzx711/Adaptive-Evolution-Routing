@@ -63,6 +63,13 @@ class ConfigLoaderTests(unittest.TestCase):
             invalid["evolution"][field] = value
             self.assert_issue(f"evolution.{field}", invalid)
 
+    def test_success_stop_is_enabled_by_default_and_configurable(self):
+        self.assertTrue(self.load().config.evolution.stop_on_success)
+        self.config["evolution"]["stop_on_success"] = False
+        self.assertFalse(self.load().config.evolution.stop_on_success)
+        self.config["evolution"]["stop_on_success"] = "false"
+        self.assert_issue("evolution.stop_on_success")
+
     def test_manual_zero_rounds_and_short_plan(self):
         manual = yaml.safe_load((CONFIGS / "v0_1_manual_prompt.yaml").read_text(encoding="utf-8"))
         manual["routing"]["manual_decisions"] = manual["routing"]["manual_decisions"][:1]

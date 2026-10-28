@@ -35,7 +35,7 @@ from plugins.agents.codex_process import capture_cli
 
 class CodexConfig(CodexModelSpace):
     command: list[NonBlank] = Field(default_factory=lambda: ["codex"])
-    initial_model: ModelId = "gpt-5.6-sol"
+    initial_model: ModelId = "gpt-6.1-sol"
     initial_reasoning_effort: ReasoningEffort | None = None
     workspace_root: NonBlank | None = None
     timeout_seconds: PositiveFloat = 300.0
@@ -196,7 +196,7 @@ class CodexCliAgent:
         components = ["prompt", "model", "tool"]
         return AgentCapabilities(supported_targets=components, supported_artifact_kinds=components,
             can_rebuild_session=True, snapshot_scope="controlled_config",
-            feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "termination_reason", "fresh_session", "seed_supported",
+            feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "execution_platform", "execution_shell", "termination_reason", "fresh_session", "seed_supported",
                                    "result_kind", "evaluation_mode", "selected_tools", "available_tools", "tool_setup_status", "tool_setup_error", "tool_invocations"],
             feedback_config_fields=["allowed_models", "allowed_reasoning_efforts", "tool_catalog"],
             feedback_tool_arguments={"command_execution": ["command"], "file_change": ["changes"],
@@ -245,6 +245,7 @@ class CodexCliAgent:
         fingerprints = {name: hashlib.sha256((home / name).read_bytes()).hexdigest()
                         for name in names if (home / name).is_file()}
         return {"cli_version": self.cli_version, "command": self.command, "config_fingerprints": fingerprints,
+                "task_permissions_version": "2",
                 "tool_executables": self.tool_executables,
                 "tool_read_roots": [str(path) for path in self.tool_read_roots],
                 "windows_sandbox": self.settings.windows_sandbox if os.name == "nt" else None,
@@ -285,9 +286,19 @@ class CodexCliAgent:
         # MXC cannot initialize some such nested deny entries (0x80070003).
         # The project-wide denial already covers every descendant, including
         # future run directories, so only emit the outermost protected paths.
-        denied = {str(path) for path in denied_paths
-                  if not any(path != parent and path.is_relative_to(parent) for parent in denied_paths)}
-        filesystem = '":root"="deny", ":minimal"="read", ":tmpdir"="deny", ":slash_tmp"="deny", '
+        # Internal optimizers keep private data and task workspaces under one
+        # temporary parent. An explicit ancestor deny masks the workspace grant
+        # in MXC. The :root deny below already protects every sibling; retain
+        # explicit denials only where they don't mask the task directory.
+        denied_roots = {path for path in denied_paths
+                        if path == workspace or not workspace.is_relative_to(path)}
+        denied = {str(path) for path in denied_roots
+                  if not any(path != parent and path.is_relative_to(parent) for parent in denied_roots)}
+        # Denying :tmpdir also denies directory handles for AER's workspaces
+        # under TEMP in MXC. Grant only this workspace from a read-only parent,
+        # without inheriting :workspace's shared temporary-directory grants.
+        filesystem = '":root"="deny", ":minimal"="read", '
+        filesystem += json.dumps(str(workspace)) + '="write", '
         filesystem += ', '.join(json.dumps(path) + '="deny"' for path in sorted(denied))
         # Nonstandard Windows Git/rg installs are absent from :minimal. Permit
         # only their runtime folders, keeping task data and host sources denied.
@@ -295,7 +306,7 @@ class CodexCliAgent:
             if not any(path.is_relative_to(parent) or parent.is_relative_to(path) for parent in denied_paths):
                 filesystem += ', ' + json.dumps(str(path)) + '="read"'
         overrides = ["approval_policy=\"never\"", "default_permissions=\"aer_task\"",
-            "permissions.aer_task.extends=\":workspace\"",
+            "permissions.aer_task.extends=\":read-only\"",
             "permissions.aer_task.filesystem={" + filesystem + "}",
             "features.multi_agent=false", "features.apps=false", "features.goals=false", "web_search=\"disabled\"",
             "developer_instructions=" + json.dumps(prompt, ensure_ascii=False)]
@@ -303,6 +314,16 @@ class CodexCliAgent:
             # The standalone CLI can otherwise select unelevated, which cannot
             # enforce this Agent's split read/write filesystem permissions.
             overrides.append("windows.sandbox=" + json.dumps(self.settings.windows_sandbox))
+            # MXC's effective user differs from the repository's host owner.
+            # Trust this task repository, without modifying host Git settings.
+            overrides.extend([
+                'shell_environment_policy.set.GIT_CONFIG_GLOBAL="NUL"',
+                'shell_environment_policy.set.GIT_CONFIG_NOSYSTEM="1"',
+                'shell_environment_policy.set.GIT_CONFIG_COUNT="1"',
+                'shell_environment_policy.set.GIT_CONFIG_KEY_0="safe.directory"',
+                'shell_environment_policy.set.GIT_CONFIG_VALUE_0=' + json.dumps(workspace.as_posix()),
+                'shell_environment_policy.set.GIT_TERMINAL_PROMPT="0"',
+            ])
         if selection.reasoning_effort is not None:
             overrides.append("model_reasoning_effort=" + json.dumps(selection.reasoning_effort))
         overrides.extend("mcp_servers." + json.dumps(name) + ".enabled=false" for name in sorted(servers)
@@ -330,8 +351,11 @@ class CodexCliAgent:
             model_id = selection.model_id
             if self.settings.tooling is not None:
                 selected_tools = self.tool_adapter.read(snapshot, self.artifacts)
-            self.workspace_root.mkdir(parents=True, exist_ok=True)
-            workspace = Path(tempfile.mkdtemp(prefix=timestamp_id("task") + "-", dir=self.workspace_root))
+            workspace_root = Path(run_ctx.execution_workspace_root).resolve() if run_ctx.execution_workspace_root else self.workspace_root
+            if workspace_root.is_relative_to(self.project_root):
+                raise ExecutionError("Execution workspace must be outside the AER project", stage=run_ctx.stage)
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            workspace = Path(tempfile.mkdtemp(prefix=timestamp_id("task") + "-", dir=workspace_root))
             handle = self.workspace_provider.prepare(task, workspace, run_ctx)
             workspace = handle.path
             schema = self.result_collector.schema(task)
@@ -345,7 +369,7 @@ class CodexCliAgent:
                 tool_session = self.tool_adapter.prepare(selected_tools, self.settings.tooling, workspace, self.project_root)
             args = self._arguments(workspace, schema_path, selection, prompt, run_ctx, tool_session)
             timed_out = False
-            deadline = record.start + self.settings.timeout_seconds
+            deadline = record.start + min(self.settings.timeout_seconds, run_ctx.execution_timeout_seconds or self.settings.timeout_seconds)
             for attempt in range(1, self.settings.startup_retries + 2):
                 remaining = deadline - monotonic()
                 if remaining <= 0:
@@ -474,6 +498,7 @@ class CodexCliAgent:
         return ExecutionResult(task_id=task.task_id, agent_version_id=snapshot.version_id,
             operation_id=run_ctx.operation_id, output=output, trajectory=record.events, usage=usage,
             status=status, error=error, state_summary={"agent_plugin": self.plugin_id, "execution_model": model_id,
+                "execution_platform": os.name, "execution_shell": "powershell" if os.name == "nt" else "native",
                 "execution_reasoning_effort": selection.reasoning_effort if selection else None,
                 "termination_reason": termination, "fresh_session": True, "seed_supported": False,
                 "workspace": str(workspace) if workspace else None, "model_calls_scope": "not_reported",

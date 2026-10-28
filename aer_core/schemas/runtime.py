@@ -20,6 +20,8 @@ class RunContextRecord(DomainModel):
     tool_timeout_seconds: PositiveFloat
     max_output_tokens: PositiveInt
     remaining_budget: BudgetRemaining | None
+    execution_workspace_root: Identifier | None = None
+    execution_timeout_seconds: PositiveFloat | None = None
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,8 @@ class RunContext:
     model_timeout_seconds: float
     tool_timeout_seconds: float
     max_output_tokens: int
+    execution_workspace_root: str | None = None
+    execution_timeout_seconds: float | None = None
 
     def __post_init__(self):
         if self.budget is not None and not isinstance(self.budget, BudgetHandle):
@@ -52,6 +56,8 @@ class RunContext:
             tool_timeout_seconds=self.tool_timeout_seconds,
             max_output_tokens=self.max_output_tokens,
             remaining_budget=self.budget.remaining() if self.budget is not None else None,
+            execution_workspace_root=self.execution_workspace_root,
+            execution_timeout_seconds=self.execution_timeout_seconds,
         )
 
     @classmethod

@@ -28,10 +28,12 @@ def task_environment(workspace, tools):
     result = {"platform": os.name, "workspace": str(workspace), "tool_executables": tools}
     if os.name == "nt":
         result["instructions"] = (
-            "This is a native Windows workspace. PowerShell may start at C:/ and Set-Location may be denied. "
-            "Use absolute paths with Get-Content/Get-ChildItem -LiteralPath; do not depend on the shell's current directory. "
-            "Use the supplied absolute tool executable paths rather than PATH lookup. For Git use -C with the absolute "
-            "workspace path. If PowerShell cannot resolve an executable's drive, invoke it through cmd.exe. "
+            "This is a native Windows workspace using PowerShell, not a POSIX shell. "
+            "Use Get-Content/Get-ChildItem -LiteralPath to read files. "
+            "Invoke supplied absolute executable paths with PowerShell's call operator, for example "
+            "& '<git executable>' -C '<workspace>' status --short and & '<rg executable>' -n '<pattern>' '<path>'. "
+            "Git already trusts this task workspace; do not change global Git settings. "
+            "Quote regex patterns and avoid nesting PowerShell, cmd.exe and shell strings. "
             "Do not try bash/WSL or inspect host directories to locate tools. "
             "Read only the relevant source ranges and keep tool output concise.")
     return result

@@ -66,7 +66,7 @@ class PreparedEvolution:
                 stable_version_id=stable.version_id, round_id=round_id, status="skipped", context=None, attempt=None,
                 decision=None, operator_id=None, response=None, stop_reason=reason, experience_refs=[])
 
-        if record.evaluation.success:
+        if record.evaluation.success and config.evolution.stop_on_success:
             return skipped(StopReason.TASK_SUCCEEDED)
         if config.evolution.mode == "disabled":
             return skipped(StopReason.EVOLUTION_DISABLED)
@@ -204,12 +204,19 @@ def prepare_evolution(path: str | Path, *, run_id: str) -> PreparedEvolution:
     return assemble_evolution(prepare_execution(path, run_id=run_id))
 
 
-def assemble_evolution(execution: PreparedExecution) -> PreparedEvolution:
+def assemble_evolution(execution: PreparedExecution, *, progress=None) -> PreparedEvolution:
     config = execution.benchmark.loaded_config.config
     registry = create_registry()
     bindings = evolution_bindings(config, registry)
     deps = {"artifact_store": execution.storage.artifact_store,
             "config_root": execution.benchmark.loaded_config.source_path.parent}
+    from .optimization import ConfiguredModelFactory, IsolatedCandidateTrials
+    from aer_core.progress import NullProgressReporter
+    deps.update(model_factory=ConfiguredModelFactory(execution.benchmark.loaded_config, registry),
+        candidate_trials=IsolatedCandidateTrials(execution.benchmark.loaded_config, registry,
+            execution.storage.artifact_store, execution.benchmark.execution_tasks,
+            snapshot_loader=execution.storage.version_store.load),
+        optimization_progress=progress if progress is not None else NullProgressReporter())
     for name in ("model", "tools"):
         if name in execution.built_plugins.instances:
             deps[name] = execution.built_plugins.instances[name]

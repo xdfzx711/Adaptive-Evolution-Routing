@@ -1,4 +1,4 @@
-# Opt-in tool evolution; original Jev/Qwen dependencies are preserved.
+# Prompt-only GEPA experiment; tool evolution is temporarily disabled.
 schema_version: aer.v0.1
 experiment:
   id: aer-swebench-jev-tool-evolution
@@ -50,7 +50,7 @@ agent:
   initial_snapshot_ref: null
   config:
     windows_sandbox: mxc
-    initial_model: gpt-5.6-sol
+    initial_model: gpt-6.1-sol
     allowed_models:
     - gpt-6.1-sol
     - gpt-6-sol
@@ -97,6 +97,7 @@ assessment:
     success_threshold: 1.0
 evolution:
   mode: llm
+  stop_on_success: false
   max_candidates_per_round: 1
   history_max_attempts: 5
   history_max_text_chars: 320
@@ -116,13 +117,27 @@ routing:
 targets:
   allowed:
   - prompt
-  - model
-  - tool
   default_operators:
-    prompt: simple_prompt_evolver
-    model: model_selection_evolver
-    tool: tool_selection_evolver
-  operator_configs: {}
+    prompt: gepa_prompt_evolver
+  operator_configs:
+    prompt:
+      max_metric_calls: 8
+      samples_per_evaluation: 3
+      max_iterations: 2
+      timeout_seconds: 600.0
+      reflection_timeout_seconds: 90.0
+      trial_timeout_seconds: 300.0
+      reflection_model:
+        plugin: qwen_model
+        model_id: ${QWEN_MODEL}
+        config:
+          dotenv_path: ../../.env
+          api_key_env: QWEN_API_KEY
+          base_url_env: QWEN_BASE_URL
+          temperature: 0.0
+          enable_thinking: false
+          send_seed: false
+          response_format: null
 validation:
   plugin: paired_validation
   split: validation

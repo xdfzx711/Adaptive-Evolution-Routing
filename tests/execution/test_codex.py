@@ -44,6 +44,19 @@ def fixture(root, mode="model", initial="gpt-5.6-sol", **changes):
 
 
 class CodexTests(unittest.TestCase):
+    def test_runtime_workspace_override_preserves_snapshot_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            agent, snapshot, _ = fixture(root)
+            isolated = root / "internal" / "workspaces"
+            benchmark = ToyBenchmark()
+            result = agent.run(benchmark.task_view(benchmark.tasks("dev")[0]), snapshot,
+                context(execution_workspace_root=str(isolated)))
+            self.assertEqual(result.status, "completed", result.error)
+            self.assertTrue(Path(result.state_summary["workspace"]).is_relative_to(isolated))
+            self.assertFalse((root / "workspaces").exists())
+            self.assertEqual(agent.snapshot(), snapshot)
+
     def test_selected_tools_must_be_discovered_but_do_not_have_to_be_called(self):
         from tests.tools.helpers import LOCAL_CATALOG
         for mode, expected in (("tools-ignored", "error"), ("tools-unused", "completed")):
@@ -168,6 +181,20 @@ class CodexTests(unittest.TestCase):
             rules = [args[index + 1] for index, value in enumerate(args[:-1]) if value == "--config"]
             profile = tomllib.loads(next(value for value in rules if value.startswith("permissions.aer_task.filesystem=")))
             self.assertEqual(profile["permissions"]["aer_task"]["filesystem"][str(agent.project_root)], "deny")
+            filesystem = profile["permissions"]["aer_task"]["filesystem"]
+            self.assertEqual(filesystem[str(root)], "write")
+            self.assertNotIn(":tmpdir", filesystem)
+            self.assertNotIn(":slash_tmp", filesystem)
+            parent = tomllib.loads(next(value for value in rules if value.startswith("permissions.aer_task.extends=")))
+            self.assertEqual(parent["permissions"]["aer_task"]["extends"], ":read-only")
+            if os.name == "nt":
+                git_values = {}
+                for value in rules:
+                    if value.startswith("shell_environment_policy.set."):
+                        git_values.update(tomllib.loads(value)["shell_environment_policy"]["set"])
+                self.assertEqual(git_values["GIT_CONFIG_KEY_0"], "safe.directory")
+                self.assertEqual(git_values["GIT_CONFIG_VALUE_0"], root.as_posix())
+                self.assertEqual(git_values["GIT_CONFIG_GLOBAL"], "NUL")
             self.assertTrue(all(not path.is_relative_to(agent.project_root) for path in agent.tool_read_roots))
 
     @unittest.skipUnless(os.name == "nt", "MXC startup recovery")
