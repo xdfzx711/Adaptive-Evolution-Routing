@@ -1,5 +1,7 @@
 # 工具选择进化
 
+生成并维护工具库的 TroVE 插件见 [TroVE 工具库进化](AER_TROVE_TOOL_EVOLUTION.md)。本文描述固定目录工具选择实验。
+
 `tool_selection_evolver` 是独立 Evolver 插件。Router 选择 `tool` 后，由现有框架 ModelProvider（示例仍为 Qwen）提出下一次任务执行所用的完整附加工具集合。Codex 自己决定何时调用工具；Prompt、执行模型、推理强度、基础 Shell/Git/rg 能力保持原样。
 
 ## 启动
