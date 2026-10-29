@@ -18,6 +18,9 @@ class StaticPatchSettings(Settings):
 class StaticPatchEvaluator:
     scorer_version = "static.patch.v1"
     score_policy = "static proxy: weighted changed-line F1 and changed-file F1; not test resolution"
+    public_reason_messages = {
+        "correct": "Static comparison met the threshold. This does not establish test correctness.",
+    }
 
     def __init__(self, settings):
         self.settings = settings

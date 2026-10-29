@@ -14,7 +14,6 @@ from plugins.evolution.model_selection import ModelSelectionEvolverConfig, Model
 from plugins.agents.model_selection import CodexModelAdapter
 from plugins.agents.tool_selection import CodexToolAdapter
 from plugins.evolution.tool_selection import ToolSelectionEvolver, ToolSelectionEvolverConfig
-from plugins.evolution.trove.config import TroveConfig
 from plugins.evolution.gepa.config import GEPAPromptConfig
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
@@ -52,24 +51,23 @@ def build_tool_selection(*, config: ToolSelectionEvolverConfig, dependencies: Re
         adapter=CodexToolAdapter())
 
 
-def build_trove(*, config: TroveConfig, dependencies: ResolvedDependencies):
-    from plugins.evolution.trove.evolver import TroveToolEvolver
-    return TroveToolEvolver(config, dependencies.get("artifact_store"), dependencies.get("model_provider"))
-
-
 def build_gepa(*, config: GEPAPromptConfig, dependencies: ResolvedDependencies):
     from plugins.evolution.gepa.evolver import GEPAPromptEvolver, require_gepa
     require_gepa()
+    trials = dependencies.get("candidate_trials")
+    if config.trial_evaluator is not None:
+        from aer_core.errors import PluginConfigurationError
+        configure = getattr(trials, "with_evaluator", None)
+        if not callable(configure):
+            raise PluginConfigurationError("Configured trial service cannot select a separate evaluator", stage="setup",
+                plugin_id="gepa_prompt_evolver")
+        trials = configure(config.trial_evaluator)
     model = dependencies.get("model_factory").create(config.reflection_model)
     return GEPAPromptEvolver(config, dependencies.get("artifact_store"), model,
-                            dependencies.get("candidate_trials"), dependencies.get("optimization_progress"))
+                            trials, dependencies.get("optimization_progress"))
 
 
 def register_evolution_plugins(registry: PluginRegistry) -> None:
-    registry.register(PluginMetadata(id="trove_tool_evolver", category="evolution", api_version=API_VERSION,
-        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["tool"], compatible_agents=["codex_cli_agent"]),
-        dependencies=["artifact_store", "model_provider"]), build_trove, config_model=TroveConfig,
-        dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider})
     for plugin_id, mode, factory in [("fixed_router", "fixed", build_fixed), ("manual_router", "manual", build_manual)]:
         registry.register(PluginMetadata(id=plugin_id, category="router", api_version=API_VERSION,
             plugin_version="0.1.0", capabilities=PluginCapabilities(routing_modes=[mode])), factory, config_model=RoutingSettings)

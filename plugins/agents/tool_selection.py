@@ -18,15 +18,7 @@ class CodexToolAdapter:
                 for name, value in snapshot.model_dump(mode="json")["config"].get("tool_catalog", {}).items()}
 
     def read(self, snapshot, artifacts):
-        content = artifacts.get(snapshot.artifacts["tool"])
-        if "schema_version" in json.loads(content):
-            from plugins.evolution.trove.library import read_library
-            if not snapshot.config.get("generated_python", False):
-                raise ValueError("Generated Python tooling is not enabled")
-            library = read_library(content)
-            library.validate_catalog(self.catalog(snapshot))
-            return library
-        selection = ToolSelection.model_validate_json(content)
+        selection = ToolSelection.model_validate_json(artifacts.get(snapshot.artifacts["tool"]))
         if not set(selection.enabled_tools) <= self.catalog(snapshot).keys():
             raise ValueError("Selected tool is outside the configured catalog")
         return selection
@@ -58,8 +50,6 @@ class CodexToolSession:
             envs = set()
             upstreams = set()
             for name in selection.enabled_tools:
-                if name not in config.catalog:
-                    continue  # Generated functions are carried by the versioned library.
                 entry = config.catalog[name]
                 if entry.kind == "mcp":
                     upstreams.add(entry.server)

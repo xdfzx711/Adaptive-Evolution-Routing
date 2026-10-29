@@ -75,7 +75,6 @@ class MCPServerConfig(Settings):
 
 class ToolingConfig(Settings):
     catalog: dict[NonBlank, CatalogEntry]
-    generated_python: bool = False
     servers: dict[NonBlank, MCPServerConfig] = Field(default_factory=dict)
     dotenv_path: NonBlank | None = None
     startup_timeout_seconds: PositiveFloat = 30.0

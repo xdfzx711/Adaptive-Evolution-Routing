@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import Field, model_validator
 
-from aer_core.config.models import ModelProviderSettings, NonBlank, NonNegativeInt, PositiveFloat, PositiveInt, Settings
+from aer_core.config.models import ComponentSettings, ModelProviderSettings, NonBlank, NonNegativeInt, PositiveFloat, PositiveInt, Settings
 
 
 class GEPAPromptConfig(Settings):
@@ -23,6 +23,7 @@ class GEPAPromptConfig(Settings):
     trial_timeout_seconds: PositiveFloat = 300.0
     train_task_ids: Annotated[list[NonBlank], Field(min_length=1)] | None = None
     selection_task_ids: Annotated[list[NonBlank], Field(min_length=1)] | None = None
+    trial_evaluator: ComponentSettings | None = None
     reflection_model: ModelProviderSettings = Field(default_factory=lambda: ModelProviderSettings(
         plugin="qwen_model", model_id="${GEPA_REFLECTION_MODEL}", config={
             "api_key_env": "GEPA_REFLECTION_API_KEY", "base_url_env": "GEPA_REFLECTION_BASE_URL"}))

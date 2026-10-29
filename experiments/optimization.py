@@ -43,10 +43,18 @@ class IsolatedCandidateTrials:
     No outer Agent, Evaluator instance, validation cache or stable pointer is used.
     """
 
-    def __init__(self, loaded, registry, artifacts, tasks, *, snapshot_loader=None):
+    def __init__(self, loaded, registry, artifacts, tasks, *, snapshot_loader=None, evaluator_settings=None):
         self.loaded, self.registry, self.artifacts = loaded, registry, artifacts
         self.snapshot_loader = snapshot_loader
+        self.evaluator_settings = evaluator_settings
         self.available = {task.task_id: task for task in tasks} if loaded.config.benchmark.execution_split == "dev" else {}
+
+    def with_evaluator(self, settings):
+        """Clone the trial composition with an explicit scorer; keep task/Agent inputs."""
+        entry = self.registry.get("evaluator", settings.plugin)
+        entry.config_model.model_validate(settings.config)
+        return type(self)(self.loaded, self.registry, self.artifacts, tuple(self.available.values()),
+            snapshot_loader=self.snapshot_loader, evaluator_settings=settings)
 
     def tasks(self, current_task, task_ids):
         current = self.available.get(current_task.task_id)
@@ -86,7 +94,9 @@ class IsolatedCandidateTrials:
                                      artifacts=updates)
             bindings = with_providers(config, self.registry, [*agent_bindings(config, self.registry),
                 component_binding("benchmark", "benchmark", config.benchmark.plugin, config.benchmark.config, self.registry),
-                component_binding("evaluator", "evaluator", config.assessment.evaluator, config.assessment.evaluator_config, self.registry)])
+                component_binding("evaluator", "evaluator",
+                    self.evaluator_settings.plugin if self.evaluator_settings else config.assessment.evaluator,
+                    self.evaluator_settings.config if self.evaluator_settings else config.assessment.evaluator_config, self.registry)])
             dependencies = provider_dependencies(self.loaded, bindings)
             dependencies.update(initial_snapshot=trial, artifact_store=store)
             built = PluginManager(self.registry).build(bindings, dependencies=dependencies)
@@ -99,7 +109,8 @@ class IsolatedCandidateTrials:
             specs = tools.specifications() if tools is not None else ()
             policy = ContextPolicy(task=task, output_fields=declaration.output_fields,
                 metadata_fields=declaration.metadata_fields, allow_evolution=True,
-                reason_messages=declaration.reason_messages, state_fields=capabilities.feedback_state_fields,
+                reason_messages={**declaration.reason_messages, **getattr(evaluator, "public_reason_messages", {})},
+                state_fields=capabilities.feedback_state_fields,
                 tool_arguments={**dict(capabilities.feedback_tool_arguments), **{tool.name: tool.feedback_arguments for tool in specs}},
                 tool_outputs={**dict(capabilities.feedback_tool_outputs), **{tool.name: tool.feedback_outputs for tool in specs}})
             context = replace(run_ctx, run_id=timestamp_id("trial-run"), episode_id=timestamp_id("trial-episode"),

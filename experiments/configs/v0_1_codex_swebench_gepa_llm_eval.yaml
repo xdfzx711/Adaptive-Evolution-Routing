@@ -1,13 +1,14 @@
-# SWE-bench Lite static patch evaluation with GEPA/TroVE, up to five rounds.
+# GEPA prompt evolution; outer scoring and routing are selected below.
 schema_version: aer.v0.1
 experiment:
-  id: aer-swebench-prompt-trove
+  id: aer-swebench-gepa
   seed: 42
   runner: aer
 benchmark:
   plugin: swebench_adapter
   execution_split: dev
-  task_ids: [psf__requests-1963]
+  task_ids:
+  - psf__requests-1963
   config:
     dataset_path: ../data/swebench_lite_smoke.json
     roles:
@@ -18,17 +19,21 @@ state:
   task_mode: independent
 agent:
   plugin: codex_cli_agent
-  initial_prompt: >-
-    Fix the reported repository issue with focused source edits. Inspect the relevant
-    code before editing. This is a static-only experiment: do not install dependencies
-    or execute tests. Reusable toolbox functions are available through MCP when present;
-    call them when useful, passing source text as an argument for source analysis.
-    Leave the changes in the working tree and end with a brief plain-text summary.
+  initial_prompt: 'Fix the reported repository issue with focused source edits. Inspect
+    the relevant code before editing. This is a static-only experiment: do not install
+    dependencies or execute tests. Reusable toolbox functions are available through
+    MCP when present; call them when useful, passing source text as an argument for
+    source analysis. Leave the changes in the working tree and end with a brief plain-text
+    summary.'
   initial_snapshot_ref: null
   config:
     windows_sandbox: mxc
     initial_model: gpt-6.1-sol
-    allowed_models: [gpt-6.1-sol, gpt-6-sol, gpt-6-luna, gpt-5.6-sol]
+    allowed_models:
+    - gpt-6.1-sol
+    - gpt-6-sol
+    - gpt-6-luna
+    - gpt-5.6-sol
     timeout_seconds: 300.0
     workspace:
       plugin: local_repo_workspace
@@ -38,12 +43,6 @@ agent:
     collector:
       plugin: git_patch_collector
       config: {}
-    tooling:
-      catalog: {}
-      generated_python: true
-      startup_timeout_seconds: 30.0
-      tool_timeout_seconds: 5.0
-    initial_tools: []
 providers:
   model:
     plugin: qwen_model
@@ -60,24 +59,45 @@ providers:
     plugin: deterministic_tools
     enabled: []
 assessment:
-  evaluator: static_patch_evaluator
+  evaluator: llm_patch_evaluator
   diagnoser: llm_diagnoser
   evaluator_config:
-    changed_lines_weight: 0.8
-    success_threshold: 1.0
+    judge_model:
+      plugin: qwen_model
+      model_id: ${QWEN_MODEL}
+      config:
+        dotenv_path: ../../.env
+        api_key_env: QWEN_API_KEY
+        base_url_env: QWEN_BASE_URL
+        temperature: 0.0
+        enable_thinking: false
+        send_seed: false
+        response_format: null
+    max_output_tokens: 2048
+    timeout_seconds: 60.0
+    max_context_chars: 120000
+    use_reference_patch: true
 evolution:
   mode: llm
   stop_on_success: false
   max_candidates_per_round: 1
 routing:
-  plugin: llm_router
+  plugin: jev_router
   fixed_target: null
   manual_decisions: []
+  config:
+    dotenv_path: ../../.env
+    api_key_env: JEV_API_KEY
+    base_url_env: JEV_BASE_URL
+    model_env: JEV_MODEL
+    max_trace_events: 8
+    max_field_chars: 1000
+    max_state_chars: 30000
 targets:
-  allowed: [prompt, tool]
+  allowed:
+  - prompt
   default_operators:
     prompt: gepa_prompt_evolver
-    tool: trove_tool_evolver
   operator_configs:
     prompt:
       max_metric_calls: 8
@@ -97,12 +117,11 @@ targets:
           enable_thinking: false
           send_seed: false
           response_format: null
-    tool:
-      samples_per_mode: 2
-      selection_strategy: tool_checks
-      max_library_tools: 32
-      check_timeout_seconds: 5.0
-      max_search_seconds: 120.0
+      trial_evaluator:
+        plugin: static_patch_evaluator
+        config:
+          changed_lines_weight: 0.8
+          success_threshold: 1.0
 validation:
   plugin: paired_validation
   split: validation

@@ -121,7 +121,10 @@ class SwebenchAdapter:
         return TaskFeedbackPolicy(task=task.identity, allow_evolution=task in self.tasks("dev"),
             output_fields=["patch", "changed_files", "patch_valid", "syntax_valid", "syntax_checked_files", "syntax_error_files"],
             metadata_fields=["source_id", "split", "category", "repo"], reason_messages={
-                "correct": "Static comparison met the threshold. This does not establish test correctness.",
+                "correct": "External patch assessment passed; project tests were not run.",
+                "judge_resolved": "Semantic patch review passed; project tests were not run.",
+                "judge_partial": "Semantic patch review found a partially resolved issue; project tests were not run.",
+                "judge_unresolved": "Semantic patch review found the issue unresolved; project tests were not run.",
                 "static_match": "Static comparison met the threshold; tests were not run.",
                 "static_partial_match": "The patch only partially matches the reference edits; tests were not run.",
                 "empty_patch": "No source changes were collected.",

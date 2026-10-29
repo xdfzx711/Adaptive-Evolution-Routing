@@ -89,10 +89,6 @@ def controlled_config(settings):
         values.pop("tooling")
     else:
         values["tool_catalog"] = settings.tooling.public_catalog()
-        if settings.tooling.generated_python:
-            values["generated_python"] = True
-        else:
-            values["tooling"].pop("generated_python")
     return values
 
 
@@ -202,7 +198,7 @@ class CodexCliAgent:
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "execution_platform", "execution_shell", "termination_reason", "fresh_session", "seed_supported",
                                    "result_kind", "evaluation_mode", "selected_tools", "available_tools", "tool_setup_status", "tool_setup_error", "tool_invocations"],
-            feedback_config_fields=["allowed_models", "allowed_reasoning_efforts", "tool_catalog", "generated_python"],
+            feedback_config_fields=["allowed_models", "allowed_reasoning_efforts", "tool_catalog"],
             feedback_tool_arguments={"command_execution": ["command"], "file_change": ["changes"],
                 "web_search": ["query"], "mcp_tool_call": ["server", "tool", "arguments"]},
             feedback_tool_outputs={"command_execution": ["text", "exit_code"], "file_change": ["changes"],
@@ -254,7 +250,7 @@ class CodexCliAgent:
                 "tool_read_roots": [str(path) for path in self.tool_read_roots],
                 "windows_sandbox": self.settings.windows_sandbox if os.name == "nt" else None,
                 "seed_supported": False, "model_calls_reported": False, "tool_calls_scope": "visible_cli_items",
-                **({"tool_adapter_version": "trove-1.0.0" if self.settings.tooling.generated_python else "1.0.0",
+                **({"tool_adapter_version": "1.0.0",
                     "tool_catalog": self.settings.tooling.public_catalog()}
                    if self.settings.tooling is not None else {})}
 

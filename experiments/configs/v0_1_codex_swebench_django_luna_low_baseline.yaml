@@ -1,0 +1,121 @@
+# Execution and scoring baseline; evolution is disabled.
+schema_version: aer.v0.1
+experiment:
+  id: aer-swebench-django-luna-low-baseline
+  seed: 42
+  runner: aer
+benchmark:
+  plugin: swebench_adapter
+  execution_split: dev
+  task_ids:
+  - django__django-13344
+  config:
+    dataset_path: ../data/swebench_verified_django_middleware.json
+    roles:
+      django__django-13344: dev
+      django__django-13810: similar
+      django__django-11133: regression
+state:
+  task_mode: independent
+agent:
+  plugin: codex_cli_agent
+  initial_prompt: 'Fix the reported repository issue with focused source edits. Inspect
+    the relevant code before editing. This is a static-only experiment: do not install
+    dependencies or execute tests. Reusable toolbox functions are available through
+    MCP when present; call them when useful, passing source text as an argument for
+    source analysis. Leave the changes in the working tree and end with a brief plain-text
+    summary.'
+  initial_snapshot_ref: null
+  config:
+    windows_sandbox: mxc
+    initial_model: gpt-6-luna
+    initial_reasoning_effort: low
+    allowed_reasoning_efforts:
+      gpt-6-luna:
+      - low
+    allowed_models:
+    - gpt-6.1-sol
+    - gpt-6-sol
+    - gpt-6-luna
+    - gpt-5.6-sol
+    timeout_seconds: 300.0
+    workspace:
+      plugin: local_repo_workspace
+      config:
+        cache_root: ../../.aer-cache/repos
+        git_timeout_seconds: 120.0
+    collector:
+      plugin: git_patch_collector
+      config: {}
+providers:
+  model:
+    plugin: qwen_model
+    model_id: ${QWEN_MODEL}
+    config:
+      dotenv_path: ../../.env
+      api_key_env: QWEN_API_KEY
+      base_url_env: QWEN_BASE_URL
+      temperature: 0.3
+      enable_thinking: false
+      send_seed: false
+      response_format: null
+  tools:
+    plugin: deterministic_tools
+    enabled: []
+assessment:
+  evaluator: llm_patch_evaluator
+  diagnoser: llm_diagnoser
+  evaluator_config:
+    judge_model:
+      plugin: qwen_model
+      model_id: ${QWEN_MODEL}
+      config:
+        dotenv_path: ../../.env
+        api_key_env: QWEN_API_KEY
+        base_url_env: QWEN_BASE_URL
+        temperature: 0.0
+        enable_thinking: false
+        send_seed: false
+        response_format: null
+    max_output_tokens: 2048
+    timeout_seconds: 60.0
+    max_context_chars: 120000
+    use_reference_patch: true
+evolution:
+  mode: disabled
+  stop_on_success: false
+  max_candidates_per_round: 1
+routing:
+  plugin: null
+  fixed_target: null
+  manual_decisions: []
+targets:
+  allowed: []
+  default_operators: {}
+  operator_configs: {}
+validation:
+  plugin: paired_validation
+  split: validation
+  group_field: validation_group
+  similar_group: similar
+  regression_group: regression
+  acceptance_policy: improvement_with_regression_guard
+  policy_version: v0.1
+  min_improvement: 0.01
+  max_regression_drop: 0.0
+feedback:
+  policy: dev_feedback_and_validation_summary
+limits:
+  max_evolution_rounds: 0
+  max_tokens: 120000
+  max_tool_calls: 200
+  max_elapsed_seconds: 900.0
+  model_call_timeout_seconds: 30.0
+  tool_call_timeout_seconds: 5.0
+  max_output_tokens_per_call: 4096
+  max_consecutive_no_commit_rounds: null
+storage:
+  root: ../../runs
+  experience: jsonl
+  artifacts: local_files
+  versions: local_manifest

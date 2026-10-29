@@ -1,0 +1,767 @@
+{
+  "status": "task_finished",
+  "run_root": "D:\\pythonproject\\adaptive-evolution-routing\\runs\\run-2026-10-29_13-41-49_330880",
+  "stable_scope_id": "orchestrator/episode-2026-10-29_13-41-49_469698",
+  "log_path": "D:\\pythonproject\\adaptive-evolution-routing\\runs\\run-2026-10-29_13-41-49_330880\\evolution.txt",
+  "round_records_path": "D:\\pythonproject\\adaptive-evolution-routing\\runs\\run-2026-10-29_13-41-49_330880\\rounds",
+  "record_ref": {
+    "artifact_id": "sha256-d9ea4a877dd0679f7ca99bcf6946133d714639d3032bb3456b7124b4ede5c036",
+    "kind": "run_result",
+    "version": "0633ca87c36783949ea3637302ec3902cd66d940487e20195e720c20b8cd0302",
+    "uri": "rounds/pytest-dev__pytest-7373-2026-10-29_13-41-49_469698/round-001/artifacts/run_result-2026-10-29_13-43-05_090211.bin",
+    "digest": "0633ca87c36783949ea3637302ec3902cd66d940487e20195e720c20b8cd0302"
+  },
+  "record": {
+    "run_id": "run-2026-10-29_13-41-49_330880",
+    "episode_id": "episode-2026-10-29_13-41-49_469698",
+    "task_id": "pytest-dev__pytest-7373",
+    "initial_version_id": "initial-f22231d8fba4570d802f3b8e8385479841b45db7cf55c3de54eadf59cb898ef4",
+    "final_stable_version_id": "initial-f22231d8fba4570d802f3b8e8385479841b45db7cf55c3de54eadf59cb898ef4",
+    "status": "error",
+    "final_evaluation_status": "evaluated",
+    "final_execution": {
+      "task_id": "pytest-dev__pytest-7373",
+      "agent_version_id": "initial-f22231d8fba4570d802f3b8e8385479841b45db7cf55c3de54eadf59cb898ef4",
+      "operation_id": "episode-2026-10-29_13-41-49_469698/initial_execution-2026-10-29_13-41-49_594345",
+      "output": {
+        "patch": "diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py\nindex 7591916..b88b91e 100644\n--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -2,7 +2,6 @@ import os\n import platform\n import sys\n import traceback\n-from typing import Any\n from typing import Dict\n from typing import List\n from typing import Optional\n@@ -10,25 +9,7 @@ from typing import Optional\n from ..outcomes import fail\n from ..outcomes import TEST_OUTCOME\n from .structures import Mark\n-from _pytest.config import Config\n from _pytest.nodes import Item\n-from _pytest.store import StoreKey\n-\n-\n-evalcache_key = StoreKey[Dict[str, Any]]()\n-\n-\n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n-    try:\n-        return evalcache[expr]\n-    except KeyError:\n-        import _pytest._code\n-\n-        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n-        evalcache[expr] = x = eval(exprcode, d)\n-        return x\n \n \n class MarkEvaluator:\n@@ -97,8 +78,11 @@ class MarkEvaluator:\n                 for expr in args:\n                     self.expr = expr\n                     if isinstance(expr, str):\n+                        import _pytest._code\n+\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n+                        result = eval(exprcode, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n",
+        "changed_files": [
+          "src/_pytest/mark/evaluate.py"
+        ],
+        "base_commit": "7b77fc086aab8b3a8ebc890200371884555eea1e",
+        "patch_valid": true,
+        "syntax_valid": true,
+        "syntax_checked_files": 1,
+        "syntax_error_files": []
+      },
+      "trajectory": [
+        {
+          "seq": 0,
+          "kind": "model_request",
+          "payload": {
+            "request": {
+              "model_id": "gpt-6.1-sol",
+              "reasoning_effort": null,
+              "messages": [
+                {
+                  "role": "developer",
+                  "content": "Fix the reported repository issue with focused source edits. Inspect the relevant code before editing. This is a static-only experiment: do not install dependencies or execute tests. Reusable toolbox functions are available through MCP when present; call them when useful, passing source text as an argument for source analysis. Leave the changes in the working tree and end with a brief plain-text summary."
+                },
+                {
+                  "role": "user",
+                  "content": "{\n  \"task_id\": \"pytest-dev__pytest-7373\",\n  \"benchmark_id\": \"swebench\",\n  \"input\": {\n    \"instruction\": \"Fix the issue by editing this repository. This experiment uses static patch comparison: do not install dependencies or run tests. Preserve unrelated behavior. End with a short summary of your changes.\",\n    \"repo\": \"pytest-dev/pytest\",\n    \"base_commit\": \"7b77fc086aab8b3a8ebc890200371884555eea1e\",\n    \"problem_statement\": \"Incorrect caching of skipif/xfail string condition evaluation\\nVersion: pytest 5.4.3, current master\\r\\n\\r\\npytest caches the evaluation of the string in e.g. `@pytest.mark.skipif(\\\"sys.platform == 'win32'\\\")`. The caching key is only the string itself (see `cached_eval` in `_pytest/mark/evaluate.py`). However, the evaluation also depends on the item's globals, so the caching can lead to incorrect results. Example:\\r\\n\\r\\n```py\\r\\n# test_module_1.py\\r\\nimport pytest\\r\\n\\r\\nskip = True\\r\\n\\r\\n@pytest.mark.skipif(\\\"skip\\\")\\r\\ndef test_should_skip():\\r\\n    assert False\\r\\n```\\r\\n\\r\\n```py\\r\\n# test_module_2.py\\r\\nimport pytest\\r\\n\\r\\nskip = False\\r\\n\\r\\n@pytest.mark.skipif(\\\"skip\\\")\\r\\ndef test_should_not_skip():\\r\\n    assert False\\r\\n```\\r\\n\\r\\nRunning `pytest test_module_1.py test_module_2.py`.\\r\\n\\r\\nExpected: `test_should_skip` is skipped, `test_should_not_skip` is not skipped.\\r\\n\\r\\nActual: both are skipped.\\r\\n\\r\\n---\\r\\n\\r\\nI think the most appropriate fix is to simply remove the caching, which I don't think is necessary really, and inline `cached_eval` into `MarkEvaluator._istrue`.\\n\"\n  },\n  \"public_metadata\": {\n    \"source_id\": \"pytest-dev__pytest-7373\",\n    \"split\": \"dev\",\n    \"category\": \"code_repair\",\n    \"repo\": \"pytest-dev/pytest\"\n  },\n  \"execution_environment\": {\n    \"platform\": \"nt\",\n    \"workspace\": \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Temp\\\\aer-codex-workspaces\\\\task-2026-10-29_13-41-49_597141-wcwlx9fl\",\n    \"tool_executables\": {\n      \"git\": \"D:\\\\python\\\\Git\\\\cmd\\\\git.exe\"\n    },\n    \"instructions\": \"This is a native Windows workspace using PowerShell, not a POSIX shell. Use Get-Content/Get-ChildItem -LiteralPath to read files. Invoke supplied absolute executable paths with PowerShell's call operator, for example & '<git executable>' -C '<workspace>' status --short and & '<rg executable>' -n '<pattern>' '<path>'. Git already trusts this task workspace; do not change global Git settings. Quote regex patterns and avoid nesting PowerShell, cmd.exe and shell strings. Do not try bash/WSL or inspect host directories to locate tools. Read only the relevant source ranges and keep tool output concise.\"\n  }\n}"
+                }
+              ]
+            },
+            "runtime": {
+              "cli_version": "codex-cli 0.162.1",
+              "command": [
+                "C:\\Program Files\\nodejs\\node.EXE",
+                "C:\\Users\\Administrator\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js"
+              ],
+              "config_fingerprints": {},
+              "task_permissions_version": "2",
+              "tool_executables": {
+                "git": "D:\\python\\Git\\cmd\\git.exe"
+              },
+              "tool_read_roots": [
+                "D:\\python\\Git"
+              ],
+              "windows_sandbox": "mxc",
+              "seed_supported": false,
+              "model_calls_reported": false,
+              "tool_calls_scope": "visible_cli_items",
+              "tool_adapter_version": "trove-1.0.0",
+              "tool_catalog": {}
+            },
+            "workspace": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl",
+            "startup_attempt": 1
+          },
+          "timestamp": "2026-10-29T05:41:55.201071Z"
+        },
+        {
+          "seq": 1,
+          "kind": "model_response",
+          "payload": {
+            "content": "I’ll inspect the marker evaluation code and remove the string-condition cache, preserving the existing error handling. I won’t run tests or install dependencies.",
+            "finish_reason": "stop"
+          },
+          "timestamp": "2026-10-29T05:42:23.297500Z"
+        },
+        {
+          "seq": 2,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_1",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'Get-ChildItem -Name; Get-ChildItem -Path . -Filter AGENTS.md -Recurse | Select-Object -ExpandProperty FullName'"
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297574Z"
+        },
+        {
+          "seq": 3,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_1",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": ".github\r\nbench\r\nchangelog\r\ndoc\r\nextra\r\nscripts\r\nsrc\r\ntesting\r\n.coveragerc\r\n.gitattributes\r\n.gitblameignore\r\n.gitignore\r\n.pre-commit-config.yaml\r\n.travis.yml\r\nAUTHORS\r\nCHANGELOG.rst\r\nCITATION\r\ncodecov.yml\r\nCODE_OF_CONDUCT.md\r\nCONTRIBUTING.rst\r\nLICENSE\r\nOPENCOLLECTIVE.rst\r\npyproject.toml\r\nREADME.rst\r\nRELEASING.rst\r\nsetup.cfg\r\nsetup.py\r\nTIDELIFT.rst\r\ntox.ini\r\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297615Z"
+        },
+        {
+          "seq": 4,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_2",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'Get-Content -LiteralPath src/_pytest/mark/evaluate.py'"
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297650Z"
+        },
+        {
+          "seq": 5,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_3",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"& 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' status --short; Get-ChildItem -Path src,testing -Recurse -Filter *.py | Select-String -Pattern 'cached_eval|_evalcache'\""
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297676Z"
+        },
+        {
+          "seq": 6,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_2",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": "import os\r\nimport platform\r\nimport sys\r\nimport traceback\r\nfrom typing import Any\r\nfrom typing import Dict\r\nfrom typing import List\r\nfrom typing import Optional\r\n\r\nfrom ..outcomes import fail\r\nfrom ..outcomes import TEST_OUTCOME\r\nfrom .structures import Mark\r\nfrom _pytest.config import Config\r\nfrom _pytest.nodes import Item\r\nfrom _pytest.store import StoreKey\r\n\r\n\r\nevalcache_key = StoreKey[Dict[str, Any]]()\r\n\r\n\r\ndef cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\r\n    default = {}  # type: Dict[str, object]\r\n    evalcache = config._store.setdefault(evalcache_key, default)\r\n    try:\r\n        return evalcache[expr]\r\n    except KeyError:\r\n        import _pytest._code\r\n\r\n        exprcode = _pytest._code.compile(expr, mode=\"eval\")\r\n        evalcache[expr] = x = eval(exprcode, d)\r\n        return x\r\n\r\n\r\nclass MarkEvaluator:\r\n    def __init__(self, item: Item, name: str) -> None:\r\n        self.item = item\r\n        self._marks = None  # type: Optional[List[Mark]]\r\n        self._mark = None  # type: Optional[Mark]\r\n        self._mark_name = name\r\n\r\n    def __bool__(self) -> bool:\r\n        # don't cache here to prevent staleness\r\n        return bool(self._get_marks())\r\n\r\n    def wasvalid(self) -> bool:\r\n        return not hasattr(self, \"exc\")\r\n\r\n    def _get_marks(self) -> List[Mark]:\r\n        return list(self.item.iter_markers(name=self._mark_name))\r\n\r\n    def invalidraise(self, exc) -> Optional[bool]:\r\n        raises = self.get(\"raises\")\r\n        if not raises:\r\n            return None\r\n        return not isinstance(exc, raises)\r\n\r\n    def istrue(self) -> bool:\r\n        try:\r\n            return self._istrue()\r\n        except TEST_OUTCOME:\r\n            self.exc = sys.exc_info()\r\n            if isinstance(self.exc[1], SyntaxError):\r\n                # TODO: Investigate why SyntaxError.offset is Optional, and if it can be None here.\r\n                assert self.exc[1].offset is not None\r\n                msg = [\" \" * (self.exc[1].offset + 4) + \"^\"]\r\n                msg.append(\"SyntaxError: invalid syntax\")\r\n            else:\r\n                msg = traceback.format_exception_only(*self.exc[:2])\r\n            fail(\r\n                \"Error evaluating %r expression\\n\"\r\n                \"    %s\\n\"\r\n                \"%s\" % (self._mark_name, self.expr, \"\\n\".join(msg)),\r\n                pytrace=False,\r\n            )\r\n\r\n    def _getglobals(self) -> Dict[str, object]:\r\n        d = {\"os\": os, \"sys\": sys, \"platform\": platform, \"config\": self.item.config}\r\n        if hasattr(self.item, \"obj\"):\r\n            d.update(self.item.obj.__globals__)  # type: ignore[attr-defined] # noqa: F821\r\n        return d\r\n\r\n    def _istrue(self) -> bool:\r\n        if hasattr(self, \"result\"):\r\n            result = getattr(self, \"result\")  # type: bool\r\n            return result\r\n        self._marks = self._get_marks()\r\n\r\n        if self._marks:\r\n            self.result = False\r\n            for mark in self._marks:\r\n                self._mark = mark\r\n                if \"condition\" not in mark.kwargs:\r\n                    args = mark.args\r\n                else:\r\n                    args = (mark.kwargs[\"condition\"],)\r\n\r\n                for expr in args:\r\n                    self.expr = expr\r\n                    if isinstance(expr, str):\r\n                        d = self._getglobals()\r\n                        result = cached_eval(self.item.config, expr, d)\r\n                    else:\r\n                        if \"reason\" not in mark.kwargs:\r\n                            # XXX better be checked at collection time\r\n                            msg = (\r\n                                \"you need to specify reason=STRING \"\r\n                                \"when using booleans as conditions.\"\r\n                            )\r\n                            fail(msg)\r\n                        result = bool(expr)\r\n                    if result:\r\n                        self.result = True\r\n                        self.reason = mark.kwargs.get(\"reason\", None)\r\n                        self.expr = expr\r\n                        return self.result\r\n\r\n                if not args:\r\n                    self.result = True\r\n                    self.reason = mark.kwargs.get(\"reason\", None)\r\n                    return self.result\r\n        return False\r\n\r\n    def get(self, attr, default=None):\r\n        if self._mark is None:\r\n            return default\r\n        return self._mark.kwargs.get(attr, default)\r\n\r\n    def getexplanation(self):\r\n        expl = getattr(self, \"reason\", None) or self.get(\"reason\", None)\r\n        if not expl:\r\n            if not hasattr(self, \"expr\"):\r\n                return \"\"\r\n            else:\r\n                return \"condition: \" + str(self.expr)\r\n        return expl\r\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297723Z"
+        },
+        {
+          "seq": 7,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_3",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": "\r\nsrc\\_pytest\\mark\\evaluate.py:21:def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\r\nsrc\\_pytest\\mark\\evaluate.py:101:                        result = cached_eval(self.item.config, expr, d)\r\n\r\n\r\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297756Z"
+        },
+        {
+          "seq": 8,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_4",
+            "name": "file_change",
+            "arguments": {
+              "changes": [
+                {
+                  "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl\\src\\_pytest\\mark\\evaluate.py",
+                  "kind": "update"
+                }
+              ]
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297785Z"
+        },
+        {
+          "seq": 9,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_4",
+            "name": "file_change",
+            "status": "completed",
+            "output": {
+              "changes": [
+                {
+                  "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl\\src\\_pytest\\mark\\evaluate.py",
+                  "kind": "update"
+                }
+              ]
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297823Z"
+        },
+        {
+          "seq": 10,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_5",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"& 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' diff --check; & 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' diff --stat; & 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' diff -- src/_pytest/mark/evaluate.py\""
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297856Z"
+        },
+        {
+          "seq": 11,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_5",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": " src/_pytest/mark/evaluate.py | 24 ++++--------------------\n 1 file changed, 4 insertions(+), 20 deletions(-)\ndiff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py\nindex 7591916..b88b91e 100644\n--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -2,7 +2,6 @@ import os\n import platform\n import sys\n import traceback\n-from typing import Any\n from typing import Dict\n from typing import List\n from typing import Optional\n@@ -10,25 +9,7 @@ from typing import Optional\n from ..outcomes import fail\n from ..outcomes import TEST_OUTCOME\n from .structures import Mark\n-from _pytest.config import Config\n from _pytest.nodes import Item\n-from _pytest.store import StoreKey\n-\n-\n-evalcache_key = StoreKey[Dict[str, Any]]()\n-\n-\n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n-    try:\n-        return evalcache[expr]\n-    except KeyError:\n-        import _pytest._code\n-\n-        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n-        evalcache[expr] = x = eval(exprcode, d)\n-        return x\n \n \n class MarkEvaluator:\n@@ -97,8 +78,11 @@ class MarkEvaluator:\n                 for expr in args:\n                     self.expr = expr\n                     if isinstance(expr, str):\n+                        import _pytest._code\n+\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n+                        result = eval(exprcode, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297890Z"
+        },
+        {
+          "seq": 12,
+          "kind": "model_response",
+          "payload": {
+            "content": "Removed the shared string-condition cache and inlined evaluation into MarkEvaluator._istrue, so skipif/xfail conditions use each item’s globals. Removed unused imports.\n\nChanges remain in the working tree. Diff checks passed; no tests were run or dependencies installed.",
+            "finish_reason": "stop"
+          },
+          "timestamp": "2026-10-29T05:42:23.297962Z"
+        },
+        {
+          "seq": 13,
+          "kind": "tool_setup",
+          "payload": {
+            "selected_tools": [],
+            "status": "ready",
+            "available_tools": [],
+            "discovered": true,
+            "invocation_count": 0,
+            "invocations": [],
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.298001Z"
+        },
+        {
+          "seq": 14,
+          "kind": "finish",
+          "payload": {
+            "output": {
+              "patch": "diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py\nindex 7591916..b88b91e 100644\n--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -2,7 +2,6 @@ import os\n import platform\n import sys\n import traceback\n-from typing import Any\n from typing import Dict\n from typing import List\n from typing import Optional\n@@ -10,25 +9,7 @@ from typing import Optional\n from ..outcomes import fail\n from ..outcomes import TEST_OUTCOME\n from .structures import Mark\n-from _pytest.config import Config\n from _pytest.nodes import Item\n-from _pytest.store import StoreKey\n-\n-\n-evalcache_key = StoreKey[Dict[str, Any]]()\n-\n-\n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n-    try:\n-        return evalcache[expr]\n-    except KeyError:\n-        import _pytest._code\n-\n-        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n-        evalcache[expr] = x = eval(exprcode, d)\n-        return x\n \n \n class MarkEvaluator:\n@@ -97,8 +78,11 @@ class MarkEvaluator:\n                 for expr in args:\n                     self.expr = expr\n                     if isinstance(expr, str):\n+                        import _pytest._code\n+\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n+                        result = eval(exprcode, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n",
+              "changed_files": [
+                "src/_pytest/mark/evaluate.py"
+              ],
+              "base_commit": "7b77fc086aab8b3a8ebc890200371884555eea1e",
+              "patch_valid": true,
+              "syntax_valid": true,
+              "syntax_checked_files": 1,
+              "syntax_error_files": []
+            },
+            "termination_reason": "finish"
+          },
+          "timestamp": "2026-10-29T05:42:23.417411Z"
+        }
+      ],
+      "state_summary": {
+        "agent_plugin": "codex_cli_agent",
+        "execution_model": "gpt-6.1-sol",
+        "execution_platform": "nt",
+        "execution_shell": "powershell",
+        "execution_reasoning_effort": null,
+        "termination_reason": "finish",
+        "fresh_session": true,
+        "seed_supported": false,
+        "workspace": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl",
+        "model_calls_scope": "not_reported",
+        "tool_calls_scope": "visible_cli_items",
+        "startup_attempts": 1,
+        "session_started": true,
+        "turn_started": true,
+        "shutdown_after_terminal_event": true,
+        "selected_tools": [],
+        "available_tools": [],
+        "tool_setup_status": "ready",
+        "tool_setup_error": null,
+        "tool_invocations": [],
+        "result_kind": "code_patch",
+        "evaluation_mode": "static"
+      },
+      "usage": {
+        "input_tokens": 66371,
+        "output_tokens": 706,
+        "total_tokens": 67077,
+        "model_calls": null,
+        "tool_calls": 5,
+        "elapsed_seconds": 33.822396800038405,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      },
+      "status": "completed",
+      "artifact_refs": [
+        {
+          "artifact_id": "sha256-98abfddd9c0cc33888643aa025dfe4a1b125c841703d033bc84d3ccb9b53c60d",
+          "kind": "code_patch",
+          "version": "917852734127f82a85d6b7cc83b19e72037bf6d4ce8bcd8298b8ebd871f489b1",
+          "uri": "rounds/pytest-dev__pytest-7373-2026-10-29_13-41-49_469698/initial/artifacts/code_patch-2026-10-29_13-42-23_410744.bin",
+          "digest": "917852734127f82a85d6b7cc83b19e72037bf6d4ce8bcd8298b8ebd871f489b1"
+        }
+      ],
+      "error": null
+    },
+    "final_evaluation": {
+      "evaluation_id": "evaluation-2026-10-29_13-42-34_209886",
+      "task_id": "pytest-dev__pytest-7373",
+      "agent_version_id": "initial-f22231d8fba4570d802f3b8e8385479841b45db7cf55c3de54eadf59cb898ef4",
+      "execution_operation_id": "episode-2026-10-29_13-41-49_469698/initial_execution-2026-10-29_13-41-49_594345",
+      "operation_id": "episode-2026-10-29_13-41-49_469698/initial_execution-2026-10-29_13-41-49_594345/evaluation",
+      "score": 1.0,
+      "success": true,
+      "metrics": {
+        "judge_score": 1.0,
+        "judge_resolved": 1.0,
+        "patch_valid": 1.0,
+        "syntax_valid": 1.0,
+        "tests_executed": 0.0,
+        "regression_findings": 0.0
+      },
+      "feedback": "Static semantic patch review: judge_resolved; project tests were not executed.",
+      "reason_code": "judge_resolved",
+      "evidence_refs": [
+        {
+          "artifact_id": "sha256-33a7d4c9e93a3b2ee9a41fca816632f54f4c065c92af7e401aa39ebfc655261c",
+          "kind": "llm_patch_review",
+          "version": "4ef9e74017b5b8f688be293e1beb24ee1fe50ed8b4837626752c795d900dbdfc",
+          "uri": "artifacts/llm_patch_review-2026-10-29_13-42-34_212149.bin",
+          "digest": "4ef9e74017b5b8f688be293e1beb24ee1fe50ed8b4837626752c795d900dbdfc"
+        }
+      ],
+      "usage": {
+        "input_tokens": 3661,
+        "output_tokens": 326,
+        "total_tokens": 3987,
+        "model_calls": 1,
+        "tool_calls": 0,
+        "elapsed_seconds": 10.79831360001117,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      }
+    },
+    "last_evaluated_execution": {
+      "task_id": "pytest-dev__pytest-7373",
+      "agent_version_id": "initial-f22231d8fba4570d802f3b8e8385479841b45db7cf55c3de54eadf59cb898ef4",
+      "operation_id": "episode-2026-10-29_13-41-49_469698/initial_execution-2026-10-29_13-41-49_594345",
+      "output": {
+        "patch": "diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py\nindex 7591916..b88b91e 100644\n--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -2,7 +2,6 @@ import os\n import platform\n import sys\n import traceback\n-from typing import Any\n from typing import Dict\n from typing import List\n from typing import Optional\n@@ -10,25 +9,7 @@ from typing import Optional\n from ..outcomes import fail\n from ..outcomes import TEST_OUTCOME\n from .structures import Mark\n-from _pytest.config import Config\n from _pytest.nodes import Item\n-from _pytest.store import StoreKey\n-\n-\n-evalcache_key = StoreKey[Dict[str, Any]]()\n-\n-\n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n-    try:\n-        return evalcache[expr]\n-    except KeyError:\n-        import _pytest._code\n-\n-        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n-        evalcache[expr] = x = eval(exprcode, d)\n-        return x\n \n \n class MarkEvaluator:\n@@ -97,8 +78,11 @@ class MarkEvaluator:\n                 for expr in args:\n                     self.expr = expr\n                     if isinstance(expr, str):\n+                        import _pytest._code\n+\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n+                        result = eval(exprcode, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n",
+        "changed_files": [
+          "src/_pytest/mark/evaluate.py"
+        ],
+        "base_commit": "7b77fc086aab8b3a8ebc890200371884555eea1e",
+        "patch_valid": true,
+        "syntax_valid": true,
+        "syntax_checked_files": 1,
+        "syntax_error_files": []
+      },
+      "trajectory": [
+        {
+          "seq": 0,
+          "kind": "model_request",
+          "payload": {
+            "request": {
+              "model_id": "gpt-6.1-sol",
+              "reasoning_effort": null,
+              "messages": [
+                {
+                  "role": "developer",
+                  "content": "Fix the reported repository issue with focused source edits. Inspect the relevant code before editing. This is a static-only experiment: do not install dependencies or execute tests. Reusable toolbox functions are available through MCP when present; call them when useful, passing source text as an argument for source analysis. Leave the changes in the working tree and end with a brief plain-text summary."
+                },
+                {
+                  "role": "user",
+                  "content": "{\n  \"task_id\": \"pytest-dev__pytest-7373\",\n  \"benchmark_id\": \"swebench\",\n  \"input\": {\n    \"instruction\": \"Fix the issue by editing this repository. This experiment uses static patch comparison: do not install dependencies or run tests. Preserve unrelated behavior. End with a short summary of your changes.\",\n    \"repo\": \"pytest-dev/pytest\",\n    \"base_commit\": \"7b77fc086aab8b3a8ebc890200371884555eea1e\",\n    \"problem_statement\": \"Incorrect caching of skipif/xfail string condition evaluation\\nVersion: pytest 5.4.3, current master\\r\\n\\r\\npytest caches the evaluation of the string in e.g. `@pytest.mark.skipif(\\\"sys.platform == 'win32'\\\")`. The caching key is only the string itself (see `cached_eval` in `_pytest/mark/evaluate.py`). However, the evaluation also depends on the item's globals, so the caching can lead to incorrect results. Example:\\r\\n\\r\\n```py\\r\\n# test_module_1.py\\r\\nimport pytest\\r\\n\\r\\nskip = True\\r\\n\\r\\n@pytest.mark.skipif(\\\"skip\\\")\\r\\ndef test_should_skip():\\r\\n    assert False\\r\\n```\\r\\n\\r\\n```py\\r\\n# test_module_2.py\\r\\nimport pytest\\r\\n\\r\\nskip = False\\r\\n\\r\\n@pytest.mark.skipif(\\\"skip\\\")\\r\\ndef test_should_not_skip():\\r\\n    assert False\\r\\n```\\r\\n\\r\\nRunning `pytest test_module_1.py test_module_2.py`.\\r\\n\\r\\nExpected: `test_should_skip` is skipped, `test_should_not_skip` is not skipped.\\r\\n\\r\\nActual: both are skipped.\\r\\n\\r\\n---\\r\\n\\r\\nI think the most appropriate fix is to simply remove the caching, which I don't think is necessary really, and inline `cached_eval` into `MarkEvaluator._istrue`.\\n\"\n  },\n  \"public_metadata\": {\n    \"source_id\": \"pytest-dev__pytest-7373\",\n    \"split\": \"dev\",\n    \"category\": \"code_repair\",\n    \"repo\": \"pytest-dev/pytest\"\n  },\n  \"execution_environment\": {\n    \"platform\": \"nt\",\n    \"workspace\": \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Temp\\\\aer-codex-workspaces\\\\task-2026-10-29_13-41-49_597141-wcwlx9fl\",\n    \"tool_executables\": {\n      \"git\": \"D:\\\\python\\\\Git\\\\cmd\\\\git.exe\"\n    },\n    \"instructions\": \"This is a native Windows workspace using PowerShell, not a POSIX shell. Use Get-Content/Get-ChildItem -LiteralPath to read files. Invoke supplied absolute executable paths with PowerShell's call operator, for example & '<git executable>' -C '<workspace>' status --short and & '<rg executable>' -n '<pattern>' '<path>'. Git already trusts this task workspace; do not change global Git settings. Quote regex patterns and avoid nesting PowerShell, cmd.exe and shell strings. Do not try bash/WSL or inspect host directories to locate tools. Read only the relevant source ranges and keep tool output concise.\"\n  }\n}"
+                }
+              ]
+            },
+            "runtime": {
+              "cli_version": "codex-cli 0.162.1",
+              "command": [
+                "C:\\Program Files\\nodejs\\node.EXE",
+                "C:\\Users\\Administrator\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js"
+              ],
+              "config_fingerprints": {},
+              "task_permissions_version": "2",
+              "tool_executables": {
+                "git": "D:\\python\\Git\\cmd\\git.exe"
+              },
+              "tool_read_roots": [
+                "D:\\python\\Git"
+              ],
+              "windows_sandbox": "mxc",
+              "seed_supported": false,
+              "model_calls_reported": false,
+              "tool_calls_scope": "visible_cli_items",
+              "tool_adapter_version": "trove-1.0.0",
+              "tool_catalog": {}
+            },
+            "workspace": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl",
+            "startup_attempt": 1
+          },
+          "timestamp": "2026-10-29T05:41:55.201071Z"
+        },
+        {
+          "seq": 1,
+          "kind": "model_response",
+          "payload": {
+            "content": "I’ll inspect the marker evaluation code and remove the string-condition cache, preserving the existing error handling. I won’t run tests or install dependencies.",
+            "finish_reason": "stop"
+          },
+          "timestamp": "2026-10-29T05:42:23.297500Z"
+        },
+        {
+          "seq": 2,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_1",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'Get-ChildItem -Name; Get-ChildItem -Path . -Filter AGENTS.md -Recurse | Select-Object -ExpandProperty FullName'"
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297574Z"
+        },
+        {
+          "seq": 3,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_1",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": ".github\r\nbench\r\nchangelog\r\ndoc\r\nextra\r\nscripts\r\nsrc\r\ntesting\r\n.coveragerc\r\n.gitattributes\r\n.gitblameignore\r\n.gitignore\r\n.pre-commit-config.yaml\r\n.travis.yml\r\nAUTHORS\r\nCHANGELOG.rst\r\nCITATION\r\ncodecov.yml\r\nCODE_OF_CONDUCT.md\r\nCONTRIBUTING.rst\r\nLICENSE\r\nOPENCOLLECTIVE.rst\r\npyproject.toml\r\nREADME.rst\r\nRELEASING.rst\r\nsetup.cfg\r\nsetup.py\r\nTIDELIFT.rst\r\ntox.ini\r\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297615Z"
+        },
+        {
+          "seq": 4,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_2",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'Get-Content -LiteralPath src/_pytest/mark/evaluate.py'"
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297650Z"
+        },
+        {
+          "seq": 5,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_3",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"& 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' status --short; Get-ChildItem -Path src,testing -Recurse -Filter *.py | Select-String -Pattern 'cached_eval|_evalcache'\""
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297676Z"
+        },
+        {
+          "seq": 6,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_2",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": "import os\r\nimport platform\r\nimport sys\r\nimport traceback\r\nfrom typing import Any\r\nfrom typing import Dict\r\nfrom typing import List\r\nfrom typing import Optional\r\n\r\nfrom ..outcomes import fail\r\nfrom ..outcomes import TEST_OUTCOME\r\nfrom .structures import Mark\r\nfrom _pytest.config import Config\r\nfrom _pytest.nodes import Item\r\nfrom _pytest.store import StoreKey\r\n\r\n\r\nevalcache_key = StoreKey[Dict[str, Any]]()\r\n\r\n\r\ndef cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\r\n    default = {}  # type: Dict[str, object]\r\n    evalcache = config._store.setdefault(evalcache_key, default)\r\n    try:\r\n        return evalcache[expr]\r\n    except KeyError:\r\n        import _pytest._code\r\n\r\n        exprcode = _pytest._code.compile(expr, mode=\"eval\")\r\n        evalcache[expr] = x = eval(exprcode, d)\r\n        return x\r\n\r\n\r\nclass MarkEvaluator:\r\n    def __init__(self, item: Item, name: str) -> None:\r\n        self.item = item\r\n        self._marks = None  # type: Optional[List[Mark]]\r\n        self._mark = None  # type: Optional[Mark]\r\n        self._mark_name = name\r\n\r\n    def __bool__(self) -> bool:\r\n        # don't cache here to prevent staleness\r\n        return bool(self._get_marks())\r\n\r\n    def wasvalid(self) -> bool:\r\n        return not hasattr(self, \"exc\")\r\n\r\n    def _get_marks(self) -> List[Mark]:\r\n        return list(self.item.iter_markers(name=self._mark_name))\r\n\r\n    def invalidraise(self, exc) -> Optional[bool]:\r\n        raises = self.get(\"raises\")\r\n        if not raises:\r\n            return None\r\n        return not isinstance(exc, raises)\r\n\r\n    def istrue(self) -> bool:\r\n        try:\r\n            return self._istrue()\r\n        except TEST_OUTCOME:\r\n            self.exc = sys.exc_info()\r\n            if isinstance(self.exc[1], SyntaxError):\r\n                # TODO: Investigate why SyntaxError.offset is Optional, and if it can be None here.\r\n                assert self.exc[1].offset is not None\r\n                msg = [\" \" * (self.exc[1].offset + 4) + \"^\"]\r\n                msg.append(\"SyntaxError: invalid syntax\")\r\n            else:\r\n                msg = traceback.format_exception_only(*self.exc[:2])\r\n            fail(\r\n                \"Error evaluating %r expression\\n\"\r\n                \"    %s\\n\"\r\n                \"%s\" % (self._mark_name, self.expr, \"\\n\".join(msg)),\r\n                pytrace=False,\r\n            )\r\n\r\n    def _getglobals(self) -> Dict[str, object]:\r\n        d = {\"os\": os, \"sys\": sys, \"platform\": platform, \"config\": self.item.config}\r\n        if hasattr(self.item, \"obj\"):\r\n            d.update(self.item.obj.__globals__)  # type: ignore[attr-defined] # noqa: F821\r\n        return d\r\n\r\n    def _istrue(self) -> bool:\r\n        if hasattr(self, \"result\"):\r\n            result = getattr(self, \"result\")  # type: bool\r\n            return result\r\n        self._marks = self._get_marks()\r\n\r\n        if self._marks:\r\n            self.result = False\r\n            for mark in self._marks:\r\n                self._mark = mark\r\n                if \"condition\" not in mark.kwargs:\r\n                    args = mark.args\r\n                else:\r\n                    args = (mark.kwargs[\"condition\"],)\r\n\r\n                for expr in args:\r\n                    self.expr = expr\r\n                    if isinstance(expr, str):\r\n                        d = self._getglobals()\r\n                        result = cached_eval(self.item.config, expr, d)\r\n                    else:\r\n                        if \"reason\" not in mark.kwargs:\r\n                            # XXX better be checked at collection time\r\n                            msg = (\r\n                                \"you need to specify reason=STRING \"\r\n                                \"when using booleans as conditions.\"\r\n                            )\r\n                            fail(msg)\r\n                        result = bool(expr)\r\n                    if result:\r\n                        self.result = True\r\n                        self.reason = mark.kwargs.get(\"reason\", None)\r\n                        self.expr = expr\r\n                        return self.result\r\n\r\n                if not args:\r\n                    self.result = True\r\n                    self.reason = mark.kwargs.get(\"reason\", None)\r\n                    return self.result\r\n        return False\r\n\r\n    def get(self, attr, default=None):\r\n        if self._mark is None:\r\n            return default\r\n        return self._mark.kwargs.get(attr, default)\r\n\r\n    def getexplanation(self):\r\n        expl = getattr(self, \"reason\", None) or self.get(\"reason\", None)\r\n        if not expl:\r\n            if not hasattr(self, \"expr\"):\r\n                return \"\"\r\n            else:\r\n                return \"condition: \" + str(self.expr)\r\n        return expl\r\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297723Z"
+        },
+        {
+          "seq": 7,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_3",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": "\r\nsrc\\_pytest\\mark\\evaluate.py:21:def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\r\nsrc\\_pytest\\mark\\evaluate.py:101:                        result = cached_eval(self.item.config, expr, d)\r\n\r\n\r\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297756Z"
+        },
+        {
+          "seq": 8,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_4",
+            "name": "file_change",
+            "arguments": {
+              "changes": [
+                {
+                  "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl\\src\\_pytest\\mark\\evaluate.py",
+                  "kind": "update"
+                }
+              ]
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297785Z"
+        },
+        {
+          "seq": 9,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_4",
+            "name": "file_change",
+            "status": "completed",
+            "output": {
+              "changes": [
+                {
+                  "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl\\src\\_pytest\\mark\\evaluate.py",
+                  "kind": "update"
+                }
+              ]
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297823Z"
+        },
+        {
+          "seq": 10,
+          "kind": "tool_call",
+          "payload": {
+            "call_id": "item_5",
+            "name": "command_execution",
+            "arguments": {
+              "command": "\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"& 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' diff --check; & 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' diff --stat; & 'D:\\\\python\\\\Git\\\\cmd\\\\git.exe' diff -- src/_pytest/mark/evaluate.py\""
+            }
+          },
+          "timestamp": "2026-10-29T05:42:23.297856Z"
+        },
+        {
+          "seq": 11,
+          "kind": "tool_result",
+          "payload": {
+            "call_id": "item_5",
+            "name": "command_execution",
+            "status": "completed",
+            "output": {
+              "exit_code": 0,
+              "text": " src/_pytest/mark/evaluate.py | 24 ++++--------------------\n 1 file changed, 4 insertions(+), 20 deletions(-)\ndiff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py\nindex 7591916..b88b91e 100644\n--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -2,7 +2,6 @@ import os\n import platform\n import sys\n import traceback\n-from typing import Any\n from typing import Dict\n from typing import List\n from typing import Optional\n@@ -10,25 +9,7 @@ from typing import Optional\n from ..outcomes import fail\n from ..outcomes import TEST_OUTCOME\n from .structures import Mark\n-from _pytest.config import Config\n from _pytest.nodes import Item\n-from _pytest.store import StoreKey\n-\n-\n-evalcache_key = StoreKey[Dict[str, Any]]()\n-\n-\n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n-    try:\n-        return evalcache[expr]\n-    except KeyError:\n-        import _pytest._code\n-\n-        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n-        evalcache[expr] = x = eval(exprcode, d)\n-        return x\n \n \n class MarkEvaluator:\n@@ -97,8 +78,11 @@ class MarkEvaluator:\n                 for expr in args:\n                     self.expr = expr\n                     if isinstance(expr, str):\n+                        import _pytest._code\n+\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n+                        result = eval(exprcode, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n"
+            },
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.297890Z"
+        },
+        {
+          "seq": 12,
+          "kind": "model_response",
+          "payload": {
+            "content": "Removed the shared string-condition cache and inlined evaluation into MarkEvaluator._istrue, so skipif/xfail conditions use each item’s globals. Removed unused imports.\n\nChanges remain in the working tree. Diff checks passed; no tests were run or dependencies installed.",
+            "finish_reason": "stop"
+          },
+          "timestamp": "2026-10-29T05:42:23.297962Z"
+        },
+        {
+          "seq": 13,
+          "kind": "tool_setup",
+          "payload": {
+            "selected_tools": [],
+            "status": "ready",
+            "available_tools": [],
+            "discovered": true,
+            "invocation_count": 0,
+            "invocations": [],
+            "error": null
+          },
+          "timestamp": "2026-10-29T05:42:23.298001Z"
+        },
+        {
+          "seq": 14,
+          "kind": "finish",
+          "payload": {
+            "output": {
+              "patch": "diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py\nindex 7591916..b88b91e 100644\n--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -2,7 +2,6 @@ import os\n import platform\n import sys\n import traceback\n-from typing import Any\n from typing import Dict\n from typing import List\n from typing import Optional\n@@ -10,25 +9,7 @@ from typing import Optional\n from ..outcomes import fail\n from ..outcomes import TEST_OUTCOME\n from .structures import Mark\n-from _pytest.config import Config\n from _pytest.nodes import Item\n-from _pytest.store import StoreKey\n-\n-\n-evalcache_key = StoreKey[Dict[str, Any]]()\n-\n-\n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n-    try:\n-        return evalcache[expr]\n-    except KeyError:\n-        import _pytest._code\n-\n-        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n-        evalcache[expr] = x = eval(exprcode, d)\n-        return x\n \n \n class MarkEvaluator:\n@@ -97,8 +78,11 @@ class MarkEvaluator:\n                 for expr in args:\n                     self.expr = expr\n                     if isinstance(expr, str):\n+                        import _pytest._code\n+\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n+                        result = eval(exprcode, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n",
+              "changed_files": [
+                "src/_pytest/mark/evaluate.py"
+              ],
+              "base_commit": "7b77fc086aab8b3a8ebc890200371884555eea1e",
+              "patch_valid": true,
+              "syntax_valid": true,
+              "syntax_checked_files": 1,
+              "syntax_error_files": []
+            },
+            "termination_reason": "finish"
+          },
+          "timestamp": "2026-10-29T05:42:23.417411Z"
+        }
+      ],
+      "state_summary": {
+        "agent_plugin": "codex_cli_agent",
+        "execution_model": "gpt-6.1-sol",
+        "execution_platform": "nt",
+        "execution_shell": "powershell",
+        "execution_reasoning_effort": null,
+        "termination_reason": "finish",
+        "fresh_session": true,
+        "seed_supported": false,
+        "workspace": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-codex-workspaces\\task-2026-10-29_13-41-49_597141-wcwlx9fl",
+        "model_calls_scope": "not_reported",
+        "tool_calls_scope": "visible_cli_items",
+        "startup_attempts": 1,
+        "session_started": true,
+        "turn_started": true,
+        "shutdown_after_terminal_event": true,
+        "selected_tools": [],
+        "available_tools": [],
+        "tool_setup_status": "ready",
+        "tool_setup_error": null,
+        "tool_invocations": [],
+        "result_kind": "code_patch",
+        "evaluation_mode": "static"
+      },
+      "usage": {
+        "input_tokens": 66371,
+        "output_tokens": 706,
+        "total_tokens": 67077,
+        "model_calls": null,
+        "tool_calls": 5,
+        "elapsed_seconds": 33.822396800038405,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      },
+      "status": "completed",
+      "artifact_refs": [
+        {
+          "artifact_id": "sha256-98abfddd9c0cc33888643aa025dfe4a1b125c841703d033bc84d3ccb9b53c60d",
+          "kind": "code_patch",
+          "version": "917852734127f82a85d6b7cc83b19e72037bf6d4ce8bcd8298b8ebd871f489b1",
+          "uri": "rounds/pytest-dev__pytest-7373-2026-10-29_13-41-49_469698/initial/artifacts/code_patch-2026-10-29_13-42-23_410744.bin",
+          "digest": "917852734127f82a85d6b7cc83b19e72037bf6d4ce8bcd8298b8ebd871f489b1"
+        }
+      ],
+      "error": null
+    },
+    "last_evaluated_evaluation": {
+      "evaluation_id": "evaluation-2026-10-29_13-42-34_209886",
+      "task_id": "pytest-dev__pytest-7373",
+      "agent_version_id": "initial-f22231d8fba4570d802f3b8e8385479841b45db7cf55c3de54eadf59cb898ef4",
+      "execution_operation_id": "episode-2026-10-29_13-41-49_469698/initial_execution-2026-10-29_13-41-49_594345",
+      "operation_id": "episode-2026-10-29_13-41-49_469698/initial_execution-2026-10-29_13-41-49_594345/evaluation",
+      "score": 1.0,
+      "success": true,
+      "metrics": {
+        "judge_score": 1.0,
+        "judge_resolved": 1.0,
+        "patch_valid": 1.0,
+        "syntax_valid": 1.0,
+        "tests_executed": 0.0,
+        "regression_findings": 0.0
+      },
+      "feedback": "Static semantic patch review: judge_resolved; project tests were not executed.",
+      "reason_code": "judge_resolved",
+      "evidence_refs": [
+        {
+          "artifact_id": "sha256-33a7d4c9e93a3b2ee9a41fca816632f54f4c065c92af7e401aa39ebfc655261c",
+          "kind": "llm_patch_review",
+          "version": "4ef9e74017b5b8f688be293e1beb24ee1fe50ed8b4837626752c795d900dbdfc",
+          "uri": "artifacts/llm_patch_review-2026-10-29_13-42-34_212149.bin",
+          "digest": "4ef9e74017b5b8f688be293e1beb24ee1fe50ed8b4837626752c795d900dbdfc"
+        }
+      ],
+      "usage": {
+        "input_tokens": 3661,
+        "output_tokens": 326,
+        "total_tokens": 3987,
+        "model_calls": 1,
+        "tool_calls": 0,
+        "elapsed_seconds": 10.79831360001117,
+        "usage_complete": true,
+        "usage_sources": [
+          "provider_reported"
+        ],
+        "pending_reservations": []
+      }
+    },
+    "evolution_rounds_used": 1,
+    "stop_reason": "evolution_error",
+    "stop_stage": "evolution",
+    "experience_refs": [
+      {
+        "record_id": "attempt-2026-10-29_13-42-34_249778/started",
+        "uri": "experience/events.jsonl#attempt-2026-10-29_13-42-34_249778/started"
+      },
+      {
+        "record_id": "attempt-2026-10-29_13-42-34_249778/finished",
+        "uri": "experience/events.jsonl#attempt-2026-10-29_13-42-34_249778/finished"
+      }
+    ],
+    "usage": {
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "model_calls": null,
+      "tool_calls": 5,
+      "elapsed_seconds": 75.49749019998126,
+      "usage_complete": false,
+      "usage_sources": [
+        "provider_reported",
+        "unknown"
+      ],
+      "pending_reservations": []
+    },
+    "error": {
+      "code": "operation_timeout",
+      "stage": "evolution",
+      "message": "Qwen HTTP request timed out",
+      "operation_id": "evolution-2026-10-29_13-42-34_239109",
+      "evidence_ref": null,
+      "plugin_id": "qwen_model",
+      "usage": {
+        "input_tokens": null,
+        "output_tokens": null,
+        "total_tokens": null,
+        "model_calls": 1,
+        "tool_calls": 0,
+        "elapsed_seconds": 30.8166086000856,
+        "usage_complete": false,
+        "usage_sources": [
+          "unknown"
+        ],
+        "pending_reservations": []
+      }
+    }
+  },
+  "notes": [
+    "One complete task evolution episode, including commit and reuse of validated task results.",
+    "Resource hard limits and consecutive-no-commit stopping remain deferred."
+  ]
+}

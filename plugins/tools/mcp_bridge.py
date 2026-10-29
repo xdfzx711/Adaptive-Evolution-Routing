@@ -47,7 +47,6 @@ def credential(name, dotenv):
 
 async def serve(config, selection, workspace, report_path, report):
     registry, exposed, upstreams = local_tool_registry(), {}, {}
-    generated = {tool.name: tool for tool in getattr(selection, "tools", ())}
     dotenv = dotenv_values(config.dotenv_path, interpolate=False) if config.dotenv_path else {}
     server = Server("aer_tools", version="1.0.0",
         instructions="Tools are bound to this task's working directory. Use paths relative to that directory.")
@@ -58,12 +57,6 @@ async def serve(config, selection, workspace, report_path, report):
     async with AsyncExitStack() as stack:
         null = stack.enter_context(open(os.devnull, "w"))
         for name in selection.enabled_tools:
-            if name in generated:
-                tool = generated[name]
-                exposed[name] = types.Tool(name=name, description=tool.description,
-                    inputSchema=tool.model_dump(mode="json")["input_schema"],
-                    annotations=types.ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False))
-                continue
             entry = config.catalog[name]
             if entry.kind == "local":
                 descriptor = entry.public_descriptor()
@@ -132,15 +125,7 @@ async def serve(config, selection, workspace, report_path, report):
                 # Validate here so invalid arguments also receive an invocation receipt.
                 jsonschema.validate(arguments, exposed[name].inputSchema)
                 async with asyncio.timeout(config.tool_timeout_seconds):
-                    if name in generated:
-                        from plugins.evolution.trove.runtime import call_tool as call_python
-                        output = await asyncio.to_thread(call_python, selection, name, arguments,
-                            config.tool_timeout_seconds)
-                        if not output["ok"]:
-                            raise ToolSetupError(output["error"])
-                        result = types.CallToolResult(content=[types.TextContent(type="text",
-                            text=json.dumps(output["output"], ensure_ascii=False))], structuredContent=output["output"])
-                    elif config.catalog[name].kind == "local":
+                    if config.catalog[name].kind == "local":
                         entry = config.catalog[name]
                         output = await asyncio.to_thread(registry.get(entry.plugin).invoke, workspace, arguments)
                         result = types.CallToolResult(content=[types.TextContent(type="text",
@@ -174,16 +159,9 @@ def main():
     try:
         data = json.loads(args.config.read_text(encoding="utf-8"))
         config = ToolingConfig.model_validate(data["tooling"])
-        if "schema_version" in data["selection"]:
-            from plugins.evolution.trove.library import ToolLibrary
-            if not config.generated_python:
-                raise ToolSetupError("generated_python_disabled")
-            selection = ToolLibrary.model_validate(data["selection"])
-            selection.validate_catalog(config.catalog)
-        else:
-            selection = ToolSelection.model_validate(data["selection"])
-            if not set(selection.enabled_tools) <= config.catalog.keys():
-                raise ToolSetupError("unknown_selected_tool")
+        selection = ToolSelection.model_validate(data["selection"])
+        if not set(selection.enabled_tools) <= config.catalog.keys():
+            raise ToolSetupError("unknown_selected_tool")
         workspace = args.workspace.resolve(strict=True)
         save_report(args.report, report)
         asyncio.run(serve(config, selection, workspace, args.report, report))

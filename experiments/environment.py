@@ -25,10 +25,11 @@ def env_file_path(loaded: LoadedConfig) -> Path | None:
 
 
 def env_file_paths(loaded: LoadedConfig) -> tuple[Path, ...]:
-    """All declared provider env inputs, including operator-owned providers."""
+    """All declared provider env inputs, including operator and evaluator providers."""
     paths = {path for path in (env_file_path(loaded),) if path is not None}
-    for config in loaded.config.targets.operator_configs.values():
-        model = config.get("reflection_model")
+    models = [config.get("reflection_model") for config in loaded.config.targets.operator_configs.values()]
+    models.append(loaded.config.assessment.evaluator_config.get("judge_model"))
+    for model in models:
         if isinstance(model, dict) and model.get("plugin") == "qwen_model":
             path = QwenModelConfig.model_validate(model.get("config", {})).dotenv_path
             if path is not None:
@@ -66,6 +67,10 @@ def resolve_model(loaded: LoadedConfig, *, required: bool = False) -> LoadedConf
 def provider_dependencies(loaded: LoadedConfig, bindings, *, supplied: dict | None = None) -> dict:
     result = {"model_settings": loaded.config.providers.model, "config_root": loaded.source_path.parent}
     result.update(supplied or {})
+    if "model_factory" not in result and any("model_factory" in binding.dependency_bindings.values() for binding in bindings):
+        from .bootstrap import create_registry
+        from .optimization import ConfiguredModelFactory
+        result["model_factory"] = ConfiguredModelFactory(loaded, create_registry())
     if not any(binding.category == "model_provider" and binding.plugin_id == "qwen_model" for binding in bindings):
         return result
     loaded = resolve_model(loaded, required=True)
