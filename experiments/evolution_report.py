@@ -170,6 +170,12 @@ class EvolutionTextReport:
             lines.extend(f"  {item.text}；证据事件={list(item.evidence_step_ids)}" for item in items)
             if not items:
                 lines.append("  未记录")
+        if value.fact_check:
+            lines.append("源码核对（静态推断，未执行项目测试）；证据版本：" + str(value.fact_check.get("evidence_version", "未完成")))
+            claims = {claim["id"]: claim["statement"] for claim in value.fact_check.get("draft", {}).get("claims", ())}
+            labels = {"supported": "源码支持", "refuted": "已反驳", "uncertain": "待核验"}
+            for finding in value.fact_check.get("review", {}).get("findings", ()):
+                lines.append(f"  {labels[finding['status']]}：{claims.get(finding['id'], finding['id'])}；{finding['reasoning']}")
         if value.usage:
             self.costs["诊断"].append(value.usage)
             lines.append(self.usage_line(value.usage))
@@ -186,6 +192,14 @@ class EvolutionTextReport:
                 lines.append("工具装配失败原因：" + state["tool_setup_error"])
             calls = state.get("tool_invocations", ())
             lines.append("工具调用：" + (", ".join(item["tool"] + "=" + item["status"] for item in calls[-6:]) or "未调用附加工具"))
+            from aer_core.tool_usage import tool_usage_summary
+            usage = tool_usage_summary(state)
+            lines.append(f"客户端读取工具列表：{usage['discovered']}；不代表模型已考虑使用；省略调用明细 {usage['receipts_omitted']} 条")
+            for name, counts in usage["tools"].items():
+                lines.append(f"{name}：调用 {counts['attempted']}；未结束 {counts['pending']}；"
+                    f"执行成功 {counts.get('execution_success', 0)}；业务成功/失败/未知 "
+                    f"{counts.get('business_success', 0)}/{counts.get('business_failure', 0)}/{counts.get('business_unknown', 0)}；"
+                    "输出是否被采用尚未判定")
         return lines
 
     def execution(self, scored, title, source):
@@ -220,6 +234,39 @@ class EvolutionTextReport:
             f"Operator：{value.operator_id or '未选择'}；生成状态：{value.response.status.value if value.response else value.status}"])
         from .optimization_report import optimization_record
         optimization = optimization_record(value, self.artifacts)
+        if value.response and value.response.record_ref and value.response.record_ref.kind == "tool_construction":
+            construction = json.loads(self.artifacts.get(value.response.record_ref))
+            lines = [f"上游版本：{construction['upstream_revision']}；状态：{construction['status']}",
+                f"模型调用：{len(construction['calls'])}；完整记录：{proposal_source} / generation.tool_construction"]
+            for event in construction["events"]:
+                if event["kind"] in {"plan", "replan"} and event.get("planner") == "FridayPlanner":
+                    graph = event["value"]
+                    lines.append(f"原生 FridayPlanner {'重新规划' if event['kind'] == 'replan' else '规划'}："
+                        + (" → ".join(graph["execution_order"]) or "空计划"))
+                    for name, node in graph["nodes"].items():
+                        lines.append(f"  {name} ({node['type']})；前置：{', '.join(node['dependencies']) or '无'}；"
+                            f"已完成：{node['completed']}")
+                elif event["kind"] == "graph_blocked":
+                    lines.append(f"任务图阻塞：{event['tool']}；未执行依赖它的后续节点")
+                elif event["kind"] == "judgment":
+                    lines.append(f"{event['tool']}：{event['status']}；通用性 {event['score']}/10；{event['reasoning']}")
+                elif event["kind"] == "stored":
+                    if event.get("scope") == "construction":
+                        lines.append(f"构造库入库：{event['tool']}；最终交付标记：{event['deliverable']}")
+                    else:
+                        lines.append(f"内部入库：{event['tool']}；仍需 AER 外层配对验证")
+                elif event["kind"] == "export_selected":
+                    lines.append("最终交付工具选择：" + (", ".join(event["tools"]) or "无"))
+                elif event["kind"] == "delivery_check":
+                    lines.append(f"干净工作区交付复验：{event['tool']}；通过：{event['passed']}")
+                elif event["kind"] == "export_verified":
+                    lines.append("实际导出工具：" + (", ".join(event["tools"]) or "无"))
+            self.block("OS-Copilot 工具构造", lines)
+            feedback = value.response.construction_feedback
+            if feedback and feedback.issues:
+                self.block("传入后续轮次的构造反馈", [
+                    f"{item.tool or '本轮'} / {item.stage} / {item.code} / {item.source} / {item.status}：{item.message}"
+                    for item in feedback.issues])
         if optimization is not None:
             lines = [f"优化器：{optimization.optimizer}；版本：{optimization.engine_version}；"
                 f"状态：{optimization.status}；原因：{optimization.reason}；停止原因：{optimization.stop_reason}",

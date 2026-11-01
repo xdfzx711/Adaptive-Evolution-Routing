@@ -26,6 +26,7 @@ from plugins.agents.model_selection import CodexModelAdapter, CodexModelSpace, M
 from plugins.agents.tool_selection import CodexToolAdapter
 from plugins.tools.catalog import ToolingConfig
 from plugins.tool_selection import ToolSelection
+from plugins.tools.generated.bundle import ToolBundle, generated_tools
 from plugins.agents.output import PublicJsonOutput
 from plugins.workspace.local import EmptyWorkspace
 from plugins.workspace.collectors import JsonResultCollector
@@ -88,6 +89,10 @@ def controlled_config(settings):
     if settings.tooling is None:
         values.pop("tooling")
     else:
+        if settings.tooling.generated_tools is None:
+            values["tooling"].pop("generated_tools", None)
+        elif settings.tooling.generated_tools.enabled:
+            values["generated_tools_enabled"] = True
         values["tool_catalog"] = settings.tooling.public_catalog()
     return values
 
@@ -98,7 +103,8 @@ def initial_artifacts(config):
             "model": CodexModelAdapter().encode(ModelSelection(model_id=settings.initial_model,
                 reasoning_effort=settings.initial_reasoning_effort))}
     if settings.tooling is not None:
-        contents["tool"] = CodexToolAdapter().encode(ToolSelection(enabled_tools=settings.initial_tools or []))
+        selection_type = ToolBundle if settings.tooling.generated_tools and settings.tooling.generated_tools.enabled else ToolSelection
+        contents["tool"] = CodexToolAdapter().encode(selection_type(enabled_tools=settings.initial_tools or []))
     return contents
 
 
@@ -197,8 +203,9 @@ class CodexCliAgent:
         return AgentCapabilities(supported_targets=components, supported_artifact_kinds=components,
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "execution_platform", "execution_shell", "termination_reason", "fresh_session", "seed_supported",
-                                   "result_kind", "evaluation_mode", "selected_tools", "available_tools", "tool_setup_status", "tool_setup_error", "tool_invocations"],
-            feedback_config_fields=["allowed_models", "allowed_reasoning_efforts", "tool_catalog"],
+                                   "result_kind", "evaluation_mode", "selected_tools", "available_tools", "tool_setup_status", "tool_setup_error", "tool_invocations", "generated_tool_catalog",
+                                   "tool_discovered", "tool_invocation_count", "tool_invocations_omitted", "tool_metrics"],
+            feedback_config_fields=["allowed_models", "allowed_reasoning_efforts", "tool_catalog", "generated_tools_enabled"],
             feedback_tool_arguments={"command_execution": ["command"], "file_change": ["changes"],
                 "web_search": ["query"], "mcp_tool_call": ["server", "tool", "arguments"]},
             feedback_tool_outputs={"command_execution": ["text", "exit_code"], "file_change": ["changes"],
@@ -236,6 +243,7 @@ class CodexCliAgent:
         self._snapshot = snapshot
 
     def runtime_info(self):
+        from plugins.tools.generated.runtime import runtime_identity
         home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
         names = ["AGENTS.md", "AGENTS.override.md"]
         if not self.settings.ignore_user_config:
@@ -250,7 +258,9 @@ class CodexCliAgent:
                 "tool_read_roots": [str(path) for path in self.tool_read_roots],
                 "windows_sandbox": self.settings.windows_sandbox if os.name == "nt" else None,
                 "seed_supported": False, "model_calls_reported": False, "tool_calls_scope": "visible_cli_items",
-                **({"tool_adapter_version": "1.0.0",
+                **({"generated_tool_runtime": runtime_identity(self.settings.tooling.generated_tools.python_executable)}
+                   if self.settings.tooling and self.settings.tooling.generated_tools else {}),
+                **({"tool_adapter_version": "3.0.0" if self.settings.tooling.generated_tools else "1.0.0",
                     "tool_catalog": self.settings.tooling.public_catalog()}
                    if self.settings.tooling is not None else {})}
 
@@ -507,9 +517,16 @@ class CodexCliAgent:
                 "session_started": session_started, "turn_started": turn_started,
                 "shutdown_after_terminal_event": terminal_shutdown,
                 **({"selected_tools": list(selected_tools.enabled_tools),
+                    **({"generated_tool_catalog": {name: tool.descriptor().model_dump(mode="json")
+                        for name, tool in generated_tools(selected_tools).items()}}
+                       if self.settings.tooling.generated_tools else {}),
                     "available_tools": tool_report["available_tools"] if tool_report else [],
                     "tool_setup_status": tool_report["status"] if tool_report else "not_started",
                     "tool_setup_error": tool_report["error"] if tool_report else None,
+                    "tool_discovered": tool_report.get("discovered") if tool_report else None,
+                    "tool_invocation_count": tool_report.get("invocation_count", 0) if tool_report else 0,
+                    "tool_invocations_omitted": tool_report.get("invocations_omitted", 0) if tool_report else 0,
+                    "tool_metrics": tool_report.get("tool_metrics") if tool_report else None,
                     "tool_invocations": tool_report["invocations"] if tool_report else []}
                    if selected_tools is not None else {}),
                 **(collected.model_dump(mode="json")["state"] if collected else {})},

@@ -112,6 +112,9 @@ class PreparedValidation:
         now = datetime.now(timezone.utc)
         outcomes, refs = [], []
         for report in reports:
+            from aer_core.tool_usage import tool_usage_summary
+            local = current_results.get(report.candidate_id)
+            tool_usage = tool_usage_summary(local.execution.state_summary) if local and local.execution and "selected_tools" in local.execution.state_summary else None
             validation_ref = storage.version_store.save_validation(report)
             acceptance = policies[report.candidate_id]
             chosen = report.candidate_id == selected
@@ -119,7 +122,7 @@ class PreparedValidation:
             outcomes.append(CandidateEvaluation(attempt_id=proposal.attempt.attempt_id, candidate_id=report.candidate_id,
                 candidate_version_id=report.candidate_version_id, validation_ref=validation_ref, acceptance=acceptance,
                 status=status, selected=chosen, committed=False, commit_error=None, final_recorded_at=now,
-                validation=validation_summary(report)))
+                validation=validation_summary(report), tool_usage=tool_usage))
         for candidate, error in invalid:
             acceptance = AcceptanceResult(candidate_id=candidate.candidate_id, accepted=False, reward=None,
                 delta_score=None, delta_similar_score=None, delta_regression_score=None, reason="invalid_candidate",

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from aer_core.contracts.storage import ExperienceStore
 from aer_core.errors import ContractError, NoFeasibleTargets
 from aer_core.history import limit_edits
+from aer_core.construction_feedback import limit_construction_feedback
 from aer_core.schemas.assessment import TaskExecutionRecord
 from aer_core.schemas.evolution import CandidateSummary, EvolutionContext, EvolutionDecision, ExperienceSummary
 from aer_core.schemas.feedback import ContextPolicy
@@ -96,6 +97,7 @@ class ContextBuilder:
                     change_summary_truncated=bool(change and change.change_summary and len(change.change_summary) > self.policy.history_max_text_chars),
                     generation_rationale_truncated=bool(change and change.generation_rationale and len(change.generation_rationale) > self.policy.history_max_text_chars),
                     validation=result.validation if result else None, candidate_version_id=candidate_version,
+                    tool_usage=result.model_dump(mode="json")["tool_usage"] if result and "tool" in self.policy.artifact_kinds else None,
                     reward=acceptance.reward if acceptance else None,
                     delta_score=acceptance.delta_score if acceptance else None,
                     delta_similar_score=acceptance.delta_similar_score if acceptance else None,
@@ -116,6 +118,8 @@ class ContextBuilder:
                 candidate_summaries=candidates, completed_at=attempt.finished_at,
                 stable_version_after=stable_after, attempt_status=attempt.status,
                 error_code=attempt.error.code if attempt.error else None,
+                construction_feedback=limit_construction_feedback(attempt.construction_feedback,
+                    self.policy.history_max_construction_chars) if "tool" in self.policy.artifact_kinds else None,
                 routing_rationale_truncated=bool(attempt.decision and len(attempt.decision.rationale) > self.policy.history_max_text_chars)))
         ordered = sorted(summaries, key=lambda item: (item.completed_at, item.episode_id, item.round_id, item.attempt_id))
         return tuple(ordered[-self.policy.history_max_attempts:]) if self.policy.history_max_attempts else ()

@@ -80,7 +80,8 @@ class PreparedOrchestrator:
             diagnoser=scoped.diagnoser, contexts=context_builder(scoped, task,
                 history_max_attempts=config.evolution.history_max_attempts,
                 history_max_text_chars=config.evolution.history_max_text_chars,
-                history_max_change_chars=config.evolution.history_max_change_chars),
+                history_max_change_chars=config.evolution.history_max_change_chars,
+                history_max_construction_chars=config.evolution.history_max_construction_chars),
             artifacts=storage.artifact_store, versions=versions, experience=storage.experience_store,
             evolution=evolution, validation=validation, progress=reporter, storage_placement=layout)
         FileRoot(storage.run_root).immutable(layout.episode_path(episode_id), canonical_bytes({

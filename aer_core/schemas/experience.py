@@ -4,8 +4,9 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from .base import DomainModel, Identifier, Items, PositiveInt, ReadOnlyMap, UtcTimestamp
+from .base import DomainModel, Identifier, Items, JsonObject, PositiveInt, ReadOnlyMap, UtcTimestamp
 from .evolution import EvolutionDecision
+from .construction import ConstructionFeedback
 from .execution import Diagnosis, ErrorInfo
 from .history import ComponentEdit, ValidationSummary
 from .experiment import RunResult, TaskFinishedSummary
@@ -48,6 +49,7 @@ class EvolutionAttempt(DomainModel):
     started_at: UtcTimestamp
     finished_at: UtcTimestamp | None
     diagnosis: Diagnosis | None = None
+    construction_feedback: ConstructionFeedback | None = None
 
     @model_validator(mode="after")
     def attempt_lifecycle(self):
@@ -88,6 +90,7 @@ class CandidateEvaluation(DomainModel):
     final_recorded_at: UtcTimestamp
     validation_error: ErrorInfo | None = None
     validation: ValidationSummary | None = None
+    tool_usage: JsonObject | None = None
 
     @model_validator(mode="after")
     def candidate_lifecycle(self):

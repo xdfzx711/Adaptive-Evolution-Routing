@@ -14,6 +14,8 @@ from aer_core.schemas.paired import ValidationEvidence
 from plugins.storage._files import FileRoot, readable_json
 from plugins.storage.layout import episode_directory
 from .routing_report import routing_record, routing_view
+from aer_core.tool_usage import tool_usage_summary
+from .tool_usage import analyze_tool_usage
 
 
 def plain(value):
@@ -57,6 +59,8 @@ def execution_view(value):
         trace.append({"step": event["seq"], "time": event["timestamp"], "kind": event["kind"], "result": payload})
     result = fields(value, "status", "output", "state_summary", "usage")
     result["trace"] = trace
+    if "selected_tools" in data["state_summary"]:
+        result["tool_usage"] = tool_usage_summary(data["state_summary"])
     if data.get("error"):
         result["error"] = error_view(data["error"])
     return result
@@ -151,7 +155,7 @@ class RoundReport:
                     "delta_regression_score", "accepted", "selected", "committed", "reason", "acceptance_reason",
                     "delta_current_task_score", "weighted_gain", "policy_id", "policy_version",
                     "actual_changes", "changes_truncated", "changes_unavailable", "change_summary_truncated",
-                    "generation_rationale_truncated", "validation")})
+                    "generation_rationale_truncated", "validation", "tool_usage")})
             result.append({"task": item.task_id, "round": item.round_id, "decision": fields(item.decision, "target", "rationale"),
                 "parent_version": self.version_names.get(item.stable_version_id, "historical_parent"),
                 "stable_version_after": self.version_names.get(item.stable_version_after,
@@ -159,7 +163,8 @@ class RoundReport:
                     if item.stable_version_after is not None else None),
                 "attempt_status": plain(item.attempt_status), "error_code": item.error_code,
                 "routing_rationale_truncated": item.routing_rationale_truncated,
-                "diagnosis": diagnosis_view(item.diagnosis), "candidates": candidates})
+                "diagnosis": diagnosis_view(item.diagnosis), "candidates": candidates,
+                "construction_feedback": plain(item.construction_feedback)})
         return result
 
     def proposal(self, value, ref):
@@ -184,12 +189,16 @@ class RoundReport:
         self.data["generation"] = {"status": response.status.value if response else value.status,
             "usage": plain(value.attempt.usage) if value.attempt else None,
             "evolver_usage": plain(response.usage) if response else None,
-            "error": error_view(response.error) if response else None}
+            "error": error_view(response.error) if response else None,
+            "construction_feedback": plain(response.construction_feedback) if response else None}
         from .optimization_report import optimization_record, optimization_view
         optimization = optimization_record(value, self.artifacts)
         if optimization is not None:
             self.link(response.record_ref)
             self.data["generation"]["internal_optimization"] = optimization_view(optimization)
+        if response and response.record_ref and response.record_ref.kind == "tool_construction":
+            self.link(response.record_ref)
+            self.data["generation"]["tool_construction"] = json.loads(self.artifacts.get(response.record_ref))
         if value.attempt:
             self.link(value.attempt.pre_state_ref)
         if response:
@@ -235,6 +244,7 @@ class RoundReport:
             entry["validation"] = {"status": report.status.value,
                 "baseline_metrics": plain(report.baseline_metrics), "candidate_metrics": plain(report.candidate_metrics),
                 "current_task_metrics": plain(report.local_metrics), "tasks": tasks,
+                "tool_usage_analysis": analyze_tool_usage(tasks),
                 "usage": plain(report.usage), "error": error_view(report.error)}
         self.data["validation_usage"] = plain(batch.usage)
         self.data["status"] = "validation_incomplete" if any(item.status != "complete" for item in batch.reports) else "selected" if batch.selected_candidate_id else "no_candidate_selected"

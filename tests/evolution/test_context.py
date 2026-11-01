@@ -31,6 +31,25 @@ def task_finished(task_id, episode_id):
 
 
 class ContextTests(unittest.TestCase):
+    def test_public_current_task_tool_use_reaches_candidate_history_only_when_tools_are_disclosed(self):
+        from aer_core.tool_usage import tool_usage_summary
+        _, stable, _, task, record, live, policy = fixture()
+        usage = tool_usage_summary({"available_tools": ["helper"], "tool_discovered": True, "tool_metrics": {}})
+        outcome = CandidateEvaluation(attempt_id="attempt-1", candidate_id="candidate-1", candidate_version_id="v2",
+            validation_ref=None, acceptance=acceptance(False), status="rejected", selected=False, committed=False,
+            commit_error=None, final_recorded_at=NOW, tool_usage=usage)
+        event = CandidateEvaluatedEvent(event_id="outcome", run_id="run-1", episode_id="episode-1", timestamp=NOW, payload=outcome)
+        store = MemoryExperience([terminal(attempt(attempt_id="attempt-1")), event])
+        for allow in (False, True):
+            active = policy.replace(artifact_kinds=["prompt", "tool"] if allow else ["prompt"])
+            context = ContextBuilder(store, active).build(task, record, stable, live, round_id=2, feasible_targets=["prompt"], as_of=NOW)
+            found = context.history[0].candidate_summaries[0].tool_usage
+            if allow:
+                self.assertFalse(found["tools"]["helper"]["invoked"])
+                self.assertIsNone(found["tools"]["helper"]["non_use_reason"])
+            else:
+                self.assertIsNone(found)
+
     def test_private_feedback_metadata_trace_and_artifact_refs_are_filtered(self):
         agent, stable, artifacts, task, record, live, policy = fixture()
         metadata = task.model_dump(mode="json")["public_metadata"]

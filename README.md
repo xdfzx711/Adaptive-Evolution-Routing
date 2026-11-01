@@ -1,5 +1,11 @@
 # Adaptive Evolution Routing
 
+OS-Copilot 工具演化插件与独立原生 baseline 入口见 [接入说明](docs/AER_OSCOPILOT_TOOL_EVOLUTION.md)。完整上游通过固定版本的 Git submodule 管理。
+
+工具演化的语义评估实验使用 [OS-Copilot 语义配置](experiments/configs/v0_1_codex_swebench_oscopilot_llm_eval.yaml)，原静态评分配置保留为对照。
+
+实验日志、轨迹和结果统一保存在 `runs/`。`run-task` 不指定 `--output` 时仍会保存完整运行记录；需要额外导出时，建议写到 `runs/<实验名>-result.json`，保持项目根目录整洁。`tests/` 保存正式回归测试和共享夹具。
+
 AER 是一个插件驱动的 Agent 自进化实验框架。当前完成步骤 1–5、7–11：配置与装配、存储、任务评分、两个 Agent、诊断、上下文过滤、目标路由、候选生成、配对验证、接受选择、版本提交与验证结果复用。步骤 6 的完整预算管理按 MVP 范围推迟；批量实验 Runner 和实验汇总仍待实现。
 
 ## 安装与环境

@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 gepa = ["gepa==0.1.4"]
+oscopilot = ["jupyter-client>=8.6,<9", "ipykernel>=6.29,<7"]
 
 [project.scripts]
 aer = "experiments.cli:main"

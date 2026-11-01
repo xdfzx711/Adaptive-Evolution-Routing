@@ -27,7 +27,8 @@ def env_file_path(loaded: LoadedConfig) -> Path | None:
 def env_file_paths(loaded: LoadedConfig) -> tuple[Path, ...]:
     """All declared provider env inputs, including operator and evaluator providers."""
     paths = {path for path in (env_file_path(loaded),) if path is not None}
-    models = [config.get("reflection_model") for config in loaded.config.targets.operator_configs.values()]
+    models = [config.get(name) for config in loaded.config.targets.operator_configs.values()
+              for name in ("reflection_model", "generation_model", "judge_model")]
     models.append(loaded.config.assessment.evaluator_config.get("judge_model"))
     for model in models:
         if isinstance(model, dict) and model.get("plugin") == "qwen_model":

@@ -13,3 +13,6 @@ htmlcov/
 !.env.example
 # Downloaded source caches are reusable execution inputs, not experiment records.
 .aer-cache/
+# Optional root-level CLI exports; canonical experiment records live in runs/.
+/*-result.json
+/*-screening-*.json

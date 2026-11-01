@@ -169,6 +169,8 @@ def assemble_experiment(
     external.setdefault("model_factory", ConfiguredModelFactory(loaded, registry))
     external.setdefault("candidate_trials", IsolatedCandidateTrials(loaded, registry, external.get("artifact_store"), ()))
     external.setdefault("optimization_progress", NullProgressReporter())
+    from .evolution_workspace import ConfiguredEvolutionWorkspaces
+    external.setdefault("evolution_workspace", ConfiguredEvolutionWorkspaces(loaded, registry))
     built = PluginManager(registry).build(bindings, dependencies=external)
     bundle = ControllerPlugins(agent=built.instances["agent"], router=built.instances.get("router"), operators={target: built.instances[f"operator:{target}"] for target in config.targets.default_operators})
     return AssembledExperiment(loaded, bundle, built)

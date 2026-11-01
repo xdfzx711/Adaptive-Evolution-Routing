@@ -8,6 +8,7 @@ from .base import DomainModel, Identifier, Items, JsonObject, PositiveInt, ReadO
 from .acceptance import WeightedGain, validate_reward
 from .execution import Diagnosis, ErrorInfo, ExecutionView, FeedbackView
 from .history import ComponentEdit, ValidationSummary
+from .construction import ConstructionFeedback
 from .references import AgentSnapshot, ArtifactRef
 from .runtime import RunContext, RunContextRecord
 from .states import AttemptStatusValue, CandidateStatus, CandidateStatusValue, EvolutionResponseStatus, ResponseStatusValue
@@ -54,6 +55,7 @@ class CandidateSummary(DomainModel):
     change_summary_truncated: bool = False
     generation_rationale_truncated: bool = False
     validation: ValidationSummary | None = None
+    tool_usage: JsonObject | None = None
     candidate_version_id: Identifier | None = None
     reward: Reward | None
     delta_score: Reward | None
@@ -95,6 +97,7 @@ class ExperienceSummary(DomainModel):
     attempt_status: AttemptStatusValue | None = None
     error_code: Identifier | None = None
     routing_rationale_truncated: bool = False
+    construction_feedback: ConstructionFeedback | None = None
 
 
 class EvolutionContext(DomainModel):
@@ -218,9 +221,15 @@ class EvolutionResponse(DomainModel):
     status: ResponseStatusValue
     error: ErrorInfo | None = None
     record_ref: ArtifactRef | None = None
+    construction_feedback: ConstructionFeedback | None = None
 
     @model_validator(mode="after")
     def response_matches_candidates(self):
+        if self.construction_feedback is not None:
+            if self.construction_feedback.outcome != self.status:
+                raise ValueError("Construction feedback outcome must match evolution status")
+            if self.construction_feedback.record_ref != self.record_ref:
+                raise ValueError("Construction feedback must reference the same construction receipt")
         ids = [item.candidate_id for item in self.candidates]
         if len(ids) != len(set(ids)):
             raise ValueError("candidate IDs must be unique")

@@ -5,7 +5,8 @@ from aer_core.errors import ContractError
 from aer_core.schemas.feedback import ContextPolicy, TaskFeedbackPolicy
 
 
-def context_builder(execution, task, *, history_max_attempts=5, history_max_text_chars=320, history_max_change_chars=4000):
+def context_builder(execution, task, *, history_max_attempts=5, history_max_text_chars=320, history_max_change_chars=4000,
+                    history_max_construction_chars=16000):
     declaration = execution.benchmark.benchmark.feedback_policy(task)
     if not isinstance(declaration, TaskFeedbackPolicy) or declaration.task != task.identity:
         raise ContractError("Benchmark feedback policy must match the selected task", stage="setup")
@@ -18,6 +19,7 @@ def context_builder(execution, task, *, history_max_attempts=5, history_max_text
         state_fields=capabilities.feedback_state_fields, snapshot_config_fields=capabilities.feedback_config_fields,
         history_max_attempts=history_max_attempts, history_max_text_chars=history_max_text_chars,
         history_max_change_chars=history_max_change_chars,
+        history_max_construction_chars=history_max_construction_chars,
         tool_arguments={**dict(capabilities.feedback_tool_arguments), **{tool.name: tool.feedback_arguments for tool in specs}},
         tool_outputs={**dict(capabilities.feedback_tool_outputs), **{tool.name: tool.feedback_outputs for tool in specs}})
     return ContextBuilder(execution.storage.experience_store, policy)

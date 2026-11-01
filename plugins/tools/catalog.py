@@ -79,6 +79,7 @@ class ToolingConfig(Settings):
     dotenv_path: NonBlank | None = None
     startup_timeout_seconds: PositiveFloat = 30.0
     tool_timeout_seconds: PositiveFloat = 30.0
+    generated_tools: "GeneratedToolingConfig | None" = None
 
     @model_validator(mode="after")
     def valid_catalog(self):
@@ -93,3 +94,12 @@ class ToolingConfig(Settings):
 
     def public_catalog(self):
         return {name: entry.public_descriptor().model_dump(mode="json") for name, entry in self.catalog.items()}
+
+
+class GeneratedToolingConfig(Settings):
+    enabled: bool = True
+    runtime: Literal["python_jupyter"] = "python_jupyter"
+    python_executable: NonBlank | None = None
+
+
+ToolingConfig.model_rebuild()

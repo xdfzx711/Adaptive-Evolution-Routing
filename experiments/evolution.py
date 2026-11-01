@@ -91,7 +91,8 @@ class PreparedEvolution:
         builder = context_builder(self.execution, task,
             history_max_attempts=config.evolution.history_max_attempts,
             history_max_text_chars=config.evolution.history_max_text_chars,
-            history_max_change_chars=config.evolution.history_max_change_chars)
+            history_max_change_chars=config.evolution.history_max_change_chars,
+            history_max_construction_chars=config.evolution.history_max_construction_chars)
         context = builder.build(public_task, record, stable, run_ctx, round_id=round_id,
             feasible_targets=availability.targets, task_mode=config.state.task_mode,
             allowed_history_task_ids=[item.task_id for item in self.execution.benchmark.benchmark.tasks("dev")])
@@ -127,6 +128,10 @@ class PreparedEvolution:
             response = binding.operator.evolve(request)
             if not isinstance(response, EvolutionResponse):
                 raise ContractError("Evolver must return EvolutionResponse", stage="evolution")
+            if response.construction_feedback is not None and (
+                    response.construction_feedback.operator_id != operator_id or
+                    response.construction_feedback.component != decision.target):
+                raise ContractError("Construction feedback must match operator and target", stage="evolution", usage=response.usage)
             if len(response.candidates) > request.max_candidates or any(candidate.parent_version_id != stable.version_id or
                 candidate.target != decision.target for candidate in response.candidates):
                 raise ContractError("Evolver candidates must match target, parent and count limit", stage="evolution", usage=response.usage)
@@ -179,6 +184,7 @@ class PreparedEvolution:
         finished = started.replace(status=status, decision=decision, operator_id=operator_id,
             candidate_ids=[candidate.candidate_id for candidate in response.candidates],
             candidate_changes=candidate_changes,
+            construction_feedback=response.construction_feedback,
             usage=sum_usage([routing_usage, response.usage]).replace(elapsed_seconds=monotonic() - attempt_begin),
             error=response.error, finished_at=finished_at)
         refs.append(storage.experience_store.append(AttemptFinishedEvent(event_id=attempt_id + "/finished", run_id=record.run_id,
@@ -217,6 +223,9 @@ def assemble_evolution(execution: PreparedExecution, *, progress=None) -> Prepar
             execution.storage.artifact_store, execution.benchmark.execution_tasks,
             snapshot_loader=execution.storage.version_store.load),
         optimization_progress=progress if progress is not None else NullProgressReporter())
+    from .evolution_workspace import ConfiguredEvolutionWorkspaces
+    deps["evolution_workspace"] = ConfiguredEvolutionWorkspaces(execution.benchmark.loaded_config, registry,
+        execution.benchmark.execution_tasks, snapshot_loader=execution.storage.version_store.load)
     for name in ("model", "tools"):
         if name in execution.built_plugins.instances:
             deps[name] = execution.built_plugins.instances[name]

@@ -14,6 +14,25 @@ from tests.tools.helpers import LOCAL_CATALOG
 
 
 class ToolEvolverTests(unittest.TestCase):
+    def test_selecting_generated_tools_preserves_their_implementations(self):
+        from plugins.tools.generated.bundle import ToolBundle, decode_tools
+        from tests.tools.test_generated import tool
+        artifacts, request = self.request()
+        before = ToolBundle(enabled_tools=[], generated_tools={"source_summary": tool()})
+        stable = request.context.stable_snapshot.replace(config={
+            **request.context.stable_snapshot.model_dump(mode="json")["config"], "generated_tools_enabled": True},
+            artifacts={**request.context.stable_snapshot.artifacts, "tool": artifacts.put(before.model_dump_json().encode(), "tool")})
+        request = EvolutionRequest(attempt_id=request.attempt_id, round_id=1,
+            context=request.context.replace(stable_snapshot=stable), decision=request.decision,
+            operator_id=request.operator_id, max_candidates=1, run_context=request.run_context)
+        model = RecordingModel(lambda *_: response('{"enabled_tools":["source_summary"],"rationale":"Use the existing generated implementation"}'))
+        result = ToolSelectionEvolver(ToolSelectionEvolverConfig(max_candidates=1), artifacts, model,
+                                      adapter=CodexToolAdapter()).evolve(request)
+        self.assertEqual(result.status, "completed", result.error)
+        selected = decode_tools(artifacts.get(result.candidates[0].artifact_updates["tool"]))
+        self.assertEqual(selected.generated_tools, before.generated_tools)
+        self.assertEqual(selected.enabled_tools, ("source_summary",))
+
     def request(self, selected=(), catalog=None):
         state, artifacts, live = evolution_context()
         cfg = ToolingConfig(catalog=LOCAL_CATALOG if catalog is None else catalog)

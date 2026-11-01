@@ -6,21 +6,28 @@ import sys
 import tempfile
 
 from plugins.tool_selection import ToolDescriptor, ToolSelection
+from plugins.tools.generated.bundle import decode_tools, generated_tools, validate_tools
 
 
 class CodexToolAdapter:
     compatible_agents = ("codex_cli_agent",)
 
-    def catalog(self, snapshot):
+    def catalog(self, snapshot, artifacts=None):
         if snapshot.agent_plugin_id not in self.compatible_agents:
             raise ValueError("Codex tool adapter requires a Codex Agent")
-        return {name: ToolDescriptor.model_validate(value)
+        catalog = {name: ToolDescriptor.model_validate(value)
                 for name, value in snapshot.model_dump(mode="json")["config"].get("tool_catalog", {}).items()}
+        if artifacts is not None:
+            selection = decode_tools(artifacts.get(snapshot.artifacts["tool"]))
+            catalog.update({name: tool.descriptor() for name, tool in generated_tools(selection).items()})
+        return catalog
 
     def read(self, snapshot, artifacts):
-        selection = ToolSelection.model_validate_json(artifacts.get(snapshot.artifacts["tool"]))
-        if not set(selection.enabled_tools) <= self.catalog(snapshot).keys():
-            raise ValueError("Selected tool is outside the configured catalog")
+        selection = decode_tools(artifacts.get(snapshot.artifacts["tool"]))
+        configuration = snapshot.model_dump(mode="json")["config"]
+        generated = configuration.get("tooling", {}).get("generated_tools")
+        validate_tools(selection, self.catalog(snapshot),
+            allow_generated=bool(configuration.get("generated_tools_enabled") or generated and generated.get("enabled")))
         return selection
 
     def encode(self, selection):
@@ -50,6 +57,8 @@ class CodexToolSession:
             envs = set()
             upstreams = set()
             for name in selection.enabled_tools:
+                if name in generated_tools(selection):
+                    continue
                 entry = config.catalog[name]
                 if entry.kind == "mcp":
                     upstreams.add(entry.server)
@@ -70,7 +79,7 @@ class CodexToolSession:
     def report(self):
         if not self.selection.enabled_tools:
             return {"status": "ready", "available_tools": [], "discovered": True,
-                    "invocation_count": 0, "invocations": [], "error": None}
+                    "invocation_count": 0, "invocations": [], "invocations_omitted": 0, "tool_metrics": {}, "error": None}
         if self.report_path.is_file():
             try:
                 return json.loads(self.report_path.read_text(encoding="utf-8"))

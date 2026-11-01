@@ -1,0 +1,302 @@
+1. Error Analysis:
+- The original code defines `build_annotation_dependency_analyzer` but does not write it to the required file path.
+- The function name should be `analyze_annotation_dependencies` for direct reusability by downstream tasks.
+- The traversal logic has a flaw: when an expression has both `.children` (e.g., WhereNode) and `.get_source_expressions()`, nodes are visited twice, risking infinite recursion on circular references.
+- String handling in `order_by` only strips `-` and `?` prefixes but doesn't handle Django's `OrderBy` expression objects properly.
+- No deduplication of child nodes before recursion.
+
+2. Detailed Explanation:
+- **File creation**: The task explicitly requires creating a reusable tool file at the specified path. The code must include file I/O to write itself.
+- **Function naming**: Renamed to `analyze_annotation_dependencies` so downstream tools can import and call it directly.
+- **Deduplication**: Using `id()` tracking prevents infinite recursion when expression trees have shared or circular references.
+- **WhereNode vs BaseExpression**: `WhereNode.get_source_expressions()` returns `self.children[:]`, so we should use one or the other, not both, to avoid double-processing.
+- **OrderBy handling**: Django wraps order_by items in `OrderBy` expressions which have `.expression` attribute containing the actual reference.
+- **Self-contained tool**: The builder writes the final reusable module to disk and then imports it to verify correctness.
+
+3. Modified Code:
+
+```python
+import os
+
+def analyze_annotation_dependencies(query, annotation_aliases=None):
+    """
+    Analyze a Django Query object to find all annotation aliases that are
+    actively referenced by the query's where clause, order_by clause, or
+    group_by clause.
+
+    This function recursively traverses expression trees (handling WhereNode,
+    Lookup, Ref, F, and other BaseExpression subclasses) to collect every
+    annotation name used. It directly addresses the failure mode where a
+    naive patch missed filter and ordering references to annotations when
+    attempting to strip unused annotations from count queries.
+
+    Args:
+        query: A Django ``Query`` object (e.g., ``queryset.query``). The
+            function inspects its ``where``, ``order_by``, and ``group_by``
+            attributes for expression trees.
+        annotation_aliases: An optional iterable of strings representing the
+            known annotation alias names on the query. If ``None``, the
+            function attempts to derive them from ``query.annotations.keys()``.
+            Providing this explicitly is useful when analyzing a cloned or
+            partially-mutated query where the annotations dict may have been
+            cleared but references still exist in clauses.
+
+    Returns:
+        A ``set`` of strings containing the annotation aliases that are
+        actively referenced by the where, order_by, or group_by clauses.
+    """
+    if annotation_aliases is not None:
+        known_aliases = set(annotation_aliases)
+    elif hasattr(query, 'annotations') and query.annotations is not None:
+        known_aliases = set(query.annotations.keys())
+    else:
+        known_aliases = set()
+
+    referenced = set()
+    visited_ids = set()
+
+    def _extract_refs(expr):
+        if expr is None:
+            return
+
+        expr_id = id(expr)
+        if expr_id in visited_ids:
+            return
+        visited_ids.add(expr_id)
+
+        # Handle string references in order_by (e.g., 'annotation_name' or '-annotation_name')
+        if isinstance(expr, str):
+            name = expr.lstrip('-').lstrip('?')
+            if name in known_aliases:
+                referenced.add(name)
+            return
+
+        try:
+            from django.db.models.expressions import Ref, F, ResolvedOuterRef, BaseExpression, OrderBy
+            from django.db.models.sql.where import WhereNode
+            from django.db.models.lookups import Lookup
+        except ImportError:
+            Ref = type(None)
+            F = type(None)
+            ResolvedOuterRef = type(None)
+            BaseExpression = type(None)
+            WhereNode = type(None)
+            Lookup = type(None)
+            OrderBy = type(None)
+
+        # Check for Ref nodes (most common resolved annotation reference)
+        if isinstance(expr, Ref):
+            ref_name = getattr(expr, 'refs', '')
+            if ref_name in known_aliases:
+                referenced.add(ref_name)
+            if hasattr(expr, 'source') and expr.source is not None:
+                _extract_refs(expr.source)
+            return
+
+        # Check for F expressions that might reference an annotation by name
+        if isinstance(expr, F):
+            name = getattr(expr, 'name', '')
+            base_name = name.split('__')[0] if name else ''
+            if base_name in known_aliases:
+                referenced.add(base_name)
+            return
+
+        # Check for ResolvedOuterRef (subclass of F in some Django versions)
+        if isinstance(expr, ResolvedOuterRef):
+            name = getattr(expr, 'name', '')
+            base_name = name.split('__')[0] if name else ''
+            if base_name in known_aliases:
+                referenced.add(base_name)
+            return
+
+        # Handle OrderBy wrapper expressions
+        if OrderBy is not type(None) and isinstance(expr, OrderBy):
+            if hasattr(expr, 'expression'):
+                _extract_refs(expr.expression)
+            return
+
+        children = []
+
+        # WhereNode uses .children; BaseExpression uses get_source_expressions()
+        # Use get_source_expressions() preferentially to avoid double-visiting
+        if hasattr(expr, 'get_source_expressions'):
+            try:
+                source_exprs = expr.get_source_expressions()
+                if source_exprs:
+                    children.extend(source_exprs)
+            except Exception:
+                pass
+        elif hasattr(expr, 'children'):
+            children.extend(expr.children)
+
+        # Some expressions store lhs/rhs directly (Lookup)
+        if hasattr(expr, 'lhs') and expr.lhs is not None:
+            if id(expr.lhs) not in {id(c) for c in children}:
+                children.append(expr.lhs)
+        if hasattr(expr, 'rhs') and expr.rhs is not None and not isinstance(expr.rhs, (int, float, str, bool)):
+            if id(expr.rhs) not in {id(c) for c in children}:
+                children.append(expr.rhs)
+
+        for child in children:
+            _extract_refs(child)
+
+    # 1. Traverse WHERE clause
+    if hasattr(query, 'where') and query.where is not None:
+        _extract_refs(query.where)
+
+    # 2. Traverse ORDER BY clause
+    if hasattr(query, 'order_by') and query.order_by:
+        for item in query.order_by:
+            _extract_refs(item)
+
+    # 3. Traverse GROUP BY clause
+    if hasattr(query, 'group_by') and query.group_by:
+        if isinstance(query.group_by, (list, tuple)):
+            for item in query.group_by:
+                _extract_refs(item)
+        elif query.group_by is not True:
+            _extract_refs(query.group_by)
+
+    return referenced
+
+
+# Build the reusable tool file content
+TOOL_SOURCE = '''"""
+Reusable tool: Annotation Dependency Analyzer for Django Query objects.
+
+Analyzes a Django Query object to find all annotation aliases that are
+actively referenced by the query's where clause, order_by clause, or
+group_by clause. Recursively traverses expression trees (handling
+WhereNode, Lookup, Ref, F, etc.) to find all annotation names used.
+"""
+
+
+def analyze_annotation_dependencies(query, annotation_aliases=None):
+    """
+    Analyze a Django Query object to find all annotation aliases that are
+    actively referenced by the query's where clause, order_by clause, or
+    group_by clause.
+
+    Args:
+        query: A Django Query object (e.g., queryset.query).
+        annotation_aliases: Optional iterable of known annotation alias strings.
+            If None, derived from query.annotations.keys().
+
+    Returns:
+        A set of strings containing the annotation aliases actively referenced.
+    """
+    if annotation_aliases is not None:
+        known_aliases = set(annotation_aliases)
+    elif hasattr(query, "annotations") and query.annotations is not None:
+        known_aliases = set(query.annotations.keys())
+    else:
+        known_aliases = set()
+
+    referenced = set()
+    visited_ids = set()
+
+    def _extract_refs(expr):
+        if expr is None:
+            return
+
+        expr_id = id(expr)
+        if expr_id in visited_ids:
+            return
+        visited_ids.add(expr_id)
+
+        if isinstance(expr, str):
+            name = expr.lstrip("-").lstrip("?")
+            if name in known_aliases:
+                referenced.add(name)
+            return
+
+        try:
+            from django.db.models.expressions import (
+                Ref, F, ResolvedOuterRef, BaseExpression, OrderBy,
+            )
+            from django.db.models.sql.where import WhereNode
+            from django.db.models.lookups import Lookup
+        except ImportError:
+            Ref = type(None)
+            F = type(None)
+            ResolvedOuterRef = type(None)
+            BaseExpression = type(None)
+            WhereNode = type(None)
+            Lookup = type(None)
+            OrderBy = type(None)
+
+        if isinstance(expr, Ref):
+            ref_name = getattr(expr, "refs", "")
+            if ref_name in known_aliases:
+                referenced.add(ref_name)
+            if hasattr(expr, "source") and expr.source is not None:
+                _extract_refs(expr.source)
+            return
+
+        if isinstance(expr, F):
+            name = getattr(expr, "name", "")
+            base_name = name.split("__")[0] if name else ""
+            if base_name in known_aliases:
+                referenced.add(base_name)
+            return
+
+        if isinstance(expr, ResolvedOuterRef):
+            name = getattr(expr, "name", "")
+            base_name = name.split("__")[0] if name else ""
+            if base_name in known_aliases:
+                referenced.add(base_name)
+            return
+
+        if OrderBy is not type(None) and isinstance(expr, OrderBy):
+            if hasattr(expr, "expression"):
+                _extract_refs(expr.expression)
+            return
+
+        children = []
+
+        if hasattr(expr, "get_source_expressions"):
+            try:
+                source_exprs = expr.get_source_expressions()
+                if source_exprs:
+                    children.extend(source_exprs)
+            except Exception:
+                pass
+        elif hasattr(expr, "children"):
+            children.extend(expr.children)
+
+        if hasattr(expr, "lhs") and expr.lhs is not None:
+            if id(expr.lhs) not in {id(c) for c in children}:
+                children.append(expr.lhs)
+        if hasattr(expr, "rhs") and expr.rhs is not None and not isinstance(expr.rhs, (int, float, str, bool)):
+            if id(expr.rhs) not in {id(c) for c in children}:
+                children.append(expr.rhs)
+
+        for child in children:
+            _extract_refs(child)
+
+    if hasattr(query, "where") and query.where is not None:
+        _extract_refs(query.where)
+
+    if hasattr(query, "order_by") and query.order_by:
+        for item in query.order_by:
+            _extract_refs(item)
+
+    if hasattr(query, "group_by") and query.group_by:
+        if isinstance(query.group_by, (list, tuple)):
+            for item in query.group_by:
+                _extract_refs(item)
+        elif query.group_by is not True:
+            _extract_refs(query.group_by)
+
+    return referenced
+'''
+
+target_path = r'C:\Users\Administrator\AppData\Local\Temp\aer-tool-construction-vu5dvj1b\task\annotation_dependency_analyzer.py'
+os.makedirs(os.path.dirname(target_path), exist_ok=True)
+with open(target_path, 'w', encoding='utf-8') as f:
+    f.write(TOOL_SOURCE)
+
+print(f"Tool file written to: {target_path}")
+print(f"File exists: {os.path.exists(target_path)}")
+
+<invoke>analyze_annotation_dependencies(query=None, annotation_aliases=set())</invoke>

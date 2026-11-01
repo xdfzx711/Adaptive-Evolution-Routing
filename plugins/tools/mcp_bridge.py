@@ -26,6 +26,10 @@ from mcp.server.stdio import stdio_server
 from plugins.tool_selection import ToolSelection
 from plugins.tools.catalog import ToolingConfig
 from plugins.tools.local import local_tool_registry
+from plugins.tools.generated.bundle import decode_tools, generated_tools, validate_tools
+from plugins.tools.generated.runtime import execute_generated
+from plugins.tools.generated.contracts import classify_result
+from plugins.tools.invocation_receipts import begin, finish, digest, empty_counts
 
 
 class ToolSetupError(ValueError):
@@ -57,6 +61,11 @@ async def serve(config, selection, workspace, report_path, report):
     async with AsyncExitStack() as stack:
         null = stack.enter_context(open(os.devnull, "w"))
         for name in selection.enabled_tools:
+            if name in generated_tools(selection):
+                descriptor = generated_tools(selection)[name].descriptor()
+                exposed[name] = types.Tool(name=name, description=descriptor.description,
+                    inputSchema=descriptor.model_dump(mode="json")["input_schema"])
+                continue
             entry = config.catalog[name]
             if entry.kind == "local":
                 descriptor = entry.public_descriptor()
@@ -108,6 +117,8 @@ async def serve(config, selection, workspace, report_path, report):
             exposed[name] = original.model_copy(update={"name": name, "description": entry.description})
 
         report.update(status="ready", available_tools=sorted(exposed))
+        report["tool_metrics"] = {name: empty_counts("generated" if name in generated_tools(selection) else
+            config.catalog[name].kind) for name in exposed}
         save_report(report_path, report)
 
         @server.list_tools()
@@ -119,13 +130,27 @@ async def serve(config, selection, workspace, report_path, report):
         @server.call_tool(validate_input=False)
         async def call_tool(name, arguments):
             started = monotonic()
+            generated = generated_tools(selection).get(name)
+            kind = "generated" if generated is not None else config.catalog[name].kind if name in config.catalog else "unknown"
+            invocation = begin(report, name, kind, arguments, digest(generated.model_dump(mode="json")) if generated else None)
+            save_report(report_path, report)
+            outcome, generated_output = None, None
             try:
                 if name not in exposed:
                     raise ValueError("Tool is not selected")
                 # Validate here so invalid arguments also receive an invocation receipt.
                 jsonschema.validate(arguments, exposed[name].inputSchema)
                 async with asyncio.timeout(config.tool_timeout_seconds):
-                    if config.catalog[name].kind == "local":
+                    if name in generated_tools(selection):
+                        output = await asyncio.to_thread(execute_generated, generated_tools(selection)[name], arguments,
+                            workspace, timeout_seconds=max(0.1, config.tool_timeout_seconds - 1),
+                            python_executable=config.generated_tools.python_executable)
+                        generated_output = output
+                        outcome = classify_result(generated, output)
+                        result = types.CallToolResult(isError=output["status"] == "error",
+                            content=[types.TextContent(type="text", text=json.dumps(output, ensure_ascii=False))],
+                            structuredContent=output)
+                    elif config.catalog[name].kind == "local":
                         entry = config.catalog[name]
                         output = await asyncio.to_thread(registry.get(entry.plugin).invoke, workspace, arguments)
                         result = types.CallToolResult(content=[types.TextContent(type="text",
@@ -138,9 +163,8 @@ async def serve(config, selection, workspace, report_path, report):
                 message = (str(failure) if name in config.catalog and config.catalog[name].kind == "local"
                            and isinstance(failure, (ValueError, SyntaxError)) else "Tool call failed: " + type(failure).__name__)
                 result = types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
-            report["invocation_count"] += 1
-            report["invocations"] = [*report["invocations"], {"tool": name,
-                "status": "error" if result.isError else "completed", "elapsed_seconds": monotonic() - started}][-100:]
+            finish(report, invocation, error=result.isError, elapsed=monotonic() - started,
+                outcome=outcome, result=generated_output)
             save_report(report_path, report)
             return result
 
@@ -159,9 +183,9 @@ def main():
     try:
         data = json.loads(args.config.read_text(encoding="utf-8"))
         config = ToolingConfig.model_validate(data["tooling"])
-        selection = ToolSelection.model_validate(data["selection"])
-        if not set(selection.enabled_tools) <= config.catalog.keys():
-            raise ToolSetupError("unknown_selected_tool")
+        selection = decode_tools(json.dumps(data["selection"]))
+        validate_tools(selection, config.catalog,
+            allow_generated=bool(config.generated_tools and config.generated_tools.enabled))
         workspace = args.workspace.resolve(strict=True)
         save_report(args.report, report)
         asyncio.run(serve(config, selection, workspace, args.report, report))

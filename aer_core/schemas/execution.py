@@ -72,6 +72,7 @@ class EvaluationResult(DomainModel):
     reason_code: Identifier | None = None
     evidence_refs: Items[ArtifactRef] = ()
     usage: ResourceUsage | None = None
+    assessment_version: Identifier | None = None
 
 
 class FeedbackView(DomainModel):
@@ -80,6 +81,7 @@ class FeedbackView(DomainModel):
     reason_code: Identifier
     public_feedback: str
     evidence_step_ids: Items[NonNegativeInt] = ()
+    assessment_version: Identifier | None = None
 
 
 class DiagnosisStatement(DomainModel):
@@ -97,6 +99,8 @@ class Diagnosis(DomainModel):
     source: Literal["rule", "model"] = "rule"
     usage: ResourceUsage | None = None
     record_ref: ArtifactRef | None = None
+    fact_check: JsonObject | None = None
+    evidence_key: Identifier | None = None
 
     @property
     def all_evidence_step_ids(self):

@@ -5,6 +5,7 @@ from pathlib import Path
 from aer_core.config.models import RoutingSettings
 from aer_core.contracts.providers import ModelProvider
 from aer_core.contracts.storage import ArtifactStore
+from aer_core.contracts.workspace import EvolutionWorkspaceService
 from aer_core.contracts.optimization import CandidateTrialService, ModelProviderFactory
 from aer_core.progress import ProgressReporter
 from aer_core.plugin_registry import API_VERSION, PluginRegistry, ResolvedDependencies
@@ -15,6 +16,7 @@ from plugins.agents.model_selection import CodexModelAdapter
 from plugins.agents.tool_selection import CodexToolAdapter
 from plugins.evolution.tool_selection import ToolSelectionEvolver, ToolSelectionEvolverConfig
 from plugins.evolution.gepa.config import GEPAPromptConfig
+from plugins.evolution.oscopilot.config import OSCopilotConfig
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
 from plugins.routers.jev import JevRouter, JevRoutingSettings, resolve_jev_credentials
@@ -67,7 +69,24 @@ def build_gepa(*, config: GEPAPromptConfig, dependencies: ResolvedDependencies):
                             trials, dependencies.get("optimization_progress"))
 
 
+def build_oscopilot(*, config: OSCopilotConfig, dependencies: ResolvedDependencies):
+    from plugins.evolution.oscopilot.evolver import OSCopilotToolEvolver
+    factory = dependencies.get("model_factory")
+    generator = factory.create(config.generation_model) if config.generation_model else dependencies.get("model_provider")
+    judge = factory.create(config.judge_model) if config.judge_model else generator
+    return OSCopilotToolEvolver(config, dependencies.get("artifact_store"), generator, judge,
+        dependencies.get("evolution_workspace"), dependencies.get("optimization_progress"),
+        config_root=dependencies.get("config_root"))
+
+
 def register_evolution_plugins(registry: PluginRegistry) -> None:
+    registry.register(PluginMetadata(id="oscopilot_tool_evolver", category="evolution", api_version=API_VERSION,
+        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["tool"], compatible_agents=["codex_cli_agent"]),
+        dependencies=["artifact_store", "model_provider", "model_factory", "evolution_workspace", "optimization_progress", "config_root"]),
+        build_oscopilot, config_model=OSCopilotConfig,
+        dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider,
+                          "model_factory": ModelProviderFactory, "evolution_workspace": EvolutionWorkspaceService,
+                          "optimization_progress": ProgressReporter, "config_root": Path})
     for plugin_id, mode, factory in [("fixed_router", "fixed", build_fixed), ("manual_router", "manual", build_manual)]:
         registry.register(PluginMetadata(id=plugin_id, category="router", api_version=API_VERSION,
             plugin_version="0.1.0", capabilities=PluginCapabilities(routing_modes=[mode])), factory, config_model=RoutingSettings)

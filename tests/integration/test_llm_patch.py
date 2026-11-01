@@ -22,7 +22,6 @@ from plugins.evaluators.llm_patch import LLMPatchConfig, LLMPatchEvaluator
 from plugins.validation.acceptance import ImprovementWithRegressionGuard
 from plugins.validation.cache import LocalValidationCache
 from plugins.validation.paired import PairedValidation
-from plugins.workspace.local import LocalRepoSettings, LocalRepoWorkspace
 from tests.benchmarks.test_llm_patch import verdict
 from tests.execution.helpers import MODEL, RecordingModel, context, response
 from tests.integration.test_swebench_static import fixture as repository_fixture
@@ -131,13 +130,11 @@ class LLMPatchPairedValidationTests(unittest.TestCase):
                                 "patch_valid": True, "syntax_valid": True}, trajectory=[], state_summary={},
                             status="completed", usage=ResourceUsage.zero())
                 def review(query, ctx):
-                    after = json.loads(query.messages[-1].content)["files"][0]["after"].strip()
-                    label = "resolved" if after == "answer = 2" else "partial" if after == "answer = 3" else "unresolved"
-                    return response(json.dumps(verdict(label, snippet=after)))
+                    candidate_patch = json.loads(query.messages[-1].content)["candidate_patch"]
+                    label = "resolved" if "+answer = 2" in candidate_patch else "partial" if "+answer = 3" in candidate_patch else "unresolved"
+                    return response(json.dumps(verdict(label)))
                 judge = RecordingModel(review)
-                workspace = LocalRepoWorkspace(LocalRepoSettings(cache_root=str(root / "cache"),
-                    repositories={"fixture/repo": str(source)}), root)
-                evaluator = LLMPatchEvaluator(LLMPatchConfig(judge_model=MODEL), judge, workspace)
+                evaluator = LLMPatchEvaluator(LLMPatchConfig(judge_model=MODEL), judge)
                 executor = ScoredTaskExecutor(Agent(), benchmark, evaluator)
                 harness = PairedValidation(executor, artifacts, versions, LocalValidationCache(root / "run"),
                     {"scorer_version": evaluator.scorer_version})

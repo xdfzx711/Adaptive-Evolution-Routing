@@ -140,6 +140,30 @@ class LLMDiagnoserTests(unittest.TestCase):
             self.assertIn("原始诊断记录：诊断_", text)
             self.assertIn("诊断：tokens=5；模型调用=1", text)
 
+    def test_controller_refreshes_versioned_diagnosis_when_evidence_key_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            startup = prepare_orchestrator(self.configure(Path(directory)), run_id="diagnosis-refresh")
+            task = startup.prepare_task("dev-001")
+            model, _ = attach_model(task, empty=True)
+            original = model.make_response
+            version = ["evidence-v1"]
+            diagnoser = task.controller.diagnoser
+            diagnoser.evidence_key = lambda *_: version[0]
+            old_diagnose = diagnoser.diagnose
+            diagnoser.diagnose = lambda *args: old_diagnose(*args).replace(evidence_key=version[0])
+            def respond(req, ctx):
+                operation = json.loads(req.messages[-1].content).get("operation")
+                if operation == "failure_diagnosis":
+                    return response(analysis_text())
+                if operation == "prompt_evolution":
+                    version[0] = "evidence-v2"
+                return original(req, ctx)
+            model.make_response = respond
+            diagnoser.model = model
+            task.run()
+            count = sum(json.loads(req.messages[-1].content).get("operation") == "failure_diagnosis" for req, _ in model.requests)
+            self.assertEqual(count, 2)
+
     def test_standalone_diagnosis_filters_private_feedback_and_sums_its_usage(self):
         with tempfile.TemporaryDirectory() as directory:
             prepared = prepare_execution(self.configure(Path(directory), mode="disabled"), run_id="standalone")

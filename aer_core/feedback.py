@@ -27,7 +27,7 @@ class PublicFeedbackBuilder:
         code = "correct" if evaluation.success else evaluation.reason_code
         code = code if code in self.messages else "unknown_failure"
         return FeedbackView(score=evaluation.score, success=evaluation.success,
-                            reason_code=code, public_feedback=self.messages[code])
+                            reason_code=code, public_feedback=self.messages[code], assessment_version=evaluation.assessment_version)
 
     def diagnosis_view(self, diagnosis: Diagnosis | None, visible_steps) -> Diagnosis | None:
         if diagnosis is None:
@@ -41,7 +41,8 @@ class PublicFeedbackBuilder:
             observations=[item.replace(evidence_step_ids=[step for step in item.evidence_step_ids if step in steps])
                           for item in diagnosis.observations] if model else [],
             hypotheses=[item.replace(evidence_step_ids=[step for step in item.evidence_step_ids if step in steps])
-                        for item in diagnosis.hypotheses] if model else [])
+                        for item in diagnosis.hypotheses] if model else [],
+            fact_check=diagnosis.model_dump(mode="json")["fact_check"] if model else None, evidence_key=diagnosis.evidence_key)
 
     def public_views(self, task, execution, evaluation):
         """Shared filtering for standalone diagnosis and evolution contexts."""

@@ -1,0 +1,46 @@
+Reasoning:
+
+The task requires developing reusable tools to fix a partially resolved Django issue (django__django-16263) where unused annotations are not properly stripped from `count()` queries. The outer agent's patch had the right idea but failed in execution due to incomplete reference tracking (using identity comparison instead of checking `Ref` nodes), missing ordering references, and potential side effects in `get_aggregation`. 
+
+To address this, I will decompose the work into the following subtasks:
+1. **Analyze the failure**: A QA node to synthesize the diagnosis hypotheses and public evidence into concrete repair requirements.
+2. **Inspect source code**: A Python node to read the relevant sections of `django/db/models/sql/query.py` and `django/db/models/expressions.py` to understand the exact structure of `WhereNode`, `Ref`, and `get_count`.
+3. **Build reference collector tool**: A Python node to implement a robust, self-contained callable function that traverses expression trees to find all annotation aliases referenced by filters and ordering, correctly handling `Ref` nodes.
+4. **Build count query optimizer tool**: A Python node to implement the final callable tool that clones a query, uses the reference collector to mask unused annotations, handles `group_by` cleanup safely, and applies the `Count("*")` annotation. This is the primary deliverable.
+5. **Execute representative test**: A Python node to invoke the constructed tools with mock/simulated JSON-compatible inputs representing Django Query objects to verify the logic works without needing a live database or Django app setup.
+6. **Verify completion criteria**: A QA node to analyze the execution results and confirm the tools meet the requirements for export.
+
+```json
+{
+    "analyze_failure_hypotheses": {
+        "description": "Analyze the provided public development evidence, specifically the diagnosis hypotheses regarding the partial fix for django__django-16263. Summarize the exact flaws in the original add_references logic (e.g., identity comparison vs Ref nodes, missing ordering checks, get_aggregation side effects) and define the precise requirements for the corrected implementation.",
+        "dependencies": [],
+        "type": "QA"
+    },
+    "inspect_django_source": {
+        "description": "Read the file 'C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-tool-construction-eehyh8lw\\task\\django\\db\\models\\sql\\query.py' focusing on the get_count method (around line 548), get_aggregation method (around line 438), and set_annotation_mask method. Also read 'C:\\Users\\Administrator\\AppData\\Local\\Temp\\aer-tool-construction-eehyh8lw\\task\\django\\db\\models\\expressions.py' focusing on the Ref class (around line 1144). Return the source code text for these specific methods and classes to inform the tool construction.",
+        "dependencies": ["analyze_failure_hypotheses"],
+        "type": "Python"
+    },
+    "build_reference_collector_tool": {
+        "description": "Construct a self-contained, directly invocable Python helper function named 'collect_referenced_annotations' that takes an expression tree (like a WhereNode or ordering tuple) and a dictionary of annotations. It must recursively traverse the tree using get_source_expressions() and explicitly check for instances of the 'Ref' class (by checking if the object has a 'refs' attribute matching an annotation alias) rather than relying on object identity ('is'). It should return a set of annotation alias strings that are actively referenced. Include any necessary mock classes for standalone execution. Do not write this to a temporary file; define it in memory for the final tool to use.",
+        "dependencies": ["inspect_django_source"],
+        "type": "Python"
+    },
+    "build_count_query_optimizer_tool": {
+        "description": "Construct the final self-contained, directly invocable Python tool function named 'optimize_count_query'. This function must accept a JSON-compatible dictionary representing a serialized Django Query state (including 'annotations', 'where', 'order_by', 'is_sliced', 'distinct', 'combinator', 'group_by') and return a modified dictionary representing the optimized query state. Internally, it must incorporate the logic from 'collect_referenced_annotations' to find referenced aliases, apply an annotation mask to strip unreferenced annotations, safely clear 'group_by' only when appropriate (handling both True and tuple cases without breaking existing aggregations), and append the Count('*') annotation. The completion criteria require this function to be directly callable with JSON arguments in a fresh namespace, performing the optimization behavior rather than just writing a .py file. It must not import temporary modules.",
+        "dependencies": ["build_reference_collector_tool"],
+        "type": "Python"
+    },
+    "execute_representative_test": {
+        "description": "Invoke the 'optimize_count_query' tool constructed in the previous step with representative JSON-compatible inputs. Create at least two test cases: 1) A query state with an annotation that is NOT referenced in the where clause or order_by (should be stripped). 2) A query state with an annotation that IS referenced via a simulated 'Ref' node in the where clause (must be preserved). Pass these dictionaries as arguments to the callable and capture the returned optimized query states. Ensure no Django application or database is required for this execution.",
+        "dependencies": ["build_count_query_optimizer_tool"],
+        "type": "Python"
+    },
+    "verify_completion_criteria": {
+        "description": "Analyze the output from 'execute_representative_test' to verify that the 'optimize_count_query' tool correctly strips unused annotations while preserving those referenced by filters or ordering via Ref nodes. Confirm that the tool is self-contained, directly invocable with JSON arguments, does not rely on temporary files or external Django setups, and fully addresses the diagnosis hypotheses identified in 'analyze_failure_hypotheses'. Provide a final summary of the tool's correctness and readiness for export.",
+        "dependencies": ["execute_representative_test"],
+        "type": "QA"
+    }
+}
+```

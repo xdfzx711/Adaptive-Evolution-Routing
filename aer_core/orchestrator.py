@@ -203,6 +203,13 @@ class Orchestrator:
                     self.storage_placement.begin_round(round_id)
                 report_record(self.progress, "round_start", round_id)
                 self._notify("进化", f"第 {round_id}/{self.config.limits.max_evolution_rounds} 轮；可行目标={', '.join(feasible)}")
+                diagnosis_key = getattr(self.diagnoser, "evidence_key", None)
+                if state.record.diagnosis is not None and callable(diagnosis_key):
+                    diagnostic_view = self.contexts.build(public_task, state.record, state.stable, self._context(context, "diagnosis"),
+                        round_id=round_id, feasible_targets=feasible, task_mode=self.config.state.task_mode,
+                        allowed_history_task_ids=allowed_history_task_ids)
+                    if state.record.diagnosis.evidence_key != diagnosis_key(diagnostic_view.task, diagnostic_view.execution, diagnostic_view.feedback):
+                        state.record = state.record.replace(diagnosis=None)
                 if state.record.diagnosis is None:
                     state.stage, state.charged = "diagnosis", False
                     diagnostic_ctx = self._context(context, "diagnosis")

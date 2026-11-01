@@ -11,6 +11,7 @@ from aer_core.schemas.providers import ModelMessage, ModelRequest, ModelResponse
 from plugins.agents.execution import SessionRecord
 from plugins.json_output import parse_final
 from plugins.tool_selection import ExecutionToolAdapter, ToolSelection
+from plugins.tools.generated.bundle import generated_tools, with_selection
 
 
 class ToolSelectionEvolverConfig(Settings):
@@ -37,7 +38,7 @@ class ToolSelectionEvolver:
 
     def is_applicable(self, snapshot):
         self.adapter.read(snapshot, self.artifacts)
-        return bool(self.adapter.catalog(snapshot))
+        return bool(self.adapter.catalog(snapshot) or generated_tools(self.adapter.read(snapshot, self.artifacts)))
 
     def evolve(self, request):
         record = SessionRecord()
@@ -47,10 +48,11 @@ class ToolSelectionEvolver:
                 raise ValueError("unsupported tool-evolution target/Agent")
             current = self.adapter.read(stable, self.artifacts)
             catalog = self.adapter.catalog(stable)
+            catalog.update({name: tool.descriptor() for name, tool in generated_tools(current).items()})
             if not catalog:
                 return EvolutionResponse(status="empty", candidates=[], usage=record.usage())
             payload = {"operation": "tool_selection", "agent_plugin_id": stable.agent_plugin_id,
-                "current_selection": current.model_dump(mode="json"),
+                "current_selection": {"enabled_tools": list(current.enabled_tools)},
                 "tool_catalog": {name: tool.model_dump(mode="json") for name, tool in catalog.items()},
                 "routing_decision": {"target": request.decision.target, "rationale": request.decision.rationale},
                 "context": request.context.model_dump(mode="json", exclude={"stable_snapshot", "run_context"})}
@@ -85,7 +87,7 @@ class ToolSelectionEvolver:
             choice = ToolProposal.model_validate(parse_final(response.content))
             if choice.enabled_tools is None:
                 return EvolutionResponse(status="empty", candidates=[], usage=record.usage())
-            selected = ToolSelection(enabled_tools=choice.enabled_tools)
+            selected = with_selection(current, choice.enabled_tools)
             if not set(selected.enabled_tools) <= catalog.keys():
                 raise ValueError("Selected tool is outside the configured catalog")
             if selected == current:

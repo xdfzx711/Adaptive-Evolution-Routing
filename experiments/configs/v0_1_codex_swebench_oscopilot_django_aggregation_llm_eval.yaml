@@ -1,0 +1,164 @@
+# OS-Copilot tool-only evolution; three outer AER rounds, at most two deliverables per construction.
+# Validation tasks exercise aggregate defaults and annotation/alias subquery selection.
+schema_version: aer.v0.1
+experiment:
+  id: aer-swebench-django-aggregation-oscopilot
+  seed: 42
+  runner: aer
+benchmark:
+  plugin: swebench_adapter
+  execution_split: dev
+  task_ids:
+  - django__django-16263
+  config:
+    dataset_path: ../data/swebench_verified_django_aggregation.json
+    roles:
+      django__django-16263: dev
+      django__django-15375: similar
+      django__django-16032: regression
+    validation_sets:
+      django__django-16263:
+        similar:
+        - django__django-15375
+        regression:
+        - django__django-16032
+state:
+  task_mode: independent
+agent:
+  plugin: codex_cli_agent
+  initial_prompt: 'Fix the reported repository issue with focused source edits. Inspect
+    the relevant code before editing. This is a static-only experiment: do not install
+    dependencies or execute tests. Leave the changes in the working tree and end with
+    a brief plain-text summary.'
+  initial_snapshot_ref: null
+  config:
+    windows_sandbox: mxc
+    initial_model: gpt-5.6-sol
+    allowed_models:
+    - gpt-6.1-sol
+    - gpt-6-sol
+    - gpt-6-luna
+    - gpt-5.6-sol
+    timeout_seconds: 300.0
+    workspace:
+      plugin: local_repo_workspace
+      config:
+        cache_root: ../../.aer-cache/repos
+        git_timeout_seconds: 120.0
+    collector:
+      plugin: git_patch_collector
+      config: {}
+    tooling:
+      catalog:
+        python_structure:
+          kind: local
+          plugin: python_structure
+        python_syntax_check:
+          kind: local
+          plugin: python_syntax_check
+      generated_tools:
+        enabled: true
+        runtime: python_jupyter
+    initial_tools: []
+providers:
+  model:
+    plugin: qwen_model
+    model_id: ${QWEN_MODEL}
+    config:
+      dotenv_path: ../../.env
+      api_key_env: QWEN_API_KEY
+      base_url_env: QWEN_BASE_URL
+      temperature: 0.0
+      enable_thinking: false
+      send_seed: false
+      response_format: null
+  tools:
+    plugin: deterministic_tools
+    enabled: []
+assessment:
+  evaluator: llm_patch_evaluator
+  diagnoser: llm_diagnoser
+  evaluator_config:
+    judge_model:
+      plugin: qwen_model
+      model_id: ${QWEN_MODEL}
+      config:
+        dotenv_path: ../../.env
+        api_key_env: QWEN_API_KEY
+        base_url_env: QWEN_BASE_URL
+        temperature: 0.0
+        enable_thinking: false
+        send_seed: false
+        response_format: null
+    max_output_tokens: 4096
+    timeout_seconds: 180.0
+    max_context_chars: 240000
+    use_reference_patch: true
+    max_output_repairs: 1
+evolution:
+  mode: fixed
+  stop_on_success: true
+  max_candidates_per_round: 1
+  history_max_attempts: 5
+  history_max_text_chars: 320
+  history_max_change_chars: 4000
+  history_max_construction_chars: 16000
+routing:
+  plugin: fixed_router
+  fixed_target: tool
+  manual_decisions: []
+  config: {}
+targets:
+  allowed:
+  - tool
+  default_operators:
+    tool: oscopilot_tool_evolver
+  operator_configs:
+    tool:
+      max_repair_iterations: 3
+      max_replan_iterations: 2
+      max_generated_tools: 2
+      max_plan_nodes: 12
+      min_generality_score: 8
+      timeout_seconds: 1200.0
+      model_timeout_seconds: 180.0
+      max_model_retries: 2
+      retry_backoff_seconds: 2.0
+      max_output_tokens: 8192
+      max_expanded_output_tokens: 16384
+      max_output_expansions: 1
+      max_export_metadata_repairs: 1
+      max_response_format_repairs: 1
+      export_token_reserve: 50000
+      max_model_calls: 20
+      max_tokens: 400000
+validation:
+  plugin: paired_validation
+  split: validation
+  group_field: validation_group
+  similar_group: similar
+  regression_group: regression
+  acceptance_policy: weighted_improvement
+  policy_version: v0.1
+  min_improvement: 0.01
+  max_regression_drop: null
+  weights:
+    current_task: 0.5
+    similar: 0.25
+    regression: 0.25
+feedback:
+  policy: dev_feedback_and_validation_summary
+limits:
+  max_evolution_rounds: 3
+  max_tokens: 1000000
+  max_tool_calls: 100
+  max_elapsed_seconds: 10800.0
+  model_call_timeout_seconds: 180.0
+  tool_call_timeout_seconds: 5.0
+  max_output_tokens_per_call: 16384
+  max_consecutive_no_commit_rounds: null
+storage:
+  root: ../../runs
+  experience: jsonl
+  artifacts: local_files
+  versions: local_manifest
