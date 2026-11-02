@@ -136,6 +136,8 @@ def assemble_experiment(
 ) -> AssembledExperiment:
     registry = registry if registry is not None else create_registry()
     loaded = load_config(path, catalog=registry.configuration_catalog(v0_1_catalog()), benchmark_index=benchmark_index)
+    from .configuration import resolve_skills
+    loaded = resolve_skills(loaded)
     from .environment import provider_dependencies, resolve_model
     loaded = resolve_model(loaded, required=True)
     config = loaded.config

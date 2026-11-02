@@ -211,6 +211,12 @@ class EvolutionTextReport:
             if execution.state_summary.get("execution_reasoning_effort") is not None:
                 lines.append("推理强度：" + execution.state_summary["execution_reasoning_effort"])
         lines.extend(self.tool_lines(execution))
+        if execution and "skill_library_artifact_id" in execution.state_summary:
+            state = execution.state_summary
+            lines.extend(["技能加载：" + state["skill_delivery"] + "；状态：" + state["skill_setup_status"],
+                "可用技能：" + (", ".join(state["available_skills"]) or "无"),
+                "实际读取：" + (", ".join(state["read_skills"]) or "无"),
+                "执行前注入：" + (", ".join(state["injected_skills"]) or "无")])
         if scored.error:
             lines.append(f"执行/评分异常：{scored.error.code}；{scored.error.message}")
         if scored.cache_hit:

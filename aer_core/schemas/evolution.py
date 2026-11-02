@@ -14,6 +14,7 @@ from .runtime import RunContext, RunContextRecord
 from .states import AttemptStatusValue, CandidateStatus, CandidateStatusValue, EvolutionResponseStatus, ResponseStatusValue
 from .task import TaskView
 from .usage import BudgetRemaining, ResourceUsage
+from .skills import SkillDeliveryCapabilities
 
 
 class AgentCapabilities(DomainModel):
@@ -25,6 +26,7 @@ class AgentCapabilities(DomainModel):
     feedback_config_fields: Items[Identifier] = ("max_steps",)
     feedback_tool_arguments: ReadOnlyMap[Items[str]] = Field(default_factory=dict)
     feedback_tool_outputs: ReadOnlyMap[Items[str]] = Field(default_factory=dict)
+    skill_delivery: SkillDeliveryCapabilities | None = None
 
 
 class EvolutionCapabilities(DomainModel):

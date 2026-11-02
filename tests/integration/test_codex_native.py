@@ -19,6 +19,8 @@ from plugins.agents.tool_selection import CodexToolAdapter
 from plugins.workspace.local import EmptyWorkspace
 from plugins.mocks import MockArtifactStore
 from tests.execution.helpers import context
+from plugins.skills.library import encode_library
+from tests.skills.test_execution import library
 
 
 @unittest.skipUnless(os.name == "nt" and os.environ.get("AER_TEST_REAL_CODEX") == "1"
@@ -27,6 +29,7 @@ class NativeCodexTests(unittest.TestCase):
     def test_real_exec_creates_session_and_returns_structured_output_through_local_responses(self):
         models, requests = [], []
         exercise_mcp = [False]
+        exercise_skills = [False]
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *_):
@@ -44,22 +47,25 @@ class NativeCodexTests(unittest.TestCase):
                 request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 models.append(request["model"])
                 requests.append(request)
+                target_name = "read_skill" if exercise_skills[0] else "python_syntax_check"
+                target_server = "aer_skills" if exercise_skills[0] else "aer_tools"
+                tool_arguments = {"name": "test-skill"} if exercise_skills[0] else {"path": "sample.py"}
                 tool = next((tool for tool in request.get("tools", [])
-                    if tool.get("name", "").endswith("python_syntax_check")), None)
+                    if tool.get("name", "").endswith(target_name)), None)
                 # Recent CLI versions also expose tools through functions.exec in
                 # additional_tools input items, rather than top-level tools.
-                code_mode_tool = exercise_mcp[0]
+                code_mode_tool = exercise_mcp[0] or exercise_skills[0]
                 if (tool is not None or code_mode_tool) and not any(item.get("type") in {"function_call_output", "custom_tool_call_output"}
                         for item in request.get("input", [])):
                     if tool is not None:
                         message = {"id": "fc_probe", "type": "function_call", "call_id": "call_probe",
-                            "name": tool["name"], "arguments": '{"path":"sample.py"}', "status": "completed"}
+                            "name": tool["name"], "arguments": json.dumps(tool_arguments), "status": "completed"}
                     else:
                         message = {"id": "fc_probe", "type": "custom_tool_call", "call_id": "call_probe",
                             "name": "exec", "namespace": "functions", "input":
-                                'const target=ALL_TOOLS.find(t=>t.name.includes("aer_tools")&&t.name.endsWith("python_syntax_check")); '
+                                f'const target=ALL_TOOLS.find(t=>t.name.includes("{target_server}")&&t.name.endsWith("{target_name}")); '
                                 'if(!target) throw Error("Expected task tool was not exposed"); '
-                                'text(await tools[target.name]({path:"sample.py"}));', "status": "completed"}
+                                f'text(await tools[target.name]({json.dumps(tool_arguments)}));', "status": "completed"}
                     response = {"id": "resp_tool_probe", "object": "response", "created_at": 1,
                         "model": request["model"], "status": "completed", "output": [message],
                         "usage": {"input_tokens": 3, "output_tokens": 1, "total_tokens": 4,
@@ -184,6 +190,50 @@ class NativeCodexTests(unittest.TestCase):
                 self.assertEqual(result.usage.tool_calls, 1)
                 self.assertTrue(any(item.get("type") in {"function_call_output", "custom_tool_call_output"}
                     for request in requests for item in request.get("input", [])))
+                # Skill transport is independent of the evolvable tool selection.
+                exercise_mcp[0], exercise_skills[0] = False, True
+                config = CodexConfig(workspace_root=str(root / "skill-workspaces"), timeout_seconds=45.0,
+                    startup_retries=0, skills={},
+                    tooling={"catalog": {"python_syntax_check": {"kind": "local", "plugin": "python_syntax_check"}}},
+                    initial_tools=["python_syntax_check"])
+                skill_snapshot = snapshot.replace(version_id="native-skill-A", config=controlled_config(config),
+                    artifacts={**snapshot.artifacts, "skill": store.put(encode_library(library()), "skill"),
+                        "tool": store.put(CodexToolAdapter().encode(ToolSelection(enabled_tools=["python_syntax_check"])), "tool")})
+
+                class AmbientSkillWorkspace(EmptyWorkspace):
+                    def prepare(self, task, directory, run_ctx):
+                        handle = super().prepare(task, directory, run_ctx)
+                        ambient = directory / ".agents/skills/ambient"
+                        ambient.mkdir(parents=True)
+                        (ambient / "SKILL.md").write_text(
+                            "---\nname: ambient-skill\ndescription: AMBIENT_SKILL_SHOULD_NOT_APPEAR\n---\nDo nothing.", encoding="utf-8")
+                        return handle
+
+                skill_agent = CodexCliAgent(AgentSettings(plugin="codex_cli_agent", initial_prompt="public probe",
+                    initial_snapshot_ref=None, config=config.model_dump(mode="json")), skill_snapshot, store,
+                    workspace_provider=AmbientSkillWorkspace())
+                skill_arguments = skill_agent._arguments
+                def with_skills(*args):
+                    argv = skill_arguments(*args)
+                    provider = '{name="AER local test",base_url="http://127.0.0.1:' + str(server.server_port)
+                    provider += '/v1",wire_api="responses",requires_openai_auth=false,request_max_retries=0,stream_max_retries=0}'
+                    return [*argv[:-1], "--config", 'model_provider="aer_test"', "--config", "model_providers.aer_test=" + provider, argv[-1]]
+                skill_agent._arguments = with_skills
+                for marker in ("VERSION_A", "VERSION_B", "VERSION_A"):
+                    current = skill_snapshot if marker == "VERSION_A" else skill_snapshot.replace(
+                        version_id="native-skill-B", parent_version_id=skill_snapshot.version_id,
+                        artifacts={**skill_snapshot.artifacts, "skill": store.put(encode_library(library(marker)), "skill")})
+                    start = len(requests)
+                    result = skill_agent.run(task, current, context(workspace_ref=str(root / "skill-run")))
+                    self.assertEqual(result.status, "completed", result.error)
+                    self.assertEqual(result.state_summary["read_skills"], ("test-skill",))
+                    self.assertEqual(result.state_summary["tool_setup_status"], "ready")
+                    self.assertEqual(result.state_summary["skill_reads"][0]["snapshot_version_id"], current.version_id)
+                    self.assertEqual(result.usage.tool_calls, 1)
+                    captured = json.dumps(requests[start:])
+                    self.assertIn(marker, captured)
+                    self.assertNotIn("VERSION_B" if marker == "VERSION_A" else "VERSION_A", captured)
+                    self.assertFalse("AMBIENT_SKILL_SHOULD_NOT_APPEAR" in captured, "Repository skill leaked into model context")
         finally:
             server.shutdown()
             server.server_close()

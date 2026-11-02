@@ -50,6 +50,22 @@ async def exercise_tools(config, workspace, *, call=True):
             return [tool.name for tool in tools]
 
 
+async def exercise_skills(config, *, call=True):
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    selected = next(tomllib.loads(value)["mcp_servers"]["aer_skills"] for value in config
+                    if value.startswith("mcp_servers.aer_skills="))
+    async with stdio_client(StdioServerParameters(command=selected["command"], args=selected["args"])) as streams:
+        async with ClientSession(*streams) as session:
+            await session.initialize()
+            await session.list_tools()
+            if call:
+                result = await session.call_tool("read_skill", {"name": "test-skill"})
+                emit({"type": "item.completed", "item": {"id": "skill-1", "type": "mcp_tool_call",
+                    "server": "aer_skills", "tool": "read_skill", "arguments": {"name": "test-skill"},
+                    "result": result.model_dump(mode="json"), "status": "failed" if result.isError else "completed"}})
+
+
 def main():
     if "--version" in sys.argv:
         print("fake-codex 0.162.1")
@@ -79,6 +95,19 @@ def main():
     prompt = next(value for value in config if value.startswith("developer_instructions="))
     is_dev = task.get("public_metadata", {}).get("split") == "dev"
     emit({"type": "thread.started", "thread_id": "fixture-thread"})
+    if not mode.startswith("skills") and any(value.startswith("mcp_servers.aer_skills=") for value in config):
+        import asyncio
+        asyncio.run(exercise_skills(config, call=False))
+    if mode.startswith("skills"):
+        import asyncio
+        if mode != "skills-ignored":
+            asyncio.run(exercise_skills(config, call=mode != "skills-unused"))
+        if mode == "skills-patch":
+            workspace = Path(sys.argv[sys.argv.index("--cd") + 1])
+            (workspace / "module.py").write_text("answer = 2\n", encoding="utf-8")
+        emit({"type": "item.completed", "item": {"id": "answer", "type": "agent_message", "text": '{"ok":true}'}})
+        emit({"type": "turn.completed", "usage": {"input_tokens": 20, "output_tokens": 5}})
+        return 0
     available = []
     if mode.startswith("tools") and mode != "tools-ignored":
         import asyncio

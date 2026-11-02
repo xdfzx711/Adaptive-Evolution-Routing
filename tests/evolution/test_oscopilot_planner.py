@@ -263,7 +263,7 @@ class FridayPlannerTests(unittest.TestCase):
             "review": {"findings": [{"id": "single", "status": "refuted", "reasoning": "A singleton is returned"}]}}
         request = replace(request, context=request.context.replace(diagnosis=Diagnosis(reason_code="unknown_failure",
             explanation="Static evidence refutes the proposed cause", source="model", fact_check=evidence)))
-        with patch("tests.evolution.test_oscopilot_planner.request_fixture", return_value=(artifacts, request)):
+        with patch(__name__ + ".request_fixture", return_value=(artifacts, request)):
             result, receipt, _, _, worker = self.run_graph([
                 native_plan({"source_summary": node("Native planner choice", deliverable=True)}), implementation(), judgment()])
         self.assertEqual(result.status, "completed", result.error)

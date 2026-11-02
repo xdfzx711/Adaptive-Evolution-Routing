@@ -1,5 +1,7 @@
 # Adaptive Evolution Routing
 
+实验默认加载 `experiments/skills/` 技能库：ReAct 按需读取、Codex MCP 读取，SingleCall 默认预加载 `task-output-contract`。技能内容随 Snapshot 冻结；设置 `agent.config.skills: null` 可关闭。配置、隔离及测试见 [技能执行说明](docs/AER_SKILL_EXECUTION.md)。
+
 OS-Copilot 工具演化插件与独立原生 baseline 入口见 [接入说明](docs/AER_OSCOPILOT_TOOL_EVOLUTION.md)。完整上游通过固定版本的 Git submodule 管理。
 
 工具演化的语义评估实验使用 [OS-Copilot 语义配置](experiments/configs/v0_1_codex_swebench_oscopilot_llm_eval.yaml)，原静态评分配置保留为对照。

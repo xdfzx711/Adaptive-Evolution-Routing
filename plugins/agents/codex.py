@@ -32,6 +32,10 @@ from plugins.workspace.local import EmptyWorkspace
 from plugins.workspace.collectors import JsonResultCollector
 from plugins.agents.codex_runtime import native_tools, task_environment, error_message
 from plugins.agents.codex_process import capture_cli
+from plugins.skills.library import SkillsConfig, initial_skill_artifacts
+from plugins.skills.runtime import SkillRuntime, STATE_FIELDS, RUNTIME_VERSION
+from plugins.skills.codex import CodexSkillSession, repository_skill_overrides
+from aer_core.schemas.skills import SkillDeliveryCapabilities
 
 
 class CodexConfig(CodexModelSpace):
@@ -48,9 +52,12 @@ class CodexConfig(CodexModelSpace):
     collector: ComponentSettings = Field(default_factory=lambda: ComponentSettings(plugin="json_result_collector"))
     tooling: ToolingConfig | None = None
     initial_tools: list[NonBlank] | None = None
+    skills: SkillsConfig | None = None
 
     @model_validator(mode="after")
     def valid_catalog(self):
+        if self.skills is not None and self.skills.mode != "on_demand":
+            raise ValueError("Codex skill delivery requires mode=on_demand")
         if not self.command:
             raise ValueError("command cannot be empty")
         if self.initial_model not in self.allowed_models:
@@ -83,6 +90,10 @@ def snapshot_config(config):
 
 def controlled_config(settings):
     values = settings.model_dump(mode="json", exclude={"initial_model", "initial_reasoning_effort", "initial_tools"})
+    if settings.skills is None:
+        values.pop("skills")
+    else:
+        values["skills"] = settings.skills.controlled()
     # Keep old Snapshot identities and frozen-config comparisons unchanged when not opted in.
     if not values["allowed_reasoning_efforts"]:
         values.pop("allowed_reasoning_efforts")
@@ -105,6 +116,7 @@ def initial_artifacts(config):
     if settings.tooling is not None:
         selection_type = ToolBundle if settings.tooling.generated_tools and settings.tooling.generated_tools.enabled else ToolSelection
         contents["tool"] = CodexToolAdapter().encode(selection_type(enabled_tools=settings.initial_tools or []))
+    contents.update(initial_skill_artifacts(settings.skills))
     return contents
 
 
@@ -200,16 +212,19 @@ class CodexCliAgent:
         # Registration describes plugin support. TargetRegistry separately requires
         # a configured tool artifact before exposing this target to a Router.
         components = ["prompt", "model", "tool"]
-        return AgentCapabilities(supported_targets=components, supported_artifact_kinds=components,
+        return AgentCapabilities(supported_targets=components,
+            supported_artifact_kinds=[*components, *(["skill"] if self.settings.skills is not None else [])],
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "execution_platform", "execution_shell", "termination_reason", "fresh_session", "seed_supported",
                                    "result_kind", "evaluation_mode", "selected_tools", "available_tools", "tool_setup_status", "tool_setup_error", "tool_invocations", "generated_tool_catalog",
-                                   "tool_discovered", "tool_invocation_count", "tool_invocations_omitted", "tool_metrics"],
+                                   "tool_discovered", "tool_invocation_count", "tool_invocations_omitted", "tool_metrics", *(STATE_FIELDS if self.settings.skills is not None else ())],
             feedback_config_fields=["allowed_models", "allowed_reasoning_efforts", "tool_catalog", "generated_tools_enabled"],
             feedback_tool_arguments={"command_execution": ["command"], "file_change": ["changes"],
                 "web_search": ["query"], "mcp_tool_call": ["server", "tool", "arguments"]},
             feedback_tool_outputs={"command_execution": ["text", "exit_code"], "file_change": ["changes"],
-                "web_search": ["query"], "mcp_tool_call": ["result"]})
+                "web_search": ["query"], "mcp_tool_call": ["result"]},
+            skill_delivery=SkillDeliveryCapabilities(transport="mcp", discovery="catalog", observes_reads=True)
+                if self.settings.skills is not None else None)
 
     def _validate_snapshot(self, snapshot):
         configuration = dict(snapshot.model_dump(mode="json")["config"])
@@ -219,7 +234,8 @@ class CodexCliAgent:
             configuration.pop("initial_reasoning_effort")
         if snapshot.agent_plugin_id != self.plugin_id or configuration != self._controlled:
             raise UnsupportedCapability("Codex Snapshot runtime settings differ from the assembled plugin", stage="setup", plugin_id=self.plugin_id)
-        required = {"prompt", "model", *({"tool"} if self.settings.tooling is not None else set())}
+        required = {"prompt", "model", *({"tool"} if self.settings.tooling is not None else set()),
+                    *({"skill"} if self.settings.skills is not None else set())}
         if any(kind not in snapshot.artifacts or snapshot.artifacts[kind].kind != kind for kind in required):
             raise UnsupportedCapability("Codex requires artifacts for all configured components", stage="setup", plugin_id=self.plugin_id)
         if set(snapshot.artifacts) - required:
@@ -228,8 +244,10 @@ class CodexCliAgent:
             selection = self.model_adapter.read(snapshot, self.artifacts)
             if self.settings.tooling is not None:
                 self.tool_adapter.read(snapshot, self.artifacts)
+            if self.settings.skills is not None:
+                SkillRuntime.from_snapshot(snapshot, self.artifacts, "setup")
         except ValueError as failure:
-            raise UnsupportedCapability("Snapshot execution model/reasoning combination or tool set is not allowed", stage="setup", plugin_id=self.plugin_id) from failure
+            raise UnsupportedCapability("Snapshot model, reasoning, tools, or skills are invalid", stage="setup", plugin_id=self.plugin_id) from failure
         prompt = self.artifacts.get(snapshot.artifacts["prompt"]).decode("utf-8")
         if not prompt.strip():
             raise UnsupportedCapability("Codex prompt cannot be blank", stage="setup", plugin_id=self.plugin_id)
@@ -253,6 +271,8 @@ class CodexCliAgent:
         fingerprints = {name: hashlib.sha256((home / name).read_bytes()).hexdigest()
                         for name in names if (home / name).is_file()}
         return {"cli_version": self.cli_version, "command": self.command, "config_fingerprints": fingerprints,
+                **({"skill_runtime_version": RUNTIME_VERSION, "skill_delivery": "mcp",
+                    "skip_host_skill_discovery": True, "plugins_enabled": False} if self.settings.skills is not None else {}),
                 "task_permissions_version": "2",
                 "tool_executables": self.tool_executables,
                 "tool_read_roots": [str(path) for path in self.tool_read_roots],
@@ -281,7 +301,7 @@ class CodexCliAgent:
             servers.update(data.get("mcp_servers", {}))
         return servers
 
-    def _arguments(self, workspace, schema_path, model_id, prompt, run_ctx, tool_session=None):
+    def _arguments(self, workspace, schema_path, model_id, prompt, run_ctx, tool_session=None, skill_session=None):
         selection = model_id if isinstance(model_id, ModelSelection) else ModelSelection(model_id=model_id)
         servers = self._check_permission_config()
         args = [*self.command, "exec", "--json", "--ephemeral", "--skip-git-repo-check",
@@ -338,9 +358,13 @@ class CodexCliAgent:
         if selection.reasoning_effort is not None:
             overrides.append("model_reasoning_effort=" + json.dumps(selection.reasoning_effort))
         overrides.extend("mcp_servers." + json.dumps(name) + ".enabled=false" for name in sorted(servers)
-                         if tool_session is None or not tool_session.selection.enabled_tools or name != "aer_tools")
+                         if not (name == "aer_tools" and tool_session is not None and tool_session.selection.enabled_tools)
+                         and not (name == "aer_skills" and skill_session is not None))
         if tool_session is not None:
             overrides.extend(tool_session.overrides)
+        if skill_session is not None:
+            overrides.extend(["features.skip_host_skill_discovery=true", "features.plugins=false",
+                              repository_skill_overrides(workspace), *skill_session.overrides])
         for value in overrides:
             args.extend(["--config", value])
         if schema_path is not None:
@@ -357,6 +381,7 @@ class CodexCliAgent:
         session_started, turn_started = False, False
         handle, collected, terminal_shutdown = None, None, False
         tool_session, tool_report, selected_tools = None, None, None
+        skills, skill_session, skill_report = None, None, None
         try:
             selection, prompt = self._validate_snapshot(snapshot)
             model_id = selection.model_id
@@ -378,7 +403,12 @@ class CodexCliAgent:
             public_input = json.dumps(public_data, ensure_ascii=False, indent=2)
             if selected_tools is not None:
                 tool_session = self.tool_adapter.prepare(selected_tools, self.settings.tooling, workspace, self.project_root)
-            args = self._arguments(workspace, schema_path, selection, prompt, run_ctx, tool_session)
+            if self.settings.skills is not None:
+                skills = SkillRuntime.from_snapshot(snapshot, self.artifacts, run_ctx.operation_id)
+                skill_session = CodexSkillSession(skills)
+                prompt += skills.instructions()
+            args = (self._arguments(workspace, schema_path, selection, prompt, run_ctx, tool_session, skill_session)
+                    if skill_session else self._arguments(workspace, schema_path, selection, prompt, run_ctx, tool_session))
             timed_out = False
             deadline = record.start + min(self.settings.timeout_seconds, run_ctx.execution_timeout_seconds or self.settings.timeout_seconds)
             for attempt in range(1, self.settings.startup_retries + 2):
@@ -392,6 +422,8 @@ class CodexCliAgent:
                     "runtime": self.runtime_info(), "workspace": str(workspace), "startup_attempt": startup_attempts})
                 if tool_session is not None and tool_session.report_path is not None:
                     tool_session.report_path.unlink(missing_ok=True)
+                if skill_session is not None:
+                    skill_session.report_path.unlink(missing_ok=True)
                 process = subprocess.Popen(args, cwd=workspace, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                     **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}))
@@ -456,6 +488,9 @@ class CodexCliAgent:
             if tool_session is not None:
                 tool_report = tool_session.report()
                 record.event("tool_setup", {"selected_tools": list(selected_tools.enabled_tools), **tool_report})
+            if skill_session is not None:
+                skill_report = skill_session.report()
+                record.event("skill_setup", skill_report)
             if timed_out or (process.returncode != 0 and not terminal_shutdown) or failed or not turn_completed or final is None:
                 phase = "model turn" if turn_started else "session startup"
                 detail = f"timeout during {phase}; {stderr[-2000:]}" if timed_out else f"exit={process.returncode}; {stderr[-2000:]}"
@@ -467,6 +502,8 @@ class CodexCliAgent:
                     or tool_report["available_tools"] != list(selected_tools.enabled_tools)):
                 raise ExecutionError("Selected tools were not available to Codex: " + str(tool_report["error"] or tool_report["status"]),
                                      stage=run_ctx.stage, plugin_id=self.plugin_id)
+            if skill_report is not None and (skill_report["status"] != "ready" or not skill_report["discovered"]):
+                raise ExecutionError("Skill service was not available to Codex", stage=run_ctx.stage, plugin_id=self.plugin_id)
             try:
                 collected = self.result_collector.collect(task, handle, final, run_ctx)
                 output = collected.model_dump(mode="json")["output"]
@@ -490,6 +527,17 @@ class CodexCliAgent:
                     tool_session.close()
                 except OSError as failure:
                     record.event("tool_cleanup_error", {"message": type(failure).__name__})
+            if skill_session is not None:
+                try:
+                    if skill_report is None:
+                        skill_report = skill_session.report()
+                except (OSError, ValueError, KeyError) as failure:
+                    record.event("skill_report_error", {"message": str(failure)})
+                finally:
+                    try:
+                        skill_session.close()
+                    except OSError as failure:
+                        record.event("skill_cleanup_error", {"message": type(failure).__name__})
             if handle is not None:
                 try:
                     self.workspace_provider.release(handle)
@@ -516,6 +564,7 @@ class CodexCliAgent:
                 "tool_calls_scope": "visible_cli_items", "startup_attempts": startup_attempts,
                 "session_started": session_started, "turn_started": turn_started,
                 "shutdown_after_terminal_event": terminal_shutdown,
+                **(skills.summary("mcp", setup_status=skill_report["status"] if skill_report else "error") if skills else {}),
                 **({"selected_tools": list(selected_tools.enabled_tools),
                     **({"generated_tool_catalog": {name: tool.descriptor().model_dump(mode="json")
                         for name, tool in generated_tools(selected_tools).items()}}

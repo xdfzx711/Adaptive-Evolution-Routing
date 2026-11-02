@@ -6,7 +6,7 @@ from time import monotonic
 
 from pydantic import model_validator
 
-from aer_core.config.models import AgentSettings, ModelProviderSettings, ToolProviderSettings
+from aer_core.config.models import AgentSettings, ModelProviderSettings, ToolProviderSettings, Settings
 from aer_core.contracts.providers import ModelProvider, ToolProvider
 from aer_core.contracts.storage import ArtifactStore
 from aer_core.errors import AERError, BudgetExceeded, ContractError, ExecutionError, OperationTimeout, UnsupportedCapability
@@ -20,15 +20,23 @@ from aer_core.schemas.task import TaskView
 
 from .execution import SessionRecord
 from plugins.json_output import parse_final
+from plugins.skills.library import SkillsConfig, initial_skill_artifacts
+from plugins.skills.runtime import SkillRuntime, READ_SPEC, READ_TOOL, STATE_FIELDS, RUNTIME_VERSION
+from aer_core.schemas.skills import SkillDeliveryCapabilities
 
 
 def snapshot_config(config):
-    return {"max_steps": config.agent.max_steps, "model": config.providers.model.model_dump(mode="json"),
+    values = {"max_steps": config.agent.max_steps, "model": config.providers.model.model_dump(mode="json"),
             "tools": config.providers.tools.model_dump(mode="json")}
+    settings = LocalConfig.model_validate(config.agent.config)
+    if settings.skills is not None:
+        values["skills"] = settings.skills.controlled()
+    return values
 
 
 def initial_artifacts(config):
     components = {"prompt": config.agent.initial_prompt.encode("utf-8")}
+    components.update(initial_skill_artifacts(LocalConfig.model_validate(config.agent.config).skills))
     return components
 
 
@@ -36,6 +44,11 @@ class ControlledConfig(DomainModel):
     max_steps: PositiveInt
     model: ModelProviderSettings
     tools: ToolProviderSettings
+    skills: SkillsConfig | None = None
+
+
+class LocalConfig(Settings):
+    skills: SkillsConfig | None = None
 
 
 class LocalAgentSettings(AgentSettings):
@@ -43,8 +56,9 @@ class LocalAgentSettings(AgentSettings):
     def require_limit(self):
         if self.max_steps is None:
             raise ValueError("this Agent requires max_steps")
-        if self.config:
-            raise ValueError("this Agent has no plugin-specific config")
+        settings = LocalConfig.model_validate(self.config)
+        if self.plugin == "single_call_agent" and settings.skills is not None and settings.skills.mode != "preload":
+            raise ValueError("single_call_agent skills require mode=preload and explicit skill names")
         return self
 
 
@@ -60,6 +74,9 @@ class ReActAgent:
         self.artifacts = artifact_store
         self.model = model_provider
         self.tools = tool_provider
+        self.skill_settings = LocalConfig.model_validate(config.config).skills
+        if not self.uses_tools and self.skill_settings is not None and self.skill_settings.mode != "preload":
+            raise UnsupportedCapability("Single-call skills require explicit preload mode", stage="setup", plugin_id=self.plugin_id)
         if self.uses_tools and self.tools is None:
             raise ValueError("ReAct Agent requires ToolProvider")
         self._snapshot = initial_snapshot
@@ -77,6 +94,9 @@ class ReActAgent:
 
     def _validate_snapshot(self, snapshot: AgentSnapshot) -> ControlledConfig:
         controlled = self._controlled(snapshot)
+        expected_skills = self.skill_settings.controlled() if self.skill_settings is not None else None
+        if (controlled.skills.controlled() if controlled.skills is not None else None) != expected_skills:
+            raise UnsupportedCapability("Snapshot skill delivery differs from Agent settings", stage="setup", plugin_id=self.plugin_id)
         if controlled.model.model_dump(mode="json") != self._provider_config or controlled.tools.model_dump(mode="json") != self._tool_config:
             raise UnsupportedCapability("Snapshot model/tools differ from injected providers", stage="setup", plugin_id=self.plugin_id)
         if not self.uses_tools and controlled.max_steps != 1:
@@ -85,13 +105,27 @@ class ReActAgent:
             raise UnsupportedCapability("Snapshot must contain a prompt artifact", stage="setup", plugin_id=self.plugin_id)
         if set(snapshot.artifacts) - set(self.capabilities().supported_artifact_kinds):
             raise UnsupportedCapability("Snapshot contains unsupported Agent components", stage="setup", plugin_id=self.plugin_id)
+        if self.skill_settings is not None:
+            if "skill" not in snapshot.artifacts:
+                raise UnsupportedCapability("Skills require a frozen skill artifact", stage="setup", plugin_id=self.plugin_id)
+            runtime = SkillRuntime.from_snapshot(snapshot, self.artifacts, "setup")
+            if not set(self.skill_settings.preload) <= {item["name"] for item in runtime.list_skills()}:
+                raise UnsupportedCapability("Snapshot is missing a preloaded skill", stage="setup", plugin_id=self.plugin_id)
         return controlled
 
     def capabilities(self) -> AgentCapabilities:
-        kinds = ["prompt"]
-        return AgentCapabilities(supported_targets=kinds, supported_artifact_kinds=kinds,
+        enabled = self.skill_settings is not None
+        preload = enabled and self.skill_settings.mode == "preload"
+        return AgentCapabilities(supported_targets=["prompt"], supported_artifact_kinds=["prompt", "skill"] if enabled else ["prompt"],
             can_rebuild_session=True, snapshot_scope="controlled_config",
-            feedback_state_fields=["agent_plugin", "model_steps", "effective_max_steps", "termination_reason", "fresh_session"])
+            feedback_state_fields=["agent_plugin", "model_steps", "effective_max_steps", "termination_reason", "fresh_session", *(STATE_FIELDS if enabled else ())],
+            feedback_tool_arguments={READ_TOOL: ["name"]} if enabled else {},
+            feedback_tool_outputs={READ_TOOL: list(READ_SPEC.feedback_outputs)} if enabled else {},
+            skill_delivery=SkillDeliveryCapabilities(transport="preload" if preload else "tool",
+                discovery="explicit" if preload else "catalog", observes_reads=not preload) if enabled else None)
+
+    def runtime_info(self):
+        return {"skill_runtime_version": RUNTIME_VERSION} if self.skill_settings is not None else None
 
     def snapshot(self) -> AgentSnapshot:
         return self._snapshot
@@ -118,16 +152,26 @@ class ReActAgent:
         status = "completed"
         termination = "finish"
         error_info = None
+        skills = None
         try:
             prompt = self.artifacts.get(snapshot.artifacts["prompt"]).decode("utf-8")
             if not prompt.strip():
                 raise ValueError("Prompt cannot be blank")
-            messages = [ModelMessage(role="system", content=prompt),
-                        ModelMessage(role="user", content=task.model_dump_json())]
             tool_specs = self.tools.specifications() if self.uses_tools else ()
             if {tool.name for tool in tool_specs} != set(controlled.tools.enabled) and self.uses_tools:
                 raise ContractError("Tool schemas do not match Snapshot enabled tools", stage=run_ctx.stage,
                                     operation_id=run_ctx.operation_id, plugin_id=self.plugin_id)
+            if self.skill_settings is not None:
+                skills = SkillRuntime.from_snapshot(snapshot, self.artifacts, run_ctx.operation_id)
+                if self.skill_settings.mode == "preload":
+                    prompt += "\n\nExplicitly loaded skills:\n" + skills.preload(self.skill_settings.preload)
+                else:
+                    if any(spec.name == READ_TOOL for spec in tool_specs):
+                        raise ContractError("Provider tool name collides with read_skill", stage=run_ctx.stage)
+                    prompt += skills.instructions()
+                    tool_specs = (*tool_specs, READ_SPEC)
+            messages = [ModelMessage(role="system", content=prompt),
+                        ModelMessage(role="user", content=task.model_dump_json())]
             seen_calls = set()
             for steps in range(1, max_steps + 1):
                 model_ctx = replace(run_ctx, operation_id=f"{run_ctx.operation_id}/model/{steps}")
@@ -163,7 +207,9 @@ class ReActAgent:
                         record.event("tool_call", {"operation_id": tool_ctx.operation_id, **call.model_dump(mode="json")})
                         start = monotonic()
                         try:
-                            observation = self.tools.invoke(call, tool_ctx)
+                            observation = (skills.invoke(call, tool_ctx) if skills is not None and
+                                           self.skill_settings.mode == "on_demand" and call.name == READ_TOOL
+                                           else self.tools.invoke(call, tool_ctx))
                         except Exception as failure:
                             self._failed_call(record, failure, model=False)
                             raise
@@ -210,7 +256,8 @@ class ReActAgent:
             operation_id=run_ctx.operation_id, output=output, trajectory=record.events,
             state_summary={"agent_plugin": self.plugin_id, "model_steps": steps,
                            "effective_max_steps": max_steps,
-                           "termination_reason": termination, "fresh_session": True},
+                           "termination_reason": termination, "fresh_session": True,
+                           **(skills.summary("preload" if self.skill_settings.mode == "preload" else "tool") if skills else {})},
             usage=usage, status=status, error=error_info)
 
 
