@@ -14,6 +14,7 @@ from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.usage import ResourceUsage
 from plugins.agents.execution import SessionRecord
 from plugins.json_output import parse_final
+from .skill_guidance import SKILL_ROUTING_GUIDANCE
 
 
 class RoutingChoice(DomainModel):
@@ -51,7 +52,8 @@ class LLMRouter:
                       for kind, ref in context.stable_snapshot.artifacts.items()}
         public = context.model_dump(mode="json", exclude={"stable_snapshot", "run_context"})
         payload = {"operation": "evolution_routing", "context": public, "stable_components": components}
-        request = ModelRequest(messages=[ModelMessage(role="system", content=SYSTEM_PROMPT),
+        system = SYSTEM_PROMPT + (SKILL_ROUTING_GUIDANCE if "skill" in context.feasible_targets else "")
+        request = ModelRequest(messages=[ModelMessage(role="system", content=system),
             ModelMessage(role="user", content=json.dumps(payload, ensure_ascii=False, indent=2))],
             seed=run_ctx.seed, max_output_tokens=run_ctx.max_output_tokens)
         started_at = datetime.now(timezone.utc)

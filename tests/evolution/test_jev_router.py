@@ -20,6 +20,32 @@ from tests.evolution.helpers import evolution_context
 
 
 class JevRouterTests(unittest.TestCase):
+    def test_skill_competition_receives_operator_boundaries_and_prior_skip_reason(self):
+        from aer_core.schemas.construction import ConstructionFeedback, ConstructionIssue
+        from plugins.routers.skill_guidance import SKILL_ROUTING_GUIDANCE
+        state, artifacts = self.two_targets()
+        previous = ExperienceSummary(attempt_id="skip-previous", run_id="run-1", episode_id="episode-1",
+            task_id=state.task.task_id, round_id=1, stable_version_id=state.stable_snapshot.version_id,
+            decision=EvolutionDecision(target="skill", rationale="Investigate the skill"), diagnosis=None,
+            candidate_summaries=[], completed_at=state.as_of, attempt_status="empty_candidates",
+            construction_feedback=ConstructionFeedback(component="skill", operator_id="skillclaw_skill_evolver",
+                outcome="empty", issues=[ConstructionIssue(stage="judgment", code="no_skill_change", source="model_assessment",
+                    message="Existing skill is adequate; Agent ignored its guidance.")]))
+        state = state.replace(round_id=2, history=[previous], feasible_targets=["prompt", "skill"],
+            target_descriptions={"prompt": "Change instructions", "skill": "Create or improve skills, or skip"})
+        bodies = []
+        def respond(request):
+            bodies.append(json.loads(request.content))
+            return httpx.Response(200, json={"answers": {"evolution_target": {
+                "type": "choice", "choice": "prompt", "confidence": 0.8,
+                "probabilities": {"prompt": 0.8, "skill": 0.2}}},
+                "usage": {"input_tokens": 20, "output_tokens": 10}})
+        router = JevRouter(self.config(), artifacts, self.credentials(), transport=httpx.MockTransport(respond))
+        self.assertEqual(router.select(state).target, "prompt")
+        self.assertTrue(bodies[0]["questions"]["evolution_target"]["instructions"].endswith(SKILL_ROUTING_GUIDANCE))
+        self.assertEqual(bodies[0]["questions"]["evolution_target"]["criteria"], dict(state.target_descriptions))
+        self.assertIn("Agent ignored", json.dumps(bodies[0]["state"]["history"][0]["construction_feedback"]))
+
     def config(self, **options):
         return JevRoutingSettings(plugin="jev_router", fixed_target=None,
             manual_decisions=[], config=JevRouterOptions(**options))

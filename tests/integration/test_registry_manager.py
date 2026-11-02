@@ -194,7 +194,10 @@ class RegistryManagerTests(unittest.TestCase):
         catalog = registry.configuration_catalog()
         self.assertEqual({(item.category, item.plugin_id) for item in catalog.declarations},
                          {(item.metadata.category, item.metadata.id) for item in registry.descriptors()})
-        self.assertEqual(catalog.get("agent", "codex_cli_agent").targets, ("prompt", "model", "tool"))
+        self.assertEqual(catalog.get("agent", "codex_cli_agent").targets, ("prompt", "model", "tool", "skill"))
+        self.assertEqual(catalog.get("evolution", "skillclaw_skill_evolver").targets, ("skill",))
+        self.assertEqual(catalog.get("evolution", "skillclaw_skill_evolver").compatible_agents,
+                         ("codex_cli_agent", "react_agent"))
         self.assertEqual(catalog.get("evolution", "tool_selection_evolver").targets, ("tool",))
         self.assertEqual(catalog.get("evolution", "tool_selection_evolver").compatible_agents, ("codex_cli_agent",))
         self.assertEqual(catalog.get("router", "mock_router_b").routing_modes, ("fixed", "manual"))

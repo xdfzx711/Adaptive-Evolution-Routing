@@ -20,6 +20,7 @@ from aer_core.schemas.evolution import EvolutionDecision
 from aer_core.schemas.routing import JevRoutingRecord
 from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.usage import ResourceUsage
+from .skill_guidance import SKILL_ROUTING_GUIDANCE
 
 
 class JevRouterOptions(Settings):
@@ -151,6 +152,10 @@ class JevRouter:
                     "status": candidate.reason, "acceptance_reason": candidate.acceptance_reason}
                     for candidate in item.candidate_summaries]})
         components = {}
+        if "skill" in context.feasible_targets:
+            for summary, item in zip(history, context.history):
+                if item.construction_feedback is not None:
+                    summary["construction_feedback"] = item.construction_feedback.model_dump(mode="json")
         for kind, ref in context.stable_snapshot.artifacts.items():
             try:
                 contents = self.artifacts.get(ref).decode("utf-8")
@@ -183,7 +188,8 @@ class JevRouter:
         state = self._state(context)
         request = {"model": self.credentials.model, "state": state,
             "questions": {"evolution_target": {"type": "choice",
-                "instructions": "Select the evolution target most likely to improve the next validation result using the public evidence.",
+                "instructions": "Select the evolution target most likely to improve the next validation result using the public evidence."
+                    + (SKILL_ROUTING_GUIDANCE if "skill" in options else ""),
                 "criteria": {target: context.target_descriptions.get(target, target) for target in options}}}}
         started_at, started = datetime.now(timezone.utc), monotonic()
         response_data, decision, error = None, None, None

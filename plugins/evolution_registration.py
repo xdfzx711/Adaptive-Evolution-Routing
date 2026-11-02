@@ -17,6 +17,7 @@ from plugins.agents.tool_selection import CodexToolAdapter
 from plugins.evolution.tool_selection import ToolSelectionEvolver, ToolSelectionEvolverConfig
 from plugins.evolution.gepa.config import GEPAPromptConfig
 from plugins.evolution.oscopilot.config import OSCopilotConfig
+from plugins.evolution.skillclaw.config import SkillClawConfig
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
 from plugins.routers.jev import JevRouter, JevRoutingSettings, resolve_jev_credentials
@@ -79,7 +80,17 @@ def build_oscopilot(*, config: OSCopilotConfig, dependencies: ResolvedDependenci
         config_root=dependencies.get("config_root"))
 
 
+def build_skillclaw(*, config: SkillClawConfig, dependencies: ResolvedDependencies):
+    from plugins.evolution.skillclaw.evolver import SkillClawSkillEvolver
+    return SkillClawSkillEvolver(config, dependencies.get("artifact_store"), dependencies.get("model_provider"),
+                                config_root=dependencies.get("config_root"))
+
+
 def register_evolution_plugins(registry: PluginRegistry) -> None:
+    registry.register(PluginMetadata(id="skillclaw_skill_evolver", category="evolution", api_version=API_VERSION,
+        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["skill"], compatible_agents=["codex_cli_agent", "react_agent"]),
+        dependencies=["artifact_store", "model_provider", "config_root"]), build_skillclaw, config_model=SkillClawConfig,
+        dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider, "config_root": Path})
     registry.register(PluginMetadata(id="oscopilot_tool_evolver", category="evolution", api_version=API_VERSION,
         plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["tool"], compatible_agents=["codex_cli_agent"]),
         dependencies=["artifact_store", "model_provider", "model_factory", "evolution_workspace", "optimization_progress", "config_root"]),

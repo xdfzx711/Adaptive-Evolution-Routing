@@ -240,6 +240,19 @@ class EvolutionTextReport:
             f"Operator：{value.operator_id or '未选择'}；生成状态：{value.response.status.value if value.response else value.status}"])
         from .optimization_report import optimization_record
         optimization = optimization_record(value, self.artifacts)
+        if value.response and value.response.record_ref and value.response.record_ref.kind == "skill_evolution":
+            skill_record = json.loads(self.artifacts.get(value.response.record_ref))
+            self.block("SkillClaw 技能进化", [f"上游版本：{skill_record['upstream_revision']}；状态：{skill_record['status']}",
+                f"进化模型调用：{len(skill_record['calls'])}；完整记录：{proposal_source} / generation.skill_evolution",
+                *[f"{item['action']}：{item['name']}；{item['rationale']}" for item in skill_record["changes"]]])
+            decisions = []
+            for event in skill_record["events"]:
+                if event["kind"] == "unchanged":
+                    decisions.append(f"{event.get('action', 'unchanged')}：{event['name']}；原因（模型判断）：{event['reason']}")
+                elif event["kind"] == "no_skill_boundary":
+                    decisions.append("no-skill：未观察到技能读取；本分支未检查全部未读技能，不能据此断言能力缺失。创建只是候选建议。")
+            if decisions:
+                self.block("SkillClaw 决策边界", decisions)
         if value.response and value.response.record_ref and value.response.record_ref.kind == "tool_construction":
             construction = json.loads(self.artifacts.get(value.response.record_ref))
             lines = [f"上游版本：{construction['upstream_revision']}；状态：{construction['status']}",
@@ -409,6 +422,20 @@ class EvolutionTextReport:
                     old, new = pair.baseline, pair.candidate
                     delta = f"{new.evaluation.score - old.evaluation.score:+.3f}" if old.evaluation and new.evaluation else "未知"
                     self.write(f"{pair.group} | {old.task.task_id} | {score(old)} → {score(new)} | {delta} | {termination(new)} | {new.seed} | {'命中' if pair.baseline_cached else '未命中'} | {'命中' if pair.candidate_cached else '未命中'}\n")
+                skill_rows = []
+                for pair, _ in pairs:
+                    if pair.skill_usage is None:
+                        continue
+                    for name, usage in pair.skill_usage["skills"].items():
+                        old, new = usage["baseline"], usage["candidate"]
+                        skill_rows.append(f"{pair.group}/{pair.baseline.task.task_id} | {name} | {new['discovered']} | "
+                            f"{old['read_verified']} → {new['read_verified']} | {new['library_matches']} | "
+                            f"{usage['body_attribution']} | 描述变化={usage['change']['description_changed']}；选择变化={usage['selection_changed']}")
+                if skill_rows:
+                    self.block(alias + " 技能执行证据", [
+                        "分数变化不等于技能收益。未读取不支持正文改善归因；摘要核验通过的读取也不证明实际采用或因果收益。描述变化需结合选择记录分析。",
+                        "发现表示传输层发现服务或提交目录，不表示模型关注；None 表示缺少记录。",
+                        "任务 | 技能 | 候选发现 | 核验读取（旧→新） | 候选库匹配 | 正文归因边界 | 选择分析", *skill_rows])
                 lines = [f"状态：{report.status.value}；完整批次：{batch_label}"]
                 local = next((pair for pair, _ in pairs if pair.group == "local"), None)
                 if local:

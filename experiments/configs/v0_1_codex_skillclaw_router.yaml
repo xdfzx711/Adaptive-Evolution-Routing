@@ -1,0 +1,107 @@
+# Codex executes tasks. Qwen diagnoses, routes, and drives the selected evolver.
+# All four targets compete; only the selected operator runs in each round.
+schema_version: aer.v0.1
+experiment:
+  id: aer-v0.1-codex-skillclaw-router
+  seed: 42
+  runner: aer
+benchmark:
+  plugin: hard_local
+  execution_split: dev
+  task_ids: null
+state:
+  task_mode: independent
+agent:
+  plugin: codex_cli_agent
+  initial_prompt: Complete the public task using tools when useful. Return only a JSON object matching the public output requirements.
+  initial_snapshot_ref: null
+  config:
+    windows_sandbox: mxc
+    initial_model: gpt-6.1-sol
+    allowed_models: [gpt-6.1-sol, gpt-6-sol, gpt-6-luna, gpt-5.6-sol]
+    timeout_seconds: 300.0
+    skills:
+      initial_library: ../skills
+      mode: on_demand
+    tooling:
+      catalog:
+        python_structure: {kind: local, plugin: python_structure}
+        python_syntax_check: {kind: local, plugin: python_syntax_check}
+      generated_tools:
+        enabled: true
+        runtime: python_jupyter
+    initial_tools: []
+providers:
+  model:
+    plugin: qwen_model
+    model_id: ${QWEN_MODEL}
+    config:
+      dotenv_path: ../../.env
+      api_key_env: QWEN_API_KEY
+      base_url_env: QWEN_BASE_URL
+      temperature: 0.0
+      enable_thinking: false
+      send_seed: false
+      response_format: null
+  tools:
+    plugin: deterministic_tools
+    enabled: []
+assessment:
+  evaluator: deterministic_evaluator
+  diagnoser: llm_diagnoser
+evolution:
+  mode: llm
+  max_candidates_per_round: 1
+  stop_on_success: true
+routing:
+  plugin: llm_router
+  fixed_target: null
+  manual_decisions: []
+targets:
+  allowed: [prompt, tool, skill, model]
+  default_operators:
+    prompt: simple_prompt_evolver
+    tool: oscopilot_tool_evolver
+    skill: skillclaw_skill_evolver
+    model: model_selection_evolver
+  operator_configs:
+    skill:
+      max_skill_changes: 4
+      max_model_calls: 8
+      max_tokens: 48000
+      max_output_tokens: 4096
+      timeout_seconds: 180.0
+      model_timeout_seconds: 60.0
+      verify_candidates: false
+    tool:
+      max_model_calls: 20
+      max_tokens: 20000
+      max_output_tokens: 4096
+      timeout_seconds: 300.0
+      model_timeout_seconds: 60.0
+validation:
+  plugin: paired_validation
+  split: validation
+  group_field: validation_group
+  similar_group: similar
+  regression_group: regression
+  acceptance_policy: improvement_with_regression_guard
+  policy_version: v0.1
+  min_improvement: 0.01
+  max_regression_drop: 0.0
+feedback:
+  policy: dev_feedback_and_validation_summary
+limits:
+  max_evolution_rounds: 3
+  max_tokens: 160000
+  max_tool_calls: 100
+  max_elapsed_seconds: 1200.0
+  model_call_timeout_seconds: 60.0
+  tool_call_timeout_seconds: 5.0
+  max_output_tokens_per_call: 4096
+  max_consecutive_no_commit_rounds: 2
+storage:
+  root: ../../runs
+  experience: jsonl
+  artifacts: local_files
+  versions: local_manifest

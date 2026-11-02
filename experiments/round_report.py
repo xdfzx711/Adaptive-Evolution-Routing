@@ -199,6 +199,9 @@ class RoundReport:
         if response and response.record_ref and response.record_ref.kind == "tool_construction":
             self.link(response.record_ref)
             self.data["generation"]["tool_construction"] = json.loads(self.artifacts.get(response.record_ref))
+        if response and response.record_ref and response.record_ref.kind == "skill_evolution":
+            self.link(response.record_ref)
+            self.data["generation"]["skill_evolution"] = json.loads(self.artifacts.get(response.record_ref))
         if value.attempt:
             self.link(value.attempt.pre_state_ref)
         if response:
@@ -240,7 +243,8 @@ class RoundReport:
                         "input": public_inputs.get(pair.baseline.task.task_id),
                         "seed": pair.baseline.seed, "baseline_cached": pair.baseline_cached,
                         "candidate_cached": pair.candidate_cached,
-                        "baseline": scored_view(pair.baseline), "candidate": scored_view(pair.candidate)})
+                        "baseline": scored_view(pair.baseline), "candidate": scored_view(pair.candidate),
+                        **({"skill_usage": plain(pair)["skill_usage"]} if pair.skill_usage is not None else {})})
             entry["validation"] = {"status": report.status.value,
                 "baseline_metrics": plain(report.baseline_metrics), "candidate_metrics": plain(report.candidate_metrics),
                 "current_task_metrics": plain(report.local_metrics), "tasks": tasks,

@@ -80,13 +80,13 @@ def register_execution_plugins(registry: PluginRegistry) -> None:
     ]:
         registry.register(PluginMetadata(id=plugin_id, category="agent", api_version=API_VERSION,
             plugin_version="0.1.0", capabilities=PluginCapabilities(
-                targets=["prompt"], fixed_max_steps=steps),
+                targets=["prompt", "skill"] if plugin_id == "react_agent" else ["prompt"], fixed_max_steps=steps),
             dependencies=tuple(deps)), factory, config_model=LocalAgentSettings, dependency_types=deps,
             snapshot_config=snapshot_config, initial_artifacts=initial_artifacts)
     codex_deps = {"initial_snapshot": AgentSnapshot, "artifact_store": ArtifactStore,
                   "workspace_provider": WorkspaceProvider, "result_collector": ResultCollector}
     registry.register(PluginMetadata(id="codex_cli_agent", category="agent", api_version=API_VERSION,
-        plugin_version="0.3.0", capabilities=PluginCapabilities(targets=["prompt", "model", "tool"]),
+        plugin_version="0.3.0", capabilities=PluginCapabilities(targets=["prompt", "model", "tool", "skill"]),
         dependencies=tuple(codex_deps)), build_codex, config_model=CodexAgentSettings, dependency_types=codex_deps,
         snapshot_config=codex.snapshot_config, initial_artifacts=codex.initial_artifacts)
     registry.register(PluginMetadata(id="lightweight_diagnoser", category="diagnoser", api_version=API_VERSION,

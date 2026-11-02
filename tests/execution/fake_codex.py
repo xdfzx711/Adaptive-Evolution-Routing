@@ -50,7 +50,7 @@ async def exercise_tools(config, workspace, *, call=True):
             return [tool.name for tool in tools]
 
 
-async def exercise_skills(config, *, call=True):
+async def exercise_skills(config, *, call=True, name="test-skill"):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
     selected = next(tomllib.loads(value)["mcp_servers"]["aer_skills"] for value in config
@@ -60,10 +60,11 @@ async def exercise_skills(config, *, call=True):
             await session.initialize()
             await session.list_tools()
             if call:
-                result = await session.call_tool("read_skill", {"name": "test-skill"})
+                result = await session.call_tool("read_skill", {"name": name})
                 emit({"type": "item.completed", "item": {"id": "skill-1", "type": "mcp_tool_call",
-                    "server": "aer_skills", "tool": "read_skill", "arguments": {"name": "test-skill"},
+                    "server": "aer_skills", "tool": "read_skill", "arguments": {"name": name},
                     "result": result.model_dump(mode="json"), "status": "failed" if result.isError else "completed"}})
+                return result.structuredContent
 
 
 def main():
@@ -95,9 +96,11 @@ def main():
     prompt = next(value for value in config if value.startswith("developer_instructions="))
     is_dev = task.get("public_metadata", {}).get("split") == "dev"
     emit({"type": "thread.started", "thread_id": "fixture-thread"})
+    skill_result = {}
     if not mode.startswith("skills") and any(value.startswith("mcp_servers.aer_skills=") for value in config):
         import asyncio
-        asyncio.run(exercise_skills(config, call=False))
+        skill_result = asyncio.run(exercise_skills(config, call=mode.startswith("skill-evolution"),
+            name="task-output-contract")) or {}
     if mode.startswith("skills"):
         import asyncio
         if mode != "skills-ignored":
@@ -146,9 +149,10 @@ def main():
         answer = {"name": re.search(r"Name:\s*([A-Za-z]+)", data["text"]).group(1),
                   "count": int(re.search(r"Count:\s*(\d+)", data["text"]).group(1))}
     is_similar = task.get("public_metadata", {}).get("validation_group") == "similar"
-    weak_selection = (not available if mode.startswith("tools") else
+    weak_selection = ("AER_SKILL_IMPROVED" not in skill_result.get("content", "") if mode.startswith("skill-evolution") else
+                      not available if mode.startswith("tools") else
                       effort != "high" if mode.startswith("reasoning") else model == "gpt-5.6-sol")
-    if mode in {"reject", "tools-reject"} or (weak_selection and (is_dev or is_similar)) or (is_dev and mode in {"local-failure", "reasoning-local-failure"} and "IMPROVED" not in prompt):
+    if mode in {"reject", "tools-reject", "skill-evolution-reject"} or (weak_selection and (is_dev or is_similar)) or (is_dev and mode in {"local-failure", "reasoning-local-failure"} and "IMPROVED" not in prompt):
         answer = {"answer": -999}
     emit({"type": "item.started", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "status": "in_progress"}})
     emit({"type": "item.completed", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "aggregated_output": "checked public input", "exit_code": 1 if mode == "tool-error" else 0, "status": "completed"}})

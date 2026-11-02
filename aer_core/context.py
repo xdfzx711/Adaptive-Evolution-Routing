@@ -119,7 +119,8 @@ class ContextBuilder:
                 stable_version_after=stable_after, attempt_status=attempt.status,
                 error_code=attempt.error.code if attempt.error else None,
                 construction_feedback=limit_construction_feedback(attempt.construction_feedback,
-                    self.policy.history_max_construction_chars) if "tool" in self.policy.artifact_kinds else None,
+                    self.policy.history_max_construction_chars) if attempt.construction_feedback is not None and
+                    attempt.construction_feedback.component in self.policy.artifact_kinds else None,
                 routing_rationale_truncated=bool(attempt.decision and len(attempt.decision.rationale) > self.policy.history_max_text_chars)))
         ordered = sorted(summaries, key=lambda item: (item.completed_at, item.episode_id, item.round_id, item.attempt_id))
         return tuple(ordered[-self.policy.history_max_attempts:]) if self.policy.history_max_attempts else ()

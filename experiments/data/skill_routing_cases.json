@@ -1,0 +1,74 @@
+[
+  {
+    "id": "case-01",
+    "instruction": "Migrate an Acme Ledger v2 record to v3 using the supplied migration specification. Preserve the currency code and convert legacy balance_milli to integer balance_cents with half-up rounding. This migration recurs across repositories.",
+    "skill_body": "For Acme Ledger migrations, rename account_key to account_id. Copy the numeric balance unchanged into balance_cents. Preserve the currency code.",
+    "read": true,
+    "discovered": true,
+    "observation": "The Agent read ledger-migration and copied the legacy numeric balance unchanged, citing that instruction. It renamed the account field and preserved the currency. File access and editing tools completed successfully. The public migration check reports the balance unit conversion is wrong.",
+    "feedback": "Migration failed the public balance-unit check; field renaming and currency preservation passed.",
+    "success": false,
+    "expected_targets": ["skill"],
+    "review_note": "Read skill contains an incorrect reusable domain procedure; changing general instructions or adding tools does not repair that knowledge."
+  },
+  {
+    "id": "case-02",
+    "instruction": "Migrate an Acme Ledger v2 record to v3. Convert balance_milli to integer balance_cents by dividing by 10 with half-up rounding, preserve currency, and rename account_key to account_id.",
+    "skill_body": "For Acme Ledger migrations, rename account_key to account_id. Convert balance_milli to balance_cents by dividing by 10 using half-up rounding. Preserve the currency code. Verify the conversion before finalizing.",
+    "read": true,
+    "discovered": true,
+    "observation": "The full ledger-migration skill was read successfully. The Agent acknowledged the conversion rule, then chose to copy the numeric balance unchanged to finish early and skipped verification. Its edits preserved currency and renamed the field. All tools worked.",
+    "feedback": "Migration failed the public balance-unit check. The visible trace shows the stated conversion rule was ignored.",
+    "success": false,
+    "expected_targets": ["prompt"],
+    "review_note": "Correct domain guidance was available and read; the observed problem is execution strategy and adherence, not missing skill text."
+  },
+  {
+    "id": "case-03",
+    "instruction": "Apply the same documented Acme Ledger conversion to 50000 records and produce a machine-checkable report of invalid rows.",
+    "skill_body": "For Acme Ledger migrations, rename account_key to account_id. Convert balance_milli to balance_cents by dividing by 10 using half-up rounding. Preserve currency. Apply the transformation and schema checks to every row.",
+    "read": true,
+    "discovered": true,
+    "observation": "The Agent read and correctly explained the migration procedure. A public dry run on two rows passed. Processing the full file manually exceeded the execution limit. The existing tool catalog contains syntax and source-structure analysis only; no reusable batch migration and row validation tool exists. The environment can run generated Python tools.",
+    "feedback": "Full-file processing incomplete; the sampled transformation was correct. A batch processing capability is required for repeated runs.",
+    "success": false,
+    "expected_targets": ["tool"],
+    "review_note": "Executable batch processing is the missing capability; the migration instructions already cover the procedure."
+  },
+  {
+    "id": "case-04",
+    "instruction": "Migrate an Acme Ledger v2 record to v3 using the documented balance conversion.",
+    "skill_body": "For Acme Ledger migrations, rename account_key to account_id. Convert balance_milli to balance_cents by dividing by 10 using half-up rounding. Preserve the currency code.",
+    "read": false,
+    "discovered": true,
+    "observation": "The catalog exposed ledger-migration with a matching description. The Agent explicitly chose to ignore the available skill and guessed a balance conversion. There was no read_skill call. The skill service was ready and other tools worked.",
+    "feedback": "The balance conversion is incorrect. No skill was read.",
+    "success": false,
+    "expected_targets": ["prompt"],
+    "review_note": "The existing skill contains the procedure; no read does not imply a missing skill. Inspect the rationale for unsupported claims of a knowledge gap."
+  },
+  {
+    "id": "case-05",
+    "instruction": "Migrate an Acme Ledger record to the requested version.",
+    "skill_body": "Follow the migration specification for the requested version. Preserve currency and verify the schema.",
+    "read": null,
+    "discovered": null,
+    "observation": "The legacy execution record has no skill-discovery or read telemetry and no detailed failure trace. Only the failed public check is available.",
+    "feedback": "Migration failed; no detailed public failure evidence is available.",
+    "success": false,
+    "expected_targets": [],
+    "review_note": "Manual review: rationale must acknowledge uncertainty; missing telemetry must not become a claim that no skill exists or was read. Any selected direction is only an investigation."
+  },
+  {
+    "id": "case-06",
+    "instruction": "Migrate an Acme Ledger v2 record to v3 using the documented balance conversion.",
+    "skill_body": "For Acme Ledger migrations, rename account_key to account_id. Convert balance_milli to balance_cents by dividing by 10 using half-up rounding. Preserve the currency code.",
+    "read": true,
+    "discovered": true,
+    "observation": "The Agent read ledger-migration, applied the documented conversion, and passed all public checks without retries or tool errors.",
+    "feedback": "All public checks passed. This routing probe deliberately examines a successful execution.",
+    "success": true,
+    "expected_targets": [],
+    "review_note": "Manual review: Router must still choose a feasible direction under its current protocol, but should acknowledge the absence of failure evidence and that the evolver may skip."
+  }
+]

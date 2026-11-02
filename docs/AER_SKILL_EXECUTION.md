@@ -1,6 +1,6 @@
 # 固定技能执行
 
-技能内容由 AER 的 Snapshot 管理。第一阶段支持固定技能库的导入、发现、读取和版本隔离；尚未注册 skill Evolver，也不将 skill 加入 targets.allowed。
+技能内容由 AER 的 Snapshot 管理。固定技能执行支持导入、发现、读取和版本隔离。默认实验不自动进化技能；需要进化时显式选择 [SkillClaw 固定目标或自适应路由配置](AER_SKILLCLAW_EVOLUTION.md)。
 
 ## 配置
 

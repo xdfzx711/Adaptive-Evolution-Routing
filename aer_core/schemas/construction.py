@@ -26,7 +26,7 @@ class ConstructionIssue(DomainModel):
 
 class ConstructionFeedback(DomainModel):
     version: Literal["aer.construction_feedback.v1"] = "aer.construction_feedback.v1"
-    component: Literal["tool"] = "tool"
+    component: Literal["tool", "skill"] = "tool"
     operator_id: Identifier
     outcome: Literal["completed", "empty", "error", "budget_interrupted"]
     issues: Items[ConstructionIssue] = ()
@@ -37,6 +37,9 @@ class ConstructionFeedback(DomainModel):
 
     @model_validator(mode="after")
     def public_receipt(self):
-        if self.record_ref is not None and self.record_ref.kind != "tool_construction":
-            raise ValueError("Construction feedback may reference only a tool_construction receipt")
+        expected = "tool_construction" if self.component == "tool" else "skill_evolution"
+        if self.record_ref is not None and self.record_ref.kind != expected:
+            raise ValueError("Construction feedback may reference only a " + expected + " receipt")
+        if self.component == "skill" and self.exported_tools:
+            raise ValueError("Skill evolution feedback cannot export tools")
         return self

@@ -1,3 +1,6 @@
 [submodule "third_party/OS-Copilot"]
 	path = third_party/OS-Copilot
 	url = https://github.com/OS-Copilot/OS-Copilot.git
+[submodule "third_party/SkillClaw"]
+	path = third_party/SkillClaw
+	url = https://github.com/AMAP-ML/SkillClaw.git

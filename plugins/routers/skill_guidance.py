@@ -1,0 +1,22 @@
+"""Shared routing guidance, enabled only when skill evolution is feasible."""
+
+SKILL_ROUTING_GUIDANCE = (
+    " Compare skill with prompt, tool and model using their actual target_descriptions. "
+    "Skill evolution addresses reusable domain knowledge, environment procedures, or incorrect/missing guidance "
+    "in the skill library; prompt evolution addresses general task instructions, output contracts and Agent strategy. "
+    "Tool evolution addresses executable capabilities or tool availability, within the configured operator's scope. "
+    "A documented procedure missing from a read skill can support skill evolution; an Agent ignoring correct "
+    "instructions already present in a read skill is not evidence that the skill needs more text. "
+    "Inspect available_skills, skill_discovered, read_skills, skill_reads and current skill contents together. "
+    "No read does not prove a missing skill: description mismatch, Agent selection, unavailable service or missing "
+    "telemetry are alternative explanations. Missing telemetry means unknown, not false. "
+    "Respect the configured skill operator's boundaries in target_descriptions, including its no-skill behavior. "
+    "Do not assume it can inspect and optimize all unread descriptions unless that capability is advertised. "
+    "Routing selects an investigation direction, not a mandatory edit or proof of a knowledge gap. "
+    "The evolver may skip for adequate skills, Agent behavior or insufficient evidence. Consider prior skip reasons "
+    "and rejected attempts; do not repeat an unsupported diagnosis as fact. "
+    "In the rationale identify the supporting observations, relevant skill names when known, the distinction from "
+    "competing targets, and any uncertainty. If evidence is weak, say so instead of claiming a missing capability. "
+    "Scores alone do not prove skill benefit: an unread changed body cannot explain an improvement; description "
+    "changes may affect selection, and even a verified read does not establish causality."
+)

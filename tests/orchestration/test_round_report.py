@@ -23,6 +23,7 @@ class RoundReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             _, startup = configured(Path(directory), rounds=2)
             task = startup.prepare_task("dev-001")
+            skill_id = task.execution.storage.version_store.stable().artifacts["skill"].artifact_id
             attach_model(task, always_wrong=True)
             result = task.run()
             root = startup.execution.storage.run_root
@@ -34,9 +35,27 @@ class RoundReportTests(unittest.TestCase):
                 data = json.loads(text)
                 self.assertTrue(text.startswith('{\n  "round":'))
                 self.assertEqual(len(list(path.parent.glob("*.json"))), 1)
+                # Frozen skill identity is intentional execution evidence. Keep
+                # it verifiable while excluding unrelated internal machine IDs.
+                skill_ids = []
+                def without_skill_identity(value, parent=None):
+                    if isinstance(value, list):
+                        return [without_skill_identity(item) for item in value]
+                    if isinstance(value, dict):
+                        result = {}
+                        for key, item in value.items():
+                            if parent == "state_summary" and key == "skill_library_artifact_id":
+                                skill_ids.append(item)
+                            else:
+                                result[key] = without_skill_identity(item, key)
+                        return result
+                    return value
+                identity_checked = json.dumps(without_skill_identity(data), ensure_ascii=False)
+                self.assertTrue(skill_ids)
+                self.assertEqual(set(skill_ids), {skill_id})
                 for technical in ('"candidate_ids"', '"artifact_id"', '"operation_id"', '"attempt_id"',
                                   '"config_schema"', '"scoring_specs"', '"private_parameters"', 'sha256-', '.bin'):
-                    self.assertNotIn(technical, text)
+                    self.assertNotIn(technical, identity_checked)
                 candidate = data["candidates"][0]
                 self.assertIn(f"round {number}", candidate["components"]["prompt"])
                 self.assertEqual(candidate["status"], "rejected")

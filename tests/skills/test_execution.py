@@ -79,7 +79,7 @@ class SkillExecutionTests(unittest.TestCase):
             self.assertEqual(result.usage.model_calls, 2)
         self.assertNotIn("VERSION_A", model.requests[0][0].messages[0].content)
         self.assertEqual(agent.capabilities().skill_delivery.transport, "tool")
-        self.assertNotIn("skill", agent.capabilities().supported_targets)
+        self.assertIn("skill", agent.capabilities().supported_targets)
 
     def test_concurrent_executions_do_not_share_read_receipts(self):
         agent, snapshot, _ = fixture(reading_model())

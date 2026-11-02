@@ -212,7 +212,7 @@ class CodexCliAgent:
         # Registration describes plugin support. TargetRegistry separately requires
         # a configured tool artifact before exposing this target to a Router.
         components = ["prompt", "model", "tool"]
-        return AgentCapabilities(supported_targets=components,
+        return AgentCapabilities(supported_targets=[*components, *(["skill"] if self.settings.skills is not None else [])],
             supported_artifact_kinds=[*components, *(["skill"] if self.settings.skills is not None else [])],
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "execution_platform", "execution_shell", "termination_reason", "fresh_session", "seed_supported",
@@ -564,7 +564,8 @@ class CodexCliAgent:
                 "tool_calls_scope": "visible_cli_items", "startup_attempts": startup_attempts,
                 "session_started": session_started, "turn_started": turn_started,
                 "shutdown_after_terminal_event": terminal_shutdown,
-                **(skills.summary("mcp", setup_status=skill_report["status"] if skill_report else "error") if skills else {}),
+                **(skills.summary("mcp", setup_status=skill_report["status"] if skill_report else "error",
+                    discovered=skill_report.get("discovered") if skill_report else None) if skills else {}),
                 **({"selected_tools": list(selected_tools.enabled_tools),
                     **({"generated_tool_catalog": {name: tool.descriptor().model_dump(mode="json")
                         for name, tool in generated_tools(selected_tools).items()}}

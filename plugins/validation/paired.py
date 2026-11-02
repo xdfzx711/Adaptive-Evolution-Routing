@@ -13,6 +13,8 @@ from aer_core.schemas.paired import PairedTaskResult, ScoredExecution, Validatio
 from aer_core.schemas.usage import ResourceUsage
 from aer_core.schemas.validation import LocalValidationMetrics, ValidationMetrics, ValidationPlan, ValidationReport
 from aer_core.usage import sum_usage
+from aer_core.skill_usage import paired_skill_usage
+from plugins.skills.library import decode_library
 from plugins.storage._files import canonical_bytes
 
 
@@ -100,14 +102,22 @@ class PairedValidation:
         reports = []
         for index, candidate in enumerate(candidates):
             version = snapshots[candidate.candidate_id]
+            skill_libraries = (decode_library(self.artifacts.get(stable.artifacts["skill"])),
+                decode_library(self.artifacts.get(version.artifacts["skill"]))) if candidate.target == "skill" else None
             pairs, candidate_costs = [], []
             for (group, task, seed), (_, old), hit in zip(jobs, baseline, cached):
                 context = replace(run_ctx, stage=group + "_validation", seed=seed,
                     operation_id=run_ctx.operation_id + "/" + candidate.candidate_id + "/" + task.benchmark_id + "/" + task.task_id)
                 new = self._execute(task, version, context)
                 candidate_costs.append(new.charged_usage)
+                skill_usage = paired_skill_usage(old, new, stable, version, *skill_libraries) if skill_libraries else None
+                if skill_usage and not skill_usage["integrity_ok"]:
+                    # Wrong-version reads invalidate the comparison; absence of
+                    # reads only limits attribution and does not invent a score.
+                    new = new.replace(error=ValidationError("Skill validation evidence does not match the expected Snapshot/library/content",
+                        stage=context.stage, operation_id=context.operation_id).to_info())
                 pairs.append(PairedTaskResult(group=group, baseline=old, candidate=new, baseline_cached=hit,
-                                            candidate_cached=new.cache_hit))
+                                            candidate_cached=new.cache_hit, skill_usage=skill_usage))
             complete = baseline_complete and all(pair.candidate.complete for pair in pairs)
             # Shared baseline calls are charged once, to the first report in this batch.
             usage = sum_usage(candidate_costs + (charged if index == 0 else []))

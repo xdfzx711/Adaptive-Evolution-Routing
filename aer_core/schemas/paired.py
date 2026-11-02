@@ -53,6 +53,7 @@ class PairedTaskResult(DomainModel):
     candidate: ScoredExecution
     baseline_cached: bool
     candidate_cached: bool = False
+    skill_usage: JsonObject | None = None
 
     @model_validator(mode="after")
     def paired(self):

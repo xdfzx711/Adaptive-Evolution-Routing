@@ -1,5 +1,7 @@
 # Adaptive Evolution Routing
 
+SkillClaw 技能进化插件、固定目标与自适应路由实验入口见 [接入说明](docs/AER_SKILLCLAW_EVOLUTION.md)。自适应配置让 Skill 与 Prompt、OS-Copilot Tool、Model 共同竞争；执行任务使用 Codex，路由和进化使用 AER 的 Qwen 接口，候选通过现有验证后晋升。另提供 Router 合成对照检查命令；现有实验配置保持不变。
+
 实验默认加载 `experiments/skills/` 技能库：ReAct 按需读取、Codex MCP 读取，SingleCall 默认预加载 `task-output-contract`。技能内容随 Snapshot 冻结；设置 `agent.config.skills: null` 可关闭。配置、隔离及测试见 [技能执行说明](docs/AER_SKILL_EXECUTION.md)。
 
 OS-Copilot 工具演化插件与独立原生 baseline 入口见 [接入说明](docs/AER_OSCOPILOT_TOOL_EVOLUTION.md)。完整上游通过固定版本的 Git submodule 管理。

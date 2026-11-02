@@ -116,7 +116,7 @@ class ReActAgent:
     def capabilities(self) -> AgentCapabilities:
         enabled = self.skill_settings is not None
         preload = enabled and self.skill_settings.mode == "preload"
-        return AgentCapabilities(supported_targets=["prompt"], supported_artifact_kinds=["prompt", "skill"] if enabled else ["prompt"],
+        return AgentCapabilities(supported_targets=["prompt", "skill"] if enabled and not preload else ["prompt"], supported_artifact_kinds=["prompt", "skill"] if enabled else ["prompt"],
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "model_steps", "effective_max_steps", "termination_reason", "fresh_session", *(STATE_FIELDS if enabled else ())],
             feedback_tool_arguments={READ_TOOL: ["name"]} if enabled else {},
@@ -257,7 +257,8 @@ class ReActAgent:
             state_summary={"agent_plugin": self.plugin_id, "model_steps": steps,
                            "effective_max_steps": max_steps,
                            "termination_reason": termination, "fresh_session": True,
-                           **(skills.summary("preload" if self.skill_settings.mode == "preload" else "tool") if skills else {})},
+                           **(skills.summary("preload" if self.skill_settings.mode == "preload" else "tool",
+                               discovered=any(event.kind == "model_request" for event in record.events)) if skills else {})},
             usage=usage, status=status, error=error_info)
 
 

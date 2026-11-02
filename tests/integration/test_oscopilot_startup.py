@@ -222,6 +222,9 @@ class OSCopilotIntegrationTests(unittest.TestCase):
             path = configured(Path(directory), "tools-reject")
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
             data["limits"]["max_evolution_rounds"] = 2
+            # Exercise candidate rejection and second-round history, not the
+            # separate construction-budget guard. History enlarges the prompt.
+            data["targets"]["operator_configs"]["tool"]["max_tokens"] = 40000
             path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
             startup = prepare_orchestrator(path, run_id="oscopilot-reject", console=False)
             task = startup.prepare_task("dev-001")
