@@ -15,6 +15,7 @@ class TaskFeedbackPolicy(DomainModel):
 
 
 class ContextPolicy(DomainModel):
+    evaluator_id: Identifier | None = None
     task: TaskIdentity | None = None
     metadata_fields: Items[Identifier] = ("category", "source_id", "split")
     output_fields: Items[Identifier]

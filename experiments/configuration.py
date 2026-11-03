@@ -2,8 +2,12 @@
 
 from pathlib import Path
 from dataclasses import replace
+import os
+import re
+from dotenv import dotenv_values
 
 from aer_core.config import LoadedConfig, load_config
+from aer_core.errors import ConfigError, ConfigIssue
 from plugins.catalog import v0_1_catalog
 from .bootstrap import create_registry
 from .environment import resolve_model
@@ -19,7 +23,7 @@ def load_experiment_config(
 
 
 def resolve_skills(loaded: LoadedConfig) -> LoadedConfig:
-    """Apply experiment defaults; explicit null disables skills, {} stays empty."""
+    """Resolve Agent libraries and embeddings; null disables default skills."""
     # Plugin input paths belong to the composition boundary, not core YAML semantics.
     if loaded.config.agent.plugin in {"react_agent", "single_call_agent", "codex_cli_agent"}:
         settings = dict(loaded.config.agent.config)
@@ -33,6 +37,26 @@ def resolve_skills(loaded: LoadedConfig) -> LoadedConfig:
             if not source.is_absolute():
                 source = loaded.source_path.parent / source
             settings["skills"] = {**skills, "initial_library": str(source.resolve())}
+        memory = settings.get("memory")
+        if "memory" in loaded.config.targets.allowed and memory is None:
+            raise ConfigError(loaded.source_path, [ConfigIssue("agent.config.memory",
+                "The memory target requires an explicit memory library and embedding configuration")])
+        if memory is not None:
+            memory = {**memory, "embedding": dict(memory["embedding"])}
+            if memory.get("initial_library"):
+                source = Path(memory["initial_library"]).expanduser()
+                memory["initial_library"] = str((loaded.source_path.parent / source).resolve() if not source.is_absolute() else source.resolve())
+            embedding = memory["embedding"]
+            if embedding.get("dotenv_path"):
+                source = Path(embedding["dotenv_path"]).expanduser()
+                embedding["dotenv_path"] = str((loaded.source_path.parent / source).resolve() if not source.is_absolute() else source.resolve())
+            match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z_0-9]*)\}", embedding["model_id"])
+            if match:
+                values = dotenv_values(embedding.get("dotenv_path"), interpolate=False) if embedding.get("dotenv_path") else {}
+                value = os.environ.get(match[1], values.get(match[1]))
+                if value and value.strip():
+                    embedding["model_id"] = value.strip()
+            settings["memory"] = memory
         loaded = replace(loaded, config=loaded.config.model_copy(update={
             "agent": loaded.config.agent.model_copy(update={"config": settings})}))
     return loaded

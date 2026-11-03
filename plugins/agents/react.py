@@ -23,12 +23,16 @@ from plugins.json_output import parse_final
 from plugins.skills.library import SkillsConfig, initial_skill_artifacts
 from plugins.skills.runtime import SkillRuntime, READ_SPEC, READ_TOOL, STATE_FIELDS, RUNTIME_VERSION
 from aer_core.schemas.skills import SkillDeliveryCapabilities
+from plugins.memory.library import MemoryConfig, initial_memory_artifacts
+from plugins.memory.runtime import MemoryRuntime, STATE_FIELDS as MEMORY_STATE_FIELDS
 
 
 def snapshot_config(config):
     values = {"max_steps": config.agent.max_steps, "model": config.providers.model.model_dump(mode="json"),
             "tools": config.providers.tools.model_dump(mode="json")}
     settings = LocalConfig.model_validate(config.agent.config)
+    if settings.memory is not None:
+        values["memory"] = settings.memory.controlled()
     if settings.skills is not None:
         values["skills"] = settings.skills.controlled()
     return values
@@ -37,10 +41,12 @@ def snapshot_config(config):
 def initial_artifacts(config):
     components = {"prompt": config.agent.initial_prompt.encode("utf-8")}
     components.update(initial_skill_artifacts(LocalConfig.model_validate(config.agent.config).skills))
+    components.update(initial_memory_artifacts(LocalConfig.model_validate(config.agent.config).memory))
     return components
 
 
 class ControlledConfig(DomainModel):
+    memory: MemoryConfig | None = None
     max_steps: PositiveInt
     model: ModelProviderSettings
     tools: ToolProviderSettings
@@ -48,6 +54,7 @@ class ControlledConfig(DomainModel):
 
 
 class LocalConfig(Settings):
+    memory: MemoryConfig | None = None
     skills: SkillsConfig | None = None
 
 
@@ -75,6 +82,8 @@ class ReActAgent:
         self.model = model_provider
         self.tools = tool_provider
         self.skill_settings = LocalConfig.model_validate(config.config).skills
+        memory_settings = LocalConfig.model_validate(config.config).memory
+        self.memory = MemoryRuntime(memory_settings, artifact_store) if memory_settings is not None else None
         if not self.uses_tools and self.skill_settings is not None and self.skill_settings.mode != "preload":
             raise UnsupportedCapability("Single-call skills require explicit preload mode", stage="setup", plugin_id=self.plugin_id)
         if self.uses_tools and self.tools is None:
@@ -94,6 +103,10 @@ class ReActAgent:
 
     def _validate_snapshot(self, snapshot: AgentSnapshot) -> ControlledConfig:
         controlled = self._controlled(snapshot)
+        if (controlled.memory.controlled() if controlled.memory else None) != (self.memory.config.controlled() if self.memory else None):
+            raise UnsupportedCapability("Snapshot memory configuration differs from Agent settings", stage="setup", plugin_id=self.plugin_id)
+        if self.memory:
+            self.memory.validate(snapshot)
         expected_skills = self.skill_settings.controlled() if self.skill_settings is not None else None
         if (controlled.skills.controlled() if controlled.skills is not None else None) != expected_skills:
             raise UnsupportedCapability("Snapshot skill delivery differs from Agent settings", stage="setup", plugin_id=self.plugin_id)
@@ -116,16 +129,21 @@ class ReActAgent:
     def capabilities(self) -> AgentCapabilities:
         enabled = self.skill_settings is not None
         preload = enabled and self.skill_settings.mode == "preload"
-        return AgentCapabilities(supported_targets=["prompt", "skill"] if enabled and not preload else ["prompt"], supported_artifact_kinds=["prompt", "skill"] if enabled else ["prompt"],
+        memory = ["memory"] if self.memory else []
+        return AgentCapabilities(supported_targets=[*(["prompt", "skill"] if enabled and not preload else ["prompt"]), "memory"],
+            supported_artifact_kinds=[*(["prompt", "skill"] if enabled else ["prompt"]), *memory],
             can_rebuild_session=True, snapshot_scope="controlled_config",
-            feedback_state_fields=["agent_plugin", "model_steps", "effective_max_steps", "termination_reason", "fresh_session", *(STATE_FIELDS if enabled else ())],
+            feedback_state_fields=["agent_plugin", "model_steps", "effective_max_steps", "termination_reason", "fresh_session", *(STATE_FIELDS if enabled else ()), *(MEMORY_STATE_FIELDS if self.memory else ())],
             feedback_tool_arguments={READ_TOOL: ["name"]} if enabled else {},
             feedback_tool_outputs={READ_TOOL: list(READ_SPEC.feedback_outputs)} if enabled else {},
             skill_delivery=SkillDeliveryCapabilities(transport="preload" if preload else "tool",
                 discovery="explicit" if preload else "catalog", observes_reads=not preload) if enabled else None)
 
     def runtime_info(self):
-        return {"skill_runtime_version": RUNTIME_VERSION} if self.skill_settings is not None else None
+        result = {"skill_runtime_version": RUNTIME_VERSION} if self.skill_settings is not None else {}
+        if self.memory:
+            result["memory_runtime"] = self.memory.runtime_info()
+        return result or None
 
     def snapshot(self) -> AgentSnapshot:
         return self._snapshot
@@ -153,8 +171,12 @@ class ReActAgent:
         termination = "finish"
         error_info = None
         skills = None
+        memory_state = {}
         try:
             prompt = self.artifacts.get(snapshot.artifacts["prompt"]).decode("utf-8")
+            if self.memory:
+                injected, memory_state = self.memory.retrieve(task, snapshot, run_ctx, record)
+                prompt += injected
             if not prompt.strip():
                 raise ValueError("Prompt cannot be blank")
             tool_specs = self.tools.specifications() if self.uses_tools else ()
@@ -254,7 +276,7 @@ class ReActAgent:
             error_info = error_info.replace(usage=usage)
         return ExecutionResult(task_id=task.task_id, agent_version_id=snapshot.version_id,
             operation_id=run_ctx.operation_id, output=output, trajectory=record.events,
-            state_summary={"agent_plugin": self.plugin_id, "model_steps": steps,
+            state_summary={"agent_plugin": self.plugin_id, "model_steps": steps, **memory_state,
                            "effective_max_steps": max_steps,
                            "termination_reason": termination, "fresh_session": True,
                            **(skills.summary("preload" if self.skill_settings.mode == "preload" else "tool",

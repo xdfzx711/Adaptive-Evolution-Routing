@@ -13,6 +13,7 @@ from aer_core.feedback import PUBLIC_REASONS, PublicFeedbackBuilder
 from aer_core.schemas.experience import AttemptFinishedEvent, CandidateEvaluatedEvent, ExperienceQuery, TaskFinishedEvent, VersionCommittedEvent
 from aer_core.schemas.references import AgentSnapshot
 from aer_core.schemas.runtime import RunContext
+from aer_core.schemas.execution import EvaluationSignal
 from aer_core.schemas.task import TaskView
 
 
@@ -152,6 +153,10 @@ class ContextBuilder:
             config={key: controlled[key] for key in self.policy.snapshot_config_fields if key in controlled},
             artifacts={key: ref for key, ref in stable.artifacts.items() if ref.kind in self.policy.artifact_kinds})
         return EvolutionContext(round_id=round_id, task=task_view, stable_snapshot=snapshot,
+            evaluation_signal=EvaluationSignal(**feedback.model_dump(mode="json"),
+                evaluation_id=record.evaluation.evaluation_id,
+                execution_operation_id=record.evaluation.execution_operation_id, evaluator_id=self.policy.evaluator_id)
+                if "memory" in feasible_targets else None,
             execution=view, feedback=feedback, diagnosis=self._diagnosis(record.diagnosis, steps),
             history=self._history(record, round_id, task_mode, cutoff, set(allowed_history_task_ids) | {task.task_id}),
             feasible_targets=feasible_targets, remaining_budget=run_ctx.budget.remaining() if run_ctx.budget else None,

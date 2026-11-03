@@ -150,9 +150,10 @@ def main():
                   "count": int(re.search(r"Count:\s*(\d+)", data["text"]).group(1))}
     is_similar = task.get("public_metadata", {}).get("validation_group") == "similar"
     weak_selection = ("AER_SKILL_IMPROVED" not in skill_result.get("content", "") if mode.startswith("skill-evolution") else
+                      "AER_MEMORY_IMPROVED" not in prompt if mode.startswith("memory-evolution") else
                       not available if mode.startswith("tools") else
                       effort != "high" if mode.startswith("reasoning") else model == "gpt-5.6-sol")
-    if mode in {"reject", "tools-reject", "skill-evolution-reject"} or (weak_selection and (is_dev or is_similar)) or (is_dev and mode in {"local-failure", "reasoning-local-failure"} and "IMPROVED" not in prompt):
+    if mode in {"reject", "tools-reject", "skill-evolution-reject", "memory-evolution-reject"} or (weak_selection and (is_dev or is_similar)) or (is_dev and mode in {"local-failure", "reasoning-local-failure"} and "IMPROVED" not in prompt):
         answer = {"answer": -999}
     emit({"type": "item.started", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "status": "in_progress"}})
     emit({"type": "item.completed", "item": {"id": "command-1", "type": "command_execution", "command": "fixture calculation", "aggregated_output": "checked public input", "exit_code": 1 if mode == "tool-error" else 0, "status": "completed"}})

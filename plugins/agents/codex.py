@@ -36,6 +36,9 @@ from plugins.skills.library import SkillsConfig, initial_skill_artifacts
 from plugins.skills.runtime import SkillRuntime, STATE_FIELDS, RUNTIME_VERSION
 from plugins.skills.codex import CodexSkillSession, repository_skill_overrides
 from aer_core.schemas.skills import SkillDeliveryCapabilities
+from aer_core.usage import sum_usage
+from plugins.memory.library import MemoryConfig, initial_memory_artifacts
+from plugins.memory.runtime import MemoryRuntime, STATE_FIELDS as MEMORY_STATE_FIELDS
 
 
 class CodexConfig(CodexModelSpace):
@@ -53,6 +56,7 @@ class CodexConfig(CodexModelSpace):
     tooling: ToolingConfig | None = None
     initial_tools: list[NonBlank] | None = None
     skills: SkillsConfig | None = None
+    memory: MemoryConfig | None = None
 
     @model_validator(mode="after")
     def valid_catalog(self):
@@ -90,6 +94,10 @@ def snapshot_config(config):
 
 def controlled_config(settings):
     values = settings.model_dump(mode="json", exclude={"initial_model", "initial_reasoning_effort", "initial_tools"})
+    if settings.memory is None:
+        values.pop("memory")
+    else:
+        values["memory"] = settings.memory.controlled()
     if settings.skills is None:
         values.pop("skills")
     else:
@@ -117,6 +125,7 @@ def initial_artifacts(config):
         selection_type = ToolBundle if settings.tooling.generated_tools and settings.tooling.generated_tools.enabled else ToolSelection
         contents["tool"] = CodexToolAdapter().encode(selection_type(enabled_tools=settings.initial_tools or []))
     contents.update(initial_skill_artifacts(settings.skills))
+    contents.update(initial_memory_artifacts(settings.memory))
     return contents
 
 
@@ -183,6 +192,7 @@ class CodexCliAgent:
         if result_collector is None and self.settings.collector.plugin != "json_result_collector":
             raise PluginConfigurationError("Selected result collector must be injected by startup", stage="setup", plugin_id=self.plugin_id)
         self.artifacts = artifacts
+        self.memory = MemoryRuntime(self.settings.memory, artifacts) if self.settings.memory is not None else None
         self.model_adapter = CodexModelAdapter()
         self.tool_adapter = tool_adapter or CodexToolAdapter()
         self.launch_adapter = launch_adapter
@@ -212,13 +222,13 @@ class CodexCliAgent:
     def capabilities(self):
         # Registration describes plugin support. TargetRegistry separately requires
         # a configured tool artifact before exposing this target to a Router.
-        components = ["prompt", "model", "tool"]
-        return AgentCapabilities(supported_targets=[*components, "skill"],
+        components = ["prompt", "model", "tool", *(["memory"] if self.memory else [])]
+        return AgentCapabilities(supported_targets=["prompt", "model", "tool", "skill", "memory"],
             supported_artifact_kinds=[*components, *(["skill"] if self.settings.skills is not None else [])],
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "execution_platform", "execution_shell", "termination_reason", "fresh_session", "seed_supported",
                                    "result_kind", "evaluation_mode", "selected_tools", "available_tools", "tool_setup_status", "tool_setup_error", "tool_invocations", "generated_tool_catalog",
-                                   "tool_discovered", "tool_invocation_count", "tool_invocations_omitted", "tool_metrics", *(STATE_FIELDS if self.settings.skills is not None else ())],
+                                   "tool_discovered", "tool_invocation_count", "tool_invocations_omitted", "tool_metrics", *(STATE_FIELDS if self.settings.skills is not None else ()), *(MEMORY_STATE_FIELDS if self.memory else ())],
             feedback_config_fields=["allowed_models", "allowed_reasoning_efforts", "tool_catalog", "generated_tools_enabled"],
             feedback_tool_arguments={"command_execution": ["command"], "file_change": ["changes"],
                 "web_search": ["query"], "mcp_tool_call": ["server", "tool", "arguments"]},
@@ -236,7 +246,7 @@ class CodexCliAgent:
         if snapshot.agent_plugin_id != self.plugin_id or configuration != self._controlled:
             raise UnsupportedCapability("Codex Snapshot runtime settings differ from the assembled plugin", stage="setup", plugin_id=self.plugin_id)
         required = {"prompt", "model", *({"tool"} if self.settings.tooling is not None else set()),
-                    *({"skill"} if self.settings.skills is not None else set())}
+                    *({"skill"} if self.settings.skills is not None else set()), *({"memory"} if self.memory else set())}
         if any(kind not in snapshot.artifacts or snapshot.artifacts[kind].kind != kind for kind in required):
             raise UnsupportedCapability("Codex requires artifacts for all configured components", stage="setup", plugin_id=self.plugin_id)
         if set(snapshot.artifacts) - required:
@@ -247,6 +257,8 @@ class CodexCliAgent:
                 self.tool_adapter.read(snapshot, self.artifacts)
             if self.settings.skills is not None:
                 SkillRuntime.from_snapshot(snapshot, self.artifacts, "setup")
+            if self.memory:
+                self.memory.validate(snapshot)
         except ValueError as failure:
             raise UnsupportedCapability("Snapshot model, reasoning, tools, or skills are invalid", stage="setup", plugin_id=self.plugin_id) from failure
         prompt = self.artifacts.get(snapshot.artifacts["prompt"]).decode("utf-8")
@@ -272,6 +284,7 @@ class CodexCliAgent:
         fingerprints = {name: hashlib.sha256((home / name).read_bytes()).hexdigest()
                         for name in names if (home / name).is_file()}
         return {"cli_version": self.cli_version, "command": self.command, "config_fingerprints": fingerprints,
+                **({"memory_runtime": self.memory.runtime_info()} if self.memory else {}),
                 **({"skill_runtime_version": RUNTIME_VERSION, "skill_delivery": "mcp",
                     "skip_host_skill_discovery": True, "plugins_enabled": False} if self.settings.skills is not None else {}),
                 "task_permissions_version": "2",
@@ -384,8 +397,12 @@ class CodexCliAgent:
         tool_session, tool_report, selected_tools = None, None, None
         skills, skill_session, skill_report = None, None, None
         launch_session, launch_report = None, None
+        memory_state = {}
         try:
             selection, prompt = self._validate_snapshot(snapshot)
+            if self.memory:
+                injected, memory_state = self.memory.retrieve(task, snapshot, run_ctx, record)
+                prompt += injected
             model_id = selection.model_id
             if self.settings.tooling is not None:
                 selected_tools = self.tool_adapter.read(snapshot, self.artifacts)
@@ -568,11 +585,13 @@ class CodexCliAgent:
             total_tokens=incoming + outgoing if known else None, model_calls=None if process is not None else 0,
             tool_calls=len(tools), elapsed_seconds=monotonic() - record.start, usage_complete=known,
             usage_sources=[] if process is None else ["provider_reported" if known else "unknown"])
+        if self.memory:
+            usage = sum_usage([usage, record.usage()]).replace(elapsed_seconds=monotonic() - record.start)
         if error is not None:
             error = error.replace(usage=usage)
         return ExecutionResult(task_id=task.task_id, agent_version_id=snapshot.version_id,
             operation_id=run_ctx.operation_id, output=output, trajectory=record.events, usage=usage,
-            status=status, error=error, state_summary={"agent_plugin": self.plugin_id, "execution_model": model_id,
+            status=status, error=error, state_summary={"agent_plugin": self.plugin_id, "execution_model": model_id, **memory_state,
                 "execution_platform": os.name, "execution_shell": "powershell" if os.name == "nt" else "native",
                 "execution_reasoning_effort": selection.reasoning_effort if selection else None,
                 "termination_reason": termination, "fresh_session": True, "seed_supported": False,

@@ -240,6 +240,12 @@ class EvolutionTextReport:
             f"Operator：{value.operator_id or '未选择'}；生成状态：{value.response.status.value if value.response else value.status}"])
         from .optimization_report import optimization_record
         optimization = optimization_record(value, self.artifacts)
+        if value.response and value.response.record_ref and value.response.record_ref.kind == "memory_evolution":
+            memory_record = json.loads(self.artifacts.get(value.response.record_ref))
+            signal = (memory_record.get("input") or {}).get("evaluation_signal", {})
+            self.block("ReasoningBank 记忆进化", [f"上游版本：{memory_record['upstream_revision']}",
+                f"评估信号：{signal.get('success')}；评估器：{signal.get('evaluator_id')}；诊断作为独立辅助证据",
+                f"完整提炼输入、响应与候选库：{proposal_source} / generation.memory_evolution"])
         if value.response and value.response.record_ref and value.response.record_ref.kind == "skill_evolution":
             skill_record = json.loads(self.artifacts.get(value.response.record_ref))
             self.block("SkillClaw 技能进化", [f"上游版本：{skill_record['upstream_revision']}；状态：{skill_record['status']}",

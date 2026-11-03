@@ -14,6 +14,7 @@ def context_builder(execution, task, *, history_max_attempts=5, history_max_text
     tools = execution.built_plugins.instances.get("tools")
     specs = tools.specifications() if tools is not None else ()
     policy = ContextPolicy(task=task.identity, output_fields=declaration.output_fields,
+        evaluator_id=execution.benchmark.loaded_config.config.assessment.evaluator,
         metadata_fields=declaration.metadata_fields, allow_evolution=declaration.allow_evolution,
         reason_messages=declaration.reason_messages, artifact_kinds=capabilities.supported_artifact_kinds,
         state_fields=capabilities.feedback_state_fields, snapshot_config_fields=capabilities.feedback_config_fields,

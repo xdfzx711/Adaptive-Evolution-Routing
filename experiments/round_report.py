@@ -133,6 +133,13 @@ class RoundReport:
 
     def content(self, ref):
         raw = self.artifacts.get(ref)
+        if ref.kind == "memory":
+            from plugins.memory.library import decode_bank
+            try:
+                return decode_bank(raw)
+            except (ValueError, UnicodeError):
+                # Older/custom memory plugins can use other artifact formats.
+                pass
         try:
             text = raw.decode("utf-8")
         except UnicodeError:
@@ -176,6 +183,7 @@ class RoundReport:
             self.data["evaluation_before_evolution"] = self.latest_execution["evaluation"] if self.latest_execution else None
             self.data["input_to_evolver"] = {
                 "execution": execution_view(context.execution), "feedback": plain(context.feedback),
+                "evaluation_signal": plain(context.evaluation_signal),
                 "diagnosis": diagnosis_view(context.diagnosis),
                 "stable_components": {name: self.content(component) for name, component in context.stable_snapshot.artifacts.items()},
                 "history": self.history(context.history), "routing_decision": fields(value.decision, "target", "rationale"),
@@ -202,6 +210,9 @@ class RoundReport:
         if response and response.record_ref and response.record_ref.kind == "skill_evolution":
             self.link(response.record_ref)
             self.data["generation"]["skill_evolution"] = json.loads(self.artifacts.get(response.record_ref))
+        if response and response.record_ref and response.record_ref.kind == "memory_evolution":
+            self.link(response.record_ref)
+            self.data["generation"]["memory_evolution"] = json.loads(self.artifacts.get(response.record_ref))
         if value.attempt:
             self.link(value.attempt.pre_state_ref)
         if response:

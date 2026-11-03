@@ -84,6 +84,14 @@ class FeedbackView(DomainModel):
     assessment_version: Identifier | None = None
 
 
+class EvaluationSignal(FeedbackView):
+    """Public evaluator verdict with provenance, independent of diagnosis."""
+
+    evaluation_id: Identifier
+    execution_operation_id: Identifier
+    evaluator_id: Identifier | None = None
+
+
 class DiagnosisStatement(DomainModel):
     text: Identifier
     evidence_step_ids: Items[NonNegativeInt] = ()

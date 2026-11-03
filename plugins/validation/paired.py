@@ -56,6 +56,9 @@ class PairedValidation:
             if not isinstance(result, ScoredExecution) or (result.task != task.identity or
                 result.version_id != snapshot.version_id or result.seed != context.seed):
                 raise ValidationError("Executor returned mismatched task/version/seed evidence", stage=context.stage)
+            if result.complete and snapshot.config.get("memory") is not None:
+                from plugins.memory.evidence import verify_exposure
+                verify_exposure(result.execution, snapshot, self.artifacts)
             return result
         except Exception as failure:
             error = failure.to_info() if isinstance(failure, AERError) else ValidationError(

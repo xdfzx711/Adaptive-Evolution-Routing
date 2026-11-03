@@ -46,10 +46,11 @@ class LocalArtifactStore:
                 self.get(identity)
                 return identity
             prefix = self._prefix(kind)
+            suffix = ".jsonl" if kind == "memory" else ".bin"
             directory = self.layout.directory + "/artifacts" if self.layout.enabled else "artifacts"
-            ref = identity.replace(uri=directory + "/" + timestamp_id(prefix) + ".bin")
+            ref = identity.replace(uri=directory + "/" + timestamp_id(prefix) + suffix)
             while self.files.path(ref.uri).exists():
-                ref = ref.replace(uri=directory + "/" + timestamp_id(prefix) + ".bin")
+                ref = ref.replace(uri=directory + "/" + timestamp_id(prefix) + suffix)
             self.files.immutable(ref.uri, content)
             index[ref.artifact_id] = ref.model_dump(mode="json")
             self._write_index(index)
@@ -91,9 +92,10 @@ class LocalArtifactStore:
 
     @staticmethod
     def _valid_uri(ref):
+        extension = r"\.(?:bin|jsonl)" if ref.kind == "memory" else r"\.bin"
         return ref.uri == f"artifacts/{ref.artifact_id}.bin" or re.fullmatch(
             r"(?:artifacts|rounds/(?:[A-Za-z0-9_.-]+/)+artifacts)/" + re.escape(LocalArtifactStore._prefix(ref.kind)) +
-            r"-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{6}\.bin", ref.uri) is not None
+            r"-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{6}" + extension, ref.uri) is not None
 
     def get(self, ref: ArtifactRef) -> bytes:
         if not re.fullmatch(r"sha256-[0-9a-f]{64}", ref.artifact_id) or not self._valid_uri(ref):

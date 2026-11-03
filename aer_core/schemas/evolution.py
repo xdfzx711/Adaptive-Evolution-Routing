@@ -6,7 +6,7 @@ from pydantic import Field, model_validator
 
 from .base import DomainModel, Identifier, Items, JsonObject, PositiveInt, ReadOnlyMap, Reward, UtcTimestamp
 from .acceptance import WeightedGain, validate_reward
-from .execution import Diagnosis, ErrorInfo, ExecutionView, FeedbackView
+from .execution import Diagnosis, ErrorInfo, EvaluationSignal, ExecutionView, FeedbackView
 from .history import ComponentEdit, ValidationSummary
 from .construction import ConstructionFeedback
 from .references import AgentSnapshot, ArtifactRef
@@ -103,6 +103,7 @@ class ExperienceSummary(DomainModel):
 
 
 class EvolutionContext(DomainModel):
+    evaluation_signal: EvaluationSignal | None = None
     round_id: PositiveInt = 1
     task: TaskView
     stable_snapshot: AgentSnapshot
@@ -118,6 +119,9 @@ class EvolutionContext(DomainModel):
 
     @model_validator(mode="after")
     def state_matches_execution(self):
+        if self.evaluation_signal is not None and any(
+                getattr(self.evaluation_signal, name) != getattr(self.feedback, name) for name in FeedbackView.model_fields):
+            raise ValueError("Evaluation signal must match public evaluator feedback")
         if self.execution.task_id != self.task.task_id:
             raise ValueError("execution must belong to the current task")
         if self.execution.agent_version_id != self.stable_snapshot.version_id:

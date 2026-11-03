@@ -1,5 +1,7 @@
 # Adaptive Evolution Routing
 
+ReasoningBank 固定记忆进化 baseline 见 [接入与运行说明](docs/AER_REASONINGBANK_MEMORY.md)：AER 检索、注入、评估及验收，ReasoningBank 提炼并追加候选记忆库；评估信号与诊断信号独立保存。
+
 SkillClaw 技能进化插件、固定目标与自适应路由实验入口见 [接入说明](docs/AER_SKILLCLAW_EVOLUTION.md)。自适应配置让 Skill 与 Prompt、OS-Copilot Tool、Model 共同竞争；执行任务使用 Codex，路由和进化使用 AER 的 Qwen 接口，候选通过现有验证后晋升。另提供 Router 合成对照检查命令；现有实验配置保持不变。
 
 独立的 [SkillClaw 原生 baseline](docs/AER_SKILLCLAW_BASELINE.md) 由 AER 执行和评估任务，SkillClaw 原生代理、队列与 workflow 负责跨任务技能学习、发布和同步，不经过 AER Router 或候选接受策略。

@@ -54,9 +54,10 @@ class RoutingTests(unittest.TestCase):
             operator = SimplePromptEvolver(PromptEvolverConfig(max_candidates=1), artifacts, ScriptedModel(MODEL))
             resolver = OperatorResolver({"prompt": "simple_prompt_evolver"}, {"prompt": OperatorBinding("simple_prompt_evolver", operator)})
             registry = TargetRegistry(resolver)
-            available = registry.feasible(agent, stable, ["prompt", "memory"])
+            available = registry.feasible(agent, stable, ["prompt", "memory", "model"])
             self.assertEqual(available.targets, ("prompt",))
-            self.assertEqual(available.availability[1].reason_code, "agent_target_unsupported")
+            self.assertEqual(available.availability[1].reason_code, "operator_unavailable")
+            self.assertEqual(available.availability[2].reason_code, "agent_target_unsupported")
             self.assertEqual(registry.feasible(agent, stable.replace(artifacts={}), ["prompt"]).targets, ())
             self.assertEqual(TargetRegistry(OperatorResolver({"prompt": "missing"}, {})).feasible(agent, stable, ["prompt"]).targets, ())
 

@@ -18,6 +18,7 @@ from plugins.evolution.tool_selection import ToolSelectionEvolver, ToolSelection
 from plugins.evolution.gepa.config import GEPAPromptConfig
 from plugins.evolution.oscopilot.config import OSCopilotConfig
 from plugins.evolution.skillclaw.config import SkillClawConfig
+from plugins.evolution.reasoningbank.config import ReasoningBankConfig
 from plugins.routers.basic import FixedRouter, ManualRouter
 from plugins.routers.llm import LLMRouter
 from plugins.routers.jev import JevRouter, JevRoutingSettings, resolve_jev_credentials
@@ -86,7 +87,18 @@ def build_skillclaw(*, config: SkillClawConfig, dependencies: ResolvedDependenci
                                 config_root=dependencies.get("config_root"))
 
 
+def build_reasoningbank(*, config: ReasoningBankConfig, dependencies: ResolvedDependencies):
+    from plugins.evolution.reasoningbank.evolver import ReasoningBankMemoryEvolver
+    return ReasoningBankMemoryEvolver(config, dependencies.get("artifact_store"), dependencies.get("model_provider"),
+        config_root=dependencies.get("config_root"))
+
+
 def register_evolution_plugins(registry: PluginRegistry) -> None:
+    registry.register(PluginMetadata(id="reasoningbank_memory_evolver", category="evolution", api_version=API_VERSION,
+        plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["memory"],
+            compatible_agents=["codex_cli_agent", "react_agent", "single_call_agent"]),
+        dependencies=["artifact_store", "model_provider", "config_root"]), build_reasoningbank, config_model=ReasoningBankConfig,
+        dependency_types={"artifact_store": ArtifactStore, "model_provider": ModelProvider, "config_root": Path})
     registry.register(PluginMetadata(id="skillclaw_skill_evolver", category="evolution", api_version=API_VERSION,
         plugin_version="0.1.0", capabilities=PluginCapabilities(targets=["skill"], compatible_agents=["codex_cli_agent", "react_agent"]),
         dependencies=["artifact_store", "model_provider", "config_root"]), build_skillclaw, config_model=SkillClawConfig,

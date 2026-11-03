@@ -40,6 +40,9 @@ class ConfigLoaderTests(unittest.TestCase):
     def test_all_example_modes(self):
         modes = set()
         for path in CONFIGS.glob("v0_1_*.yaml"):
+            # Native SkillClaw has a separate runner schema and its own loader tests.
+            if path.name == "v0_1_codex_skillclaw_baseline.yaml":
+                continue
             with self.subTest(path=path.name):
                 loaded = load_experiment_config(path)
                 modes.add(loaded.config.evolution.mode)
@@ -141,7 +144,7 @@ class ConfigLoaderTests(unittest.TestCase):
         self.config["targets"]["allowed"] = ["memory"]
         self.config["targets"]["default_operators"] = {"memory": "simple_prompt_evolver"}
         self.config["routing"]["fixed_target"] = "memory"
-        self.assert_issue("targets.allowed[0]")
+        self.assert_issue("targets.default_operators.memory")
 
     def test_disabled_mode_rejects_evolution_state(self):
         disabled = yaml.safe_load((CONFIGS / "v0_1_no_evolution.yaml").read_text(encoding="utf-8"))
@@ -150,6 +153,14 @@ class ConfigLoaderTests(unittest.TestCase):
         disabled["limits"]["max_evolution_rounds"] = 0
         disabled["routing"]["plugin"] = "fixed_router"
         self.assert_issue("routing.plugin", disabled)
+
+    def test_memory_evolution_requires_configured_bank_and_embeddings(self):
+        self.config["targets"]["allowed"] = ["memory"]
+        self.config["targets"]["default_operators"] = {"memory": "reasoningbank_memory_evolver"}
+        self.config["routing"]["fixed_target"] = "memory"
+        self.assert_issue("agent.config.memory")
+        self.config["agent"]["config"] = {"memory": {"embedding": {"model_id": "embedding-fixture"}}}
+        self.assertEqual(self.load().config.agent.config["memory"]["embedding"]["model_id"], "embedding-fixture")
 
     def test_manual_plan_order_length_and_targets(self):
         manual = yaml.safe_load((CONFIGS / "v0_1_manual_prompt.yaml").read_text(encoding="utf-8"))
