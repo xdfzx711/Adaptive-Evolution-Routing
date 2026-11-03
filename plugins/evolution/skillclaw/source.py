@@ -14,7 +14,7 @@ DEFAULT_SOURCE = Path(__file__).resolve().parents[3] / "third_party/SkillClaw"
 _LOCK = RLock()
 
 
-def load_upstream(source=None):
+def verify_source(source=None):
     root = Path(source or DEFAULT_SOURCE).resolve()
     if not (root / "evolve_server/pipeline/execution.py").is_file():
         raise ValueError("SkillClaw source missing; run git submodule update --init third_party/SkillClaw")
@@ -26,6 +26,11 @@ def load_upstream(source=None):
                             "evolve_server", "skillclaw"], capture_output=True, text=True, check=True, timeout=15)
     if clean.stdout.strip():
         raise ValueError("SkillClaw upstream source must remain unmodified")
+    return root
+
+
+def load_upstream(source=None):
+    root = verify_source(source)
     namespace = "_aer_skillclaw_" + sha256(str(root).encode()).hexdigest()[:16]
     with _LOCK:
         # Upstream's top-level __init__ eagerly imports unrelated Agent/server

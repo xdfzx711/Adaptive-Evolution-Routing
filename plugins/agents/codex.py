@@ -174,7 +174,7 @@ class CodexCliAgent:
     plugin_id = "codex_cli_agent"
 
     def __init__(self, config, initial_snapshot, artifacts, output_adapter=None, *, workspace_provider=None, result_collector=None,
-                 tool_adapter=None):
+                 tool_adapter=None, launch_adapter=None):
         if config.plugin != self.plugin_id:
             raise ValueError("Agent config does not match its factory")
         self.settings = CodexConfig.model_validate(config.config)
@@ -185,6 +185,7 @@ class CodexCliAgent:
         self.artifacts = artifacts
         self.model_adapter = CodexModelAdapter()
         self.tool_adapter = tool_adapter or CodexToolAdapter()
+        self.launch_adapter = launch_adapter
         self.output_adapter = output_adapter or PublicJsonOutput()
         self.workspace_provider = workspace_provider or EmptyWorkspace()
         self.result_collector = result_collector or JsonResultCollector(self.output_adapter)
@@ -212,7 +213,7 @@ class CodexCliAgent:
         # Registration describes plugin support. TargetRegistry separately requires
         # a configured tool artifact before exposing this target to a Router.
         components = ["prompt", "model", "tool"]
-        return AgentCapabilities(supported_targets=[*components, *(["skill"] if self.settings.skills is not None else [])],
+        return AgentCapabilities(supported_targets=[*components, "skill"],
             supported_artifact_kinds=[*components, *(["skill"] if self.settings.skills is not None else [])],
             can_rebuild_session=True, snapshot_scope="controlled_config",
             feedback_state_fields=["agent_plugin", "execution_model", "execution_reasoning_effort", "execution_platform", "execution_shell", "termination_reason", "fresh_session", "seed_supported",
@@ -382,6 +383,7 @@ class CodexCliAgent:
         handle, collected, terminal_shutdown = None, None, False
         tool_session, tool_report, selected_tools = None, None, None
         skills, skill_session, skill_report = None, None, None
+        launch_session, launch_report = None, None
         try:
             selection, prompt = self._validate_snapshot(snapshot)
             model_id = selection.model_id
@@ -409,6 +411,11 @@ class CodexCliAgent:
                 prompt += skills.instructions()
             args = (self._arguments(workspace, schema_path, selection, prompt, run_ctx, tool_session, skill_session)
                     if skill_session else self._arguments(workspace, schema_path, selection, prompt, run_ctx, tool_session))
+            if self.launch_adapter is not None:
+                if self.settings.skills is not None:
+                    raise ValueError("External launch adapter cannot be combined with AER skill delivery")
+                launch_session = self.launch_adapter.prepare(workspace, run_ctx)
+                args = launch_session.arguments(args)
             timed_out = False
             deadline = record.start + min(self.settings.timeout_seconds, run_ctx.execution_timeout_seconds or self.settings.timeout_seconds)
             for attempt in range(1, self.settings.startup_retries + 2):
@@ -426,6 +433,7 @@ class CodexCliAgent:
                     skill_session.report_path.unlink(missing_ok=True)
                 process = subprocess.Popen(args, cwd=workspace, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                    **({"env": launch_session.environment} if launch_session is not None else {}),
                     **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}))
                 captured = capture_cli(process, public_input, remaining, stop_process_tree)
                 stdout, stderr = captured.stdout, captured.stderr
@@ -504,6 +512,9 @@ class CodexCliAgent:
                                      stage=run_ctx.stage, plugin_id=self.plugin_id)
             if skill_report is not None and (skill_report["status"] != "ready" or not skill_report["discovered"]):
                 raise ExecutionError("Skill service was not available to Codex", stage=run_ctx.stage, plugin_id=self.plugin_id)
+            if launch_session is not None:
+                # Remove external runtime files before a patch collector sees them.
+                launch_report = launch_session.finish()
             try:
                 collected = self.result_collector.collect(task, handle, final, run_ctx)
                 output = collected.model_dump(mode="json")["output"]
@@ -520,6 +531,11 @@ class CodexCliAgent:
             if process is not None and process.poll() is None:
                 stop_process_tree(process)
                 process.communicate(timeout=10)
+            if launch_session is not None and launch_report is None:
+                try:
+                    launch_report = launch_session.finish()
+                except Exception as failure:
+                    record.event("launch_cleanup_error", {"message": str(failure)})
             if tool_session is not None:
                 if tool_report is None:
                     tool_report = tool_session.report()
@@ -564,6 +580,7 @@ class CodexCliAgent:
                 "tool_calls_scope": "visible_cli_items", "startup_attempts": startup_attempts,
                 "session_started": session_started, "turn_started": turn_started,
                 "shutdown_after_terminal_event": terminal_shutdown,
+                **({"external_runtime": launch_report} if launch_report is not None else {}),
                 **(skills.summary("mcp", setup_status=skill_report["status"] if skill_report else "error",
                     discovered=skill_report.get("discovered") if skill_report else None) if skills else {}),
                 **({"selected_tools": list(selected_tools.enabled_tools),

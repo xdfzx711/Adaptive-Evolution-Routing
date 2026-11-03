@@ -1,0 +1,19 @@
+# Independent native workflow baseline. Paths are relative to this file.
+aer_config: v0_1_codex_skillclaw_baseline_tasks.yaml
+initial_library: ../skills
+source: ../../third_party/SkillClaw
+dotenv_path: ../../.env
+mode: learn
+evolve_every_tasks: 2
+cycle_timeout_seconds: 900
+execution_api:
+  api_key_env: CODEX_API_KEY
+  base_url_env: CODEX_BASE_URL
+evolution_api:
+  api_key_env: QWEN_API_KEY
+  base_url_env: QWEN_BASE_URL
+  model_env: QWEN_MODEL
+llm_max_tokens: 8192
+llm_temperature: 0.4
+use_session_judge: true
+use_skill_verifier: false
