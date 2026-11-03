@@ -1,0 +1,85 @@
+{
+  "schema_version": "aer.task_manifest.v1",
+  "benchmark_id": "hotpotqa",
+  "sources": [
+    {
+      "path": "../../.aer-cache/hotpotqa/hotpot_train_distractor.json",
+      "sha256": "f00b9e5e80413ee0b734543302af8b7e537a5bfb7eb458c0650958dd933d1995",
+      "source_split": "official_train"
+    },
+    {
+      "path": "../../.aer-cache/hotpotqa/hotpot_dev_distractor.json",
+      "sha256": "aa56620ee01b6781bdffb07dbce1d8df42439898b2b0c37a5ea5c4e14b7c0484",
+      "source_split": "official_dev"
+    }
+  ],
+  "roles": {
+    "5ae63b2255429908198fa526": "test",
+    "5a7fb1765542992e7d278d20": "test",
+    "5a80ad19554299485f5986a8": "test",
+    "5a75d9b4554299109176e5a7": "test",
+    "5abe848555429976d4830b50": "similar",
+    "5a794c215542994bb9456feb": "similar",
+    "5a8dcc82554299441c6ba08e": "similar",
+    "5ae4200555429970de88d908": "similar",
+    "5a7e40fa554299495941994c": "regression",
+    "5a7b73985542997c3ec9718b": "regression",
+    "5ab4280b554299233955003a": "dev",
+    "5ae3e9635542995dadf24246": "dev",
+    "5ae5caac5542996de7b71a1e": "dev",
+    "5ae07bae55429945ae959364": "dev"
+  },
+  "validation_sets": {
+    "5ab4280b554299233955003a": {
+      "similar": [
+        "5abe848555429976d4830b50",
+        "5a794c215542994bb9456feb"
+      ],
+      "regression": [
+        "5a7e40fa554299495941994c",
+        "5a7b73985542997c3ec9718b"
+      ]
+    },
+    "5ae3e9635542995dadf24246": {
+      "similar": [
+        "5a8dcc82554299441c6ba08e",
+        "5ae4200555429970de88d908"
+      ],
+      "regression": [
+        "5a7b73985542997c3ec9718b",
+        "5a7e40fa554299495941994c"
+      ]
+    },
+    "5ae5caac5542996de7b71a1e": {
+      "similar": [
+        "5abe848555429976d4830b50",
+        "5a794c215542994bb9456feb"
+      ],
+      "regression": [
+        "5a7e40fa554299495941994c",
+        "5a7b73985542997c3ec9718b"
+      ]
+    },
+    "5ae07bae55429945ae959364": {
+      "similar": [
+        "5a8dcc82554299441c6ba08e",
+        "5ae4200555429970de88d908"
+      ],
+      "regression": [
+        "5a7b73985542997c3ec9718b",
+        "5a7e40fa554299495941994c"
+      ]
+    }
+  },
+  "selection_policy": {
+    "version": "public_category_stratified.v1",
+    "seed": 42,
+    "category": "type",
+    "dev_count": 4,
+    "similar_per_task": 2,
+    "regression_per_task": 2,
+    "test_count": 4,
+    "setting": "distractor",
+    "test_note": "Reserved official-dev subset; not the hidden official test set"
+  }
+}

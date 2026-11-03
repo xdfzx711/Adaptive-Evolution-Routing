@@ -101,6 +101,8 @@ class IsolatedCandidateTrials:
             dependencies.update(initial_snapshot=trial, artifact_store=store)
             built = PluginManager(self.registry).build(bindings, dependencies=dependencies)
             agent, benchmark, evaluator = (built.instances[name] for name in ("agent", "benchmark", "evaluator"))
+            from .native_scoring import validate_native_scoring
+            validate_native_scoring(benchmark, config, self.registry, self.evaluator_settings)
             declaration = benchmark.feedback_policy(source)
             if not isinstance(declaration, TaskFeedbackPolicy) or declaration.task != task or not declaration.allow_evolution:
                 raise ContractError("Optimizer task does not permit public evolution feedback", stage="evolution")

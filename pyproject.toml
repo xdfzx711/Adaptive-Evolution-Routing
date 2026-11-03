@@ -21,6 +21,7 @@ dependencies = [
 gepa = ["gepa==0.1.4"]
 oscopilot = ["jupyter-client>=8.6,<9", "ipykernel>=6.29,<7"]
 skillclaw-baseline = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "openai>=1.50,<3"]
+hotpotqa-data = ["pyarrow>=18"]
 
 [project.scripts]
 aer = "experiments.cli:main"
@@ -34,3 +35,4 @@ exclude = ["tests*"]
 "plugins.benchmarks.toy_tasks" = ["*.json"]
 "plugins.benchmarks.hard_local" = ["*.json"]
 "experiments" = ["data/*.json", "configs/*.yaml", "skills/*/SKILL.md"]
+"plugins.evaluators.hotpotqa_official" = ["LICENSE.txt", "PROVENANCE.json"]

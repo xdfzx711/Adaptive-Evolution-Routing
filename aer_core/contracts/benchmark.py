@@ -37,3 +37,17 @@ class TaskValidationProvider(Protocol):
     """
 
     def validation_tasks(self, task: Task) -> tuple[Task, ...]: ...
+
+
+@runtime_checkable
+class NativeEvaluationProvider(Protocol):
+    """Optional native-scoring requirement; legacy benchmarks remain unchanged."""
+
+    def native_evaluator_id(self) -> str: ...
+
+
+@runtime_checkable
+class PredictionExportProvider(Protocol):
+    """Optional dataset-native prediction format, without accessing gold labels."""
+
+    def export_predictions(self, outputs: dict[str, dict]) -> dict: ...

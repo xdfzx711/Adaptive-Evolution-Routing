@@ -1,0 +1,132 @@
+from contextlib import ExitStack
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import yaml
+
+from aer_core.errors import ContractError
+from experiments.batch import aggregate, run_benchmark
+from experiments.bootstrap import create_registry
+from experiments.execution import prepare_execution
+from experiments.optimization import ConfiguredModelFactory, IsolatedCandidateTrials
+from experiments.orchestration import prepare_orchestrator
+from plugins.providers.scripted import ScriptedModel
+from tests.benchmarks.hotpotqa_helpers import ROOT, config_file
+from tests.execution.helpers import RecordingModel, context, response
+
+
+@unittest.skipUnless(importlib.util.find_spec("gepa"), "install [gepa]")
+class HotpotGEPATests(unittest.TestCase):
+    def model_patches(self, stack, rows, *, regression_ids=()):
+        by_id = {row["_id"]: row for row in rows}
+        reflection = RecordingModel(lambda *_: response("```\nIMPROVED reusable instructions\n```"))
+        stack.enter_context(patch.object(ConfiguredModelFactory, "create", return_value=reflection))
+
+        def generate(model, request, run_ctx):
+            public = json.loads(request.messages[-1].content)
+            row = by_id[public["task_id"]]
+            improved = request.messages[0].content.startswith("IMPROVED")
+            correct = not improved if row["_id"] in regression_ids else improved
+            return response(json.dumps({"answer": row["answer"] if correct else "wrong",
+                "supporting_facts": row["supporting_facts"] if correct else []}))
+
+        stack.enter_context(patch.object(ScriptedModel, "generate", generate))
+        return reflection
+
+    def test_real_gepa_native_scores_commit_and_independent_batch_reset(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            root = Path(directory)
+            path, rows, manifest = config_file(root)
+            self.model_patches(stack, rows)
+            summary = run_benchmark(path, run_id="batch")
+            self.assertEqual(summary["status"], "completed")
+            self.assertEqual(len(summary["tasks"]), 2)
+            self.assertEqual(summary["aggregate"]["mean_native_metrics_evaluated"]["joint_f1"], 1)
+            self.assertEqual(summary["aggregate"]["mean_score_gain_paired"], 1)
+            predictions = json.loads(Path(summary["predictions_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(set(predictions["answer"]), {entry["task_id"] for entry in summary["tasks"]})
+            for entry in summary["tasks"]:
+                self.assertEqual(entry["initial_prompt"], "BAD initial prompt")
+                self.assertEqual(entry["initial_evaluation"]["score"], 0)
+                self.assertEqual(entry["holdouts"], manifest.validation_sets[entry["task_id"]].model_dump())
+                self.assertIn("IMPROVED", entry["final_prompt"])
+                self.assertNotEqual(entry["initial_version_id"], entry["final_stable_version_id"])
+                round_record = entry["rounds"][0]
+                self.assertEqual(round_record["internal_trials"], 6)
+                acceptance = round_record["candidates"][0]["acceptance"]
+                self.assertEqual(acceptance["reward"], 1)
+                self.assertTrue(round_record["candidates"][0]["committed"])
+                record = json.loads((Path(summary["run_root"]) / round_record["record"]).read_text(encoding="utf-8"))
+                trials = record["generation"]["internal_optimization"]["trials"]
+                self.assertEqual({item["task"]["task_id"] for item in trials}, {entry["task_id"]})
+                self.assertEqual([item["evaluation"]["score"] for item in trials], [0, 0, 0, 1, 1, 1])
+            with self.assertRaisesRegex(ValueError, "new run_id"):
+                run_benchmark(path, run_id="batch")
+
+    def test_regression_guard_rejects_and_preserves_prompt(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            root = Path(directory)
+            path, rows, manifest = config_file(root, tasks=1)
+            regression = next(iter(manifest.validation_sets.values())).regression
+            self.model_patches(stack, rows, regression_ids=regression)
+            summary = run_benchmark(path)
+            entry = summary["tasks"][0]
+            self.assertEqual(entry["initial_version_id"], entry["final_stable_version_id"])
+            self.assertEqual(entry["initial_prompt"], entry["final_prompt"])
+            acceptance = entry["rounds"][0]["candidates"][0]["acceptance"]
+            self.assertFalse(acceptance["accepted"])
+            self.assertEqual(acceptance["reason"], "regression_guard")
+
+    def test_trials_cannot_read_holdouts_and_share_outer_metric(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            root = Path(directory)
+            path, rows, manifest = config_file(root, tasks=1)
+            self.model_patches(stack, rows)
+            prepared = prepare_execution(path)
+            current = prepared.benchmark.execution_tasks[0]
+            service = IsolatedCandidateTrials(prepared.benchmark.loaded_config, create_registry(),
+                prepared.storage.artifact_store, prepared.benchmark.execution_tasks)
+            stable = prepared.storage.version_store.stable()
+            trial = service.evaluate(current.identity, current.identity, stable, "BAD initial prompt", context())
+            self.assertIsNone(trial.error)
+            self.assertEqual(trial.feedback.score, 0)
+            self.assertNotIn("PRIVATE_ANSWER", trial.model_dump_json())
+            for task_id in manifest.validation_sets[current.task_id].similar + manifest.validation_sets[current.task_id].regression:
+                with self.assertRaises(ContractError):
+                    service.tasks(current.identity, (task_id,))
+
+    def test_error_denominator_is_explicit(self):
+        result = aggregate([{"status": "completed", "final_evaluation": {"score": 1, "success": True, "metrics": {"f1": 1}}},
+                            {"status": "error", "final_evaluation": None}])
+        self.assertEqual(result["evaluated_tasks"], 1)
+        self.assertEqual(result["error_tasks"], 1)
+        self.assertEqual(result["mean_score_evaluated"], 1)
+
+
+class GenericBatchTests(unittest.TestCase):
+    def test_existing_toy_benchmark_works_without_native_protocols(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = yaml.safe_load((ROOT / "experiments/configs/v0_1_no_evolution.yaml").read_text(encoding="utf-8"))
+            data["storage"]["root"] = str(root / "runs")
+            path = root / "config.yaml"
+            path.write_text(yaml.safe_dump(data), encoding="utf-8")
+            result = run_benchmark(path, limit=2)
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(result["aggregate"]["evaluated_tasks"], 2)
+            self.assertNotIn("predictions_path", result)
+
+    def test_cli_checks_output_before_execution(self):
+        from experiments.cli import main
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path, _, _ = config_file(root)
+            before = path.read_bytes()
+            with patch("experiments.batch.run_benchmark") as run:
+                self.assertEqual(main(["run-benchmark", str(path), "--output", str(path)]), 2)
+                run.assert_not_called()
+            self.assertEqual(before, path.read_bytes())

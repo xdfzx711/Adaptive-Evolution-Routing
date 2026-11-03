@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/hotpotqa/hotpot",
+  "commit": "3635853403a8735609ee997664e1528f4480762a",
+  "file": "hotpot_evaluate_v1.py",
+  "original_sha256": "d35fc91a6db21d791dbdda11daf3856e9359f5701d54e3eefba20d88fecc02c0",
+  "modification": "Replace ujson import with standard-library json; all scoring code unchanged."
+}

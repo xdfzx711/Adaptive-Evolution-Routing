@@ -134,6 +134,8 @@ def prepare_benchmark(path: str | Path) -> PreparedBenchmark:
     built = PluginManager(registry).build(bindings, dependencies=provider_dependencies(loaded, bindings))
     benchmark = built.instances["benchmark"]
     evaluator = built.instances["evaluator"]
+    from .native_scoring import validate_native_scoring
+    validate_native_scoring(benchmark, config, registry)
     benchmark_id = registry.get("benchmark", config.benchmark.plugin).metadata.capabilities.benchmark_id
     issues = validate_partitions(config, benchmark.index(), benchmark_id)
     if issues:

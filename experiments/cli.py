@@ -71,6 +71,13 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--output", type=Path)
     run.add_argument("--quiet", action="store_true", help="suppress console progress; evolution.txt is still saved")
     run.add_argument("--json", action="store_true", help="print the full result JSON when --output is omitted")
+    batch = subparsers.add_parser("run-benchmark", help="run selected benchmark tasks and save an incremental baseline summary")
+    batch.add_argument("config", type=Path)
+    batch.add_argument("--run-id")
+    batch.add_argument("--limit", type=int)
+    batch.add_argument("--output", type=Path)
+    batch.add_argument("--quiet", action="store_true")
+    batch.add_argument("--set", dest="overrides", action="append", default=[], metavar="PATH=VALUE")
     summary = subparsers.add_parser("summarize-run", help="create one structured evolution.txt from a saved run-task result without executing models")
     summary.add_argument("result", type=Path)
     reorganize = subparsers.add_parser("reorganize-run", help="move a completed legacy run into round directories without model calls")
@@ -88,6 +95,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             reconfigure(encoding="utf-8")
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "run-benchmark":
+            from .batch import cli_run
+            return cli_run(args)
         if args.command == "reorganize-run":
             print(json.dumps(reorganize_run(args.run_root), ensure_ascii=False, indent=2))
             return 0
