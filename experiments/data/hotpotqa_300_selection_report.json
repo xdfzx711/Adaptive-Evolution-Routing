@@ -1,0 +1,219 @@
+{
+  "schema_version": "aer.hotpotqa_selection_audit.v1",
+  "manifest": "hotpotqa_300_manifest.json",
+  "dataset_version": "hotpotqa.distractor.c65611306d8e1753951e",
+  "role_counts": {
+    "dev": 300,
+    "similar": 300,
+    "regression": 300
+  },
+  "unique_ids": 900,
+  "unique_normalized_questions": 900,
+  "all_matching_rules_verified_at_startup": true,
+  "all_per_task_holdout_counts_verified": true,
+  "source_checksums_verified_at_startup": true,
+  "selection_inputs": [
+    "_id",
+    "question",
+    "type",
+    "level"
+  ],
+  "selection_policy": "hotpotqa.exclusive_question_tfidf.v1",
+  "similar_question_cosine": {
+    "minimum": 0.1126924,
+    "median": 0.290896785,
+    "mean": 0.32674340576666666,
+    "maximum": 1.0
+  },
+  "source_integrity": {
+    "rule": "valid official row structure and supporting-fact references within supplied context; no answer-content or performance filtering",
+    "source_count": 90447,
+    "eligible_count": 90425
+  },
+  "excluded_invalid_source_count": 22,
+  "skipped_unmatchable_current_tasks": [
+    {
+      "task_id": "5ac01bb75542996f0d89cb22",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5a8b84f15542997f31a41d5e",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5abbb5da5542996606241723",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5ae5117e55429960a22e025d",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5ae20dbe5542997283cd2384",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5ac46db3554299204fd21f48",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5ab7da125542995dae37e9bb",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5a8049fc5542996402f6a4a2",
+      "reason": "no_available_similar_match"
+    },
+    {
+      "task_id": "5a751aea55429916b0164263",
+      "reason": "no_available_similar_match"
+    }
+  ],
+  "distributions": {
+    "current": {
+      "bridge/person/hard": 4,
+      "comparison/yes_no/easy": 2,
+      "bridge/time/medium": 14,
+      "comparison/location/easy": 3,
+      "bridge/entity_or_other/medium": 49,
+      "comparison/entity_or_other/easy": 22,
+      "bridge/location/medium": 9,
+      "comparison/yes_no/medium": 39,
+      "comparison/entity_or_other/hard": 12,
+      "bridge/entity_or_other/hard": 9,
+      "comparison/person/medium": 10,
+      "bridge/entity_or_other/easy": 22,
+      "comparison/person/hard": 4,
+      "comparison/entity_or_other/medium": 41,
+      "comparison/yes_no/hard": 11,
+      "comparison/location/medium": 2,
+      "bridge/location/hard": 7,
+      "bridge/person/medium": 21,
+      "bridge/yes_no/easy": 1,
+      "bridge/quantity/medium": 3,
+      "bridge/time/easy": 2,
+      "bridge/quantity/hard": 1,
+      "bridge/person/easy": 4,
+      "bridge/time/hard": 3,
+      "bridge/location/easy": 1,
+      "comparison/person/easy": 2,
+      "comparison/time/medium": 2
+    },
+    "similar": {
+      "bridge/person/hard": 4,
+      "comparison/yes_no/easy": 2,
+      "bridge/time/medium": 14,
+      "comparison/location/easy": 3,
+      "bridge/entity_or_other/medium": 49,
+      "comparison/entity_or_other/easy": 22,
+      "bridge/location/medium": 9,
+      "comparison/yes_no/medium": 39,
+      "comparison/entity_or_other/hard": 12,
+      "bridge/entity_or_other/hard": 9,
+      "comparison/person/medium": 10,
+      "bridge/entity_or_other/easy": 22,
+      "comparison/person/hard": 4,
+      "comparison/entity_or_other/medium": 41,
+      "comparison/yes_no/hard": 11,
+      "comparison/location/medium": 2,
+      "bridge/location/hard": 7,
+      "bridge/person/medium": 21,
+      "bridge/yes_no/easy": 1,
+      "bridge/quantity/medium": 3,
+      "bridge/time/easy": 2,
+      "bridge/quantity/hard": 1,
+      "bridge/person/easy": 4,
+      "bridge/time/hard": 3,
+      "bridge/location/easy": 1,
+      "comparison/person/easy": 2,
+      "comparison/time/medium": 2
+    },
+    "regression": {
+      "comparison/entity_or_other/hard": 11,
+      "bridge/location/easy": 6,
+      "comparison/yes_no/medium": 49,
+      "bridge/quantity/easy": 2,
+      "comparison/location/medium": 1,
+      "bridge/person/medium": 18,
+      "bridge/location/medium": 16,
+      "comparison/yes_no/hard": 8,
+      "bridge/entity_or_other/medium": 49,
+      "bridge/quantity/hard": 2,
+      "comparison/quantity/hard": 1,
+      "comparison/location/hard": 3,
+      "comparison/yes_no/easy": 9,
+      "bridge/location/hard": 4,
+      "comparison/person/medium": 13,
+      "bridge/person/easy": 15,
+      "comparison/entity_or_other/medium": 33,
+      "bridge/time/hard": 3,
+      "comparison/location/easy": 5,
+      "bridge/person/hard": 5,
+      "comparison/entity_or_other/easy": 8,
+      "bridge/entity_or_other/hard": 13,
+      "bridge/entity_or_other/easy": 5,
+      "comparison/person/easy": 8,
+      "bridge/time/medium": 8,
+      "bridge/quantity/medium": 3,
+      "bridge/time/easy": 1,
+      "comparison/person/hard": 1
+    }
+  },
+  "examples": [
+    {
+      "current_id": "5abe848555429976d4830b50",
+      "current_question": "Who produced the 1977 film John Richardson was in?",
+      "features": {
+        "type": "bridge",
+        "question_form": "person",
+        "level": "hard"
+      },
+      "similar_id": "5a8a28b65542992d82986ed3",
+      "similar_question": "Who is the director of this 1977 American musical drama film starring Adrienne King and John Travolta?",
+      "regression_id": "5ac01bb75542996f0d89cb22",
+      "regression_question": "Of the film directors Kenji Mizoguchi and Andrzej Żuławski, which one often went against mainstream commercialism in his films?"
+    },
+    {
+      "current_id": "5a8dcc82554299441c6ba08e",
+      "current_question": "Did Kan Mi-youn and Derek St. Holmes both work in the music industry?",
+      "features": {
+        "type": "comparison",
+        "question_form": "yes_no",
+        "level": "easy"
+      },
+      "similar_id": "5ac137f255429964131be19b",
+      "similar_question": "Are Derek Sherinian and Alex Sevanian both American?",
+      "regression_id": "5ae5117e55429960a22e025d",
+      "regression_question": "Where is Ubisoft's Tetris Ultimate partner based in?"
+    },
+    {
+      "current_id": "5a794c215542994bb9456feb",
+      "current_question": "In what year were the pioneers of managed care in the United States established?",
+      "features": {
+        "type": "bridge",
+        "question_form": "time",
+        "level": "medium"
+      },
+      "similar_id": "5a7a400c5542994f819ef193",
+      "similar_question": "What year did the singer of I Care 4 U die?",
+      "regression_id": "5adffb01554299025d62a39c",
+      "regression_question": "have Bob Bryan and Samantha Stosur both been world No. 1 in doubles?"
+    },
+    {
+      "current_id": "5ae4200555429970de88d908",
+      "current_question": "Shaoguan and Qinhuangdao, are located in which country?",
+      "features": {
+        "type": "comparison",
+        "question_form": "location",
+        "level": "easy"
+      },
+      "similar_id": "5ade198755429939a52fe816",
+      "similar_question": "Lhasa and Qinhuangdao, are located in which country?",
+      "regression_id": "5ae20dbe5542997283cd2384",
+      "regression_question": "A Faust Symphony in three character pictures, was written by Hungarian composer Franz Liszt and was inspired by Johann Wolfgang von Goethe's drama, \"Faust\", a tragic play in how many parts?"
+    }
+  ],
+  "model_calls": 0,
+  "baseline_executed": false,
+  "full_source_regeneration_identical": true
+}

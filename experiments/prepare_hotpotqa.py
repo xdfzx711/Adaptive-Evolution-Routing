@@ -78,12 +78,15 @@ def download_sources(root):
     return paths
 
 
-def prepare_manifest(train, dev, output, *, seed=42, task_count=4, similar_count=2, regression_count=2, test_count=4):
+def prepare_manifest(train, dev, output, *, seed=42, task_count=4, similar_count=2, regression_count=2,
+                     test_count=4, selection="legacy-shared"):
     train, dev, output = Path(train).resolve(), Path(dev).resolve(), Path(output).resolve()
     if output in {train, dev} or train == dev or output.exists():
         raise ValueError("Use distinct sources and a new manifest output path")
-    if test_count < 1:
-        raise ValueError("test_count must be positive")
+    if test_count < 0:
+        raise ValueError("test_count must be nonnegative")
+    if selection not in {"legacy-shared", "exclusive"}:
+        raise ValueError("unknown selection policy")
     training = read_json(train)
     development = read_json(dev)
     categories = {row["_id"]: row["type"] for row in training}
@@ -96,17 +99,36 @@ def prepare_manifest(train, dev, output, *, seed=42, task_count=4, similar_count
         raise ValueError("not enough official dev examples for the reserved test subset")
     from hashlib import sha256
     test_ids = sorted(test_ids, key=lambda key: sha256(f"{seed}:{key}".encode()).hexdigest())[:test_count]
-    roles, selections = select_holdouts(categories, seed=seed, task_count=task_count,
-        similar_count=similar_count, regression_count=regression_count, test_ids=test_ids)
+    policy = {"version": "public_category_stratified.v1", "seed": seed, "category": "type",
+        "dev_count": task_count, "similar_per_task": similar_count, "regression_per_task": regression_count}
+    if selection == "exclusive":
+        from plugins.benchmarks.hotpotqa_selection import select_exclusive_episodes
+        from plugins.benchmarks.hotpotqa import validate_row
+        eligible, invalid = [], []
+        for row in training:
+            try:
+                validate_row(row)
+            except ValueError as error:
+                invalid.append({"task_id": row["_id"], "reason": str(error)})
+            else:
+                eligible.append(row)
+        selected_tests = set(test_ids)
+        roles, selections, policy = select_exclusive_episodes(eligible, seed=seed, task_count=task_count,
+            similar_count=similar_count, regression_count=regression_count,
+            test_rows=[row for row in development if row["_id"] in selected_tests])
+        policy["source_integrity"] = {"rule": "valid official row structure and supporting-fact references within supplied context; no answer-content or performance filtering",
+            "source_count": len(training), "eligible_count": len(eligible), "excluded": invalid}
+    else:
+        roles, selections = select_holdouts(categories, seed=seed, task_count=task_count,
+            similar_count=similar_count, regression_count=regression_count, test_ids=test_ids)
     sources = [DatasetSource(path=Path(os.path.relpath(path, output.parent)).as_posix(), sha256=file_digest(path), source_split=split)
                for path, split in ((train, "official_train"), (dev, "official_dev"))]
     manifest = TaskManifest(benchmark_id="hotpotqa", sources=sources, roles=roles, validation_sets=selections,
-        selection_policy={"version": "public_category_stratified.v1", "seed": seed, "category": "type",
-            "dev_count": task_count, "similar_per_task": similar_count, "regression_per_task": regression_count,
-            "test_count": test_count, "setting": "distractor",
+        holdout_reuse="forbidden" if selection == "exclusive" else "allowed",
+        selection_policy={**policy, "test_count": test_count, "setting": "distractor",
             "test_note": "Reserved official-dev subset; not the hidden official test set"})
     output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("x", encoding="utf-8") as stream:
+    with output.open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(manifest.model_dump_json(indent=2) + "\n")
     return manifest
 
@@ -118,12 +140,14 @@ def main(argv=None):
     parser.add_argument("--data-root", type=Path, default=Path(".aer-cache/hotpotqa"))
     parser.add_argument("--train", type=Path)
     parser.add_argument("--dev", type=Path)
-    parser.add_argument("--output", type=Path, default=Path("experiments/data/hotpotqa_manifest.json"))
+    parser.add_argument("--output", type=Path, default=Path("experiments/data/hotpotqa_300_manifest.json"))
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--tasks", type=int, default=4)
-    parser.add_argument("--similar", type=int, default=2)
-    parser.add_argument("--regression", type=int, default=2)
-    parser.add_argument("--test", type=int, default=4)
+    parser.add_argument("--tasks", type=int, default=300)
+    parser.add_argument("--similar", type=int, default=1)
+    parser.add_argument("--regression", type=int, default=1)
+    parser.add_argument("--test", type=int, default=0)
+    parser.add_argument("--selection", choices=("exclusive", "legacy-shared"), default="exclusive",
+                        help="exclusive: label-free matching with no holdout or normalized-question reuse")
     args = parser.parse_args(argv)
     if args.output.exists() and not args.download_only:
         parser.error("manifest already exists; choose a new --output to preserve the experiment split")
@@ -138,9 +162,10 @@ def main(argv=None):
             train = args.train or args.data_root / "hotpot_train_distractor.json"
             dev = args.dev or args.data_root / "hotpot_dev_distractor.json"
         manifest = prepare_manifest(train, dev, args.output, seed=args.seed, task_count=args.tasks,
-            similar_count=args.similar, regression_count=args.regression, test_count=args.test)
-        print(json.dumps({"manifest": str(args.output.resolve()), "roles": manifest.roles,
-                          "validation_sets": manifest.model_dump()["validation_sets"]}, indent=2))
+            similar_count=args.similar, regression_count=args.regression, test_count=args.test, selection=args.selection)
+        from collections import Counter
+        print(json.dumps({"manifest": str(args.output.resolve()), "role_counts": Counter(manifest.roles.values()),
+                          "selection": manifest.selection_policy["version"], "holdout_reuse": manifest.holdout_reuse}, indent=2))
     except (OSError, ValueError, KeyError, ImportError) as error:
         parser.exit(2, f"HotpotQA preparation failed: {error}\n")
     return 0

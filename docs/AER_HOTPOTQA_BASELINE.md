@@ -1,5 +1,10 @@
 # HotpotQA fixed-router baseline
 
+For the current **300-task / 1 similar / 1 regression** experiment with globally
+exclusive holdouts and full initial/final reporting, see
+[AER_HOTPOTQA_300_BASELINE.md](AER_HOTPOTQA_300_BASELINE.md).
+The four-task configuration documented below remains available unchanged.
+
 This integration uses HotpotQA **distractor**: the Agent receives the question,
 ten context paragraphs with original sentence IDs, and a public JSON output
 schema. Gold answers and supporting facts stay in `EvaluationSpec`.
@@ -49,7 +54,7 @@ endpoint was unavailable during implementation; this is a pinned HF copy.
 For a different selection, produce a **new** manifest:
 
 ```powershell
-.venv/Scripts/python.exe -m experiments.prepare_hotpotqa --tasks 8 --similar 2 --regression 2 --test 8 --seed 43 --output experiments/data/hotpotqa_seed43.json
+.venv/Scripts/python.exe -m experiments.prepare_hotpotqa --tasks 8 --similar 2 --regression 2 --test 8 --seed 43 --selection legacy-shared --output experiments/data/hotpotqa_seed43.json
 ```
 
 Original JSON downloads can instead be supplied with `--train PATH --dev PATH`.

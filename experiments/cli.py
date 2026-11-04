@@ -77,6 +77,8 @@ def build_parser() -> argparse.ArgumentParser:
     batch.add_argument("--limit", type=int)
     batch.add_argument("--output", type=Path)
     batch.add_argument("--quiet", action="store_true")
+    batch.add_argument("--report-holdouts", action="store_true",
+                       help="record initial/final holdout performance for every episode, including unchanged Prompts")
     batch.add_argument("--set", dest="overrides", action="append", default=[], metavar="PATH=VALUE")
     summary = subparsers.add_parser("summarize-run", help="create one structured evolution.txt from a saved run-task result without executing models")
     summary.add_argument("result", type=Path)

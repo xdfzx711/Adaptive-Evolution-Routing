@@ -27,6 +27,7 @@ class TaskManifest(Settings):
     sources: list[DatasetSource] = Field(min_length=1)
     roles: dict[NonBlank, Literal["dev", "similar", "regression", "test"]]
     validation_sets: dict[NonBlank, HoldoutSelection]
+    holdout_reuse: Literal["allowed", "forbidden"] = "allowed"
     selection_policy: dict[str, JsonValue] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -41,6 +42,14 @@ class TaskManifest(Settings):
                 for key in getattr(selection, group):
                     if self.roles.get(key) != group:
                         raise ValueError(f"{task_id}.{group}: {key} must belong to the {group} pool")
+        if self.holdout_reuse == "forbidden":
+            assigned = [key for selection in self.validation_sets.values()
+                        for key in (*selection.similar, *selection.regression)]
+            if len(assigned) != len(set(assigned)):
+                raise ValueError("holdout_reuse=forbidden: each holdout belongs to exactly one current task")
+            reserved = {key for key, role in self.roles.items() if role in {"similar", "regression"}}
+            if set(assigned) != reserved:
+                raise ValueError("exclusive holdout pools must match the assigned holdouts exactly")
         return self
 
     @classmethod

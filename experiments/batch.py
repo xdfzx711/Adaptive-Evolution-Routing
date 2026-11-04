@@ -10,6 +10,7 @@ from aer_core.usage import sum_usage
 from aer_core.schemas.usage import ResourceUsage
 from experiments.configuration import load_experiment_config
 from experiments.orchestration import prepare_orchestrator
+from experiments.holdout_reporting import aggregate_holdouts, measure_holdouts, paired_metrics
 from plugins.storage._files import FileRoot, readable_json
 from plugins.storage.layout import episode_directory
 
@@ -28,10 +29,12 @@ def aggregate(entries):
                                         for entry in paired) if paired else None,
         "mean_native_metrics_evaluated": {key: fmean(entry["final_evaluation"]["metrics"][key] for entry in evaluated)
                                           for key in sorted(metrics)},
+        "current_task_initial_vs_final": paired_metrics([
+            (entry.get("initial_evaluation"), entry.get("final_evaluation")) for entry in entries], expected=len(entries)),
         "note": "Metrics use evaluated final states only; error/missing counts are reported separately."}
 
 
-def run_benchmark(path, *, run_id=None, limit=None, console=False):
+def run_benchmark(path, *, run_id=None, limit=None, console=False, report_holdouts=False):
     loaded = load_experiment_config(path)
     if limit is not None and (type(limit) is not int or limit < 1):
         raise ValueError("limit must be a positive integer")
@@ -51,17 +54,22 @@ def run_benchmark(path, *, run_id=None, limit=None, console=False):
         "score_policy": benchmark.evaluator.score_policy, "router": config.routing.plugin,
         "fixed_target": config.routing.fixed_target, "operators": dict(config.targets.default_operators),
         "task_mode": config.state.task_mode, "acceptance": config.validation.model_dump(mode="json"),
-        "requested_tasks": [task.task_id for task in tasks], "tasks": entries, "total_token_budget_enforced": False}
+        "requested_tasks": [task.task_id for task in tasks], "tasks": entries, "total_token_budget_enforced": False,
+        "report_holdouts": report_holdouts}
 
     def save():
         summary["aggregate"] = aggregate(entries)
+        summary["aggregate"]["requested_tasks"] = len(tasks)
+        summary["aggregate"]["pending_tasks"] = len(tasks) - len(entries)
+        if report_holdouts:
+            summary["aggregate"]["holdouts_initial_vs_final"] = aggregate_holdouts(entries)
         summary["usage"] = sum_usage(usages).model_dump(mode="json")
         with files.locked():
             files.replace("baseline_summary.json", readable_json(summary))
 
     save()
     for task in tasks:
-        similar, regression = benchmark.validation_groups(task) if config.evolution.mode != "disabled" else ((), ())
+        similar, regression = benchmark.validation_groups(task) if config.evolution.mode != "disabled" or report_holdouts else ((), ())
         entry = {"task_id": task.task_id, "holdouts": {"similar": [t.task_id for t in similar],
                   "regression": [t.task_id for t in regression]}}
         try:
@@ -99,6 +107,20 @@ def run_benchmark(path, *, run_id=None, limit=None, console=False):
                 rounds=rounds, usage=result.usage.model_dump(mode="json"), result_ref=saved["record_ref"])
             if result.evolution_rounds_used == 0:
                 entry["initial_evaluation"] = entry["final_evaluation"]
+            if report_holdouts:
+                if console:
+                    print(f"[留出报告] {task.task_id}: initial/final stable，复用已有评分并补齐缺失执行", flush=True)
+                try:
+                    report, extra_usage = measure_holdouts(episode, initial, final, (similar, regression))
+                except AERError as failure:
+                    info = failure.to_info()
+                    extra_usage = info.usage or ResourceUsage(input_tokens=None, output_tokens=None, total_tokens=None,
+                        model_calls=None, tool_calls=0, elapsed_seconds=0, usage_complete=False, usage_sources=["unknown"])
+                    report = {"status": "error", "observations": [], "error": info.model_dump(mode="json"),
+                              "usage": extra_usage.model_dump(mode="json")}
+                entry["holdout_reporting"] = report
+                usages.append(extra_usage)
+                entry["usage"] = sum_usage((result.usage, extra_usage)).model_dump(mode="json")
         except AERError as failure:
             info = failure.to_info()
             entry.update(status="error", final_evaluation=None, error=info.model_dump(mode="json"))
@@ -112,7 +134,9 @@ def run_benchmark(path, *, run_id=None, limit=None, console=False):
         # Failed continual episodes may have incomplete state; don't propagate it.
         if entry["status"] != "completed" and config.state.task_mode == "continual":
             break
-    summary["status"] = "completed" if all(entry["status"] == "completed" for entry in entries) else "completed_with_errors"
+    summary["status"] = "completed" if all(entry["status"] == "completed" and
+        (not report_holdouts or entry.get("holdout_reporting", {}).get("status") == "complete")
+        for entry in entries) else "completed_with_errors"
     if isinstance(benchmark.benchmark, PredictionExportProvider):
         predictions = benchmark.benchmark.export_predictions({entry["task_id"]: entry["final_output"]
             for entry in entries if entry.get("final_output") is not None})
@@ -141,7 +165,8 @@ def cli_run(args):
             raise ValueError("output must be a new file outside inputs and managed storage")
         if not target.parent.is_dir():
             raise ValueError("output parent directory must exist")
-    summary = run_benchmark(loaded, run_id=args.run_id, limit=args.limit, console=not args.quiet)
+    summary = run_benchmark(loaded, run_id=args.run_id, limit=args.limit, console=not args.quiet,
+                            report_holdouts=args.report_holdouts)
     if args.output:
         with args.output.open("x", encoding="utf-8") as stream:
             stream.write(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")

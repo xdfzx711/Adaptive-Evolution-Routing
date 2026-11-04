@@ -106,6 +106,73 @@ class HotpotGEPATests(unittest.TestCase):
         self.assertEqual(result["error_tasks"], 1)
         self.assertEqual(result["mean_score_evaluated"], 1)
 
+    def test_all_episode_reporting_reuses_accepted_validation_results(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, manifest = config_file(Path(directory), tasks=1)
+            self.model_patches(stack, rows)
+            summary = run_benchmark(path, report_holdouts=True)
+            entry = summary["tasks"][0]
+            report = entry["holdout_reporting"]
+            self.assertEqual(report["status"], "complete")
+            self.assertEqual(report["usage"]["total_tokens"], 0)
+            self.assertTrue(all(row[name]["cache_hit"] for row in report["observations"] for name in ("initial", "final")))
+            groups = summary["aggregate"]["holdouts_initial_vs_final"]
+            for group in groups.values():
+                self.assertEqual(group["paired_count"], 2)
+                self.assertEqual(group["initial_success_rate_all"], 0)
+                self.assertEqual(group["final_success_rate_all"], 1)
+
+    def test_rejected_candidate_reporting_uses_final_stable_not_candidate(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, manifest = config_file(Path(directory), tasks=1)
+            self.model_patches(stack, rows, regression_ids=next(iter(manifest.validation_sets.values())).regression)
+            summary = run_benchmark(path, report_holdouts=True)
+            report = summary["tasks"][0]["holdout_reporting"]
+            self.assertTrue(report["unchanged_version"])
+            self.assertEqual(report["usage"]["total_tokens"], 0)
+            regression = summary["aggregate"]["holdouts_initial_vs_final"]["regression"]
+            self.assertEqual(regression["initial_success_rate_all"], 1)
+            self.assertEqual(regression["final_success_rate_all"], 1)
+            self.assertEqual(regression["transitions"]["success_to_failure"], 0)
+
+    def test_no_candidate_still_measures_holdouts_and_preserves_version(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, manifest = config_file(Path(directory), tasks=1)
+            self.model_patches(stack, rows)
+            by_id = {row["_id"]: row for row in rows}
+            def perfect(model, request, run_ctx):
+                row = by_id[json.loads(request.messages[-1].content)["task_id"]]
+                return response(json.dumps({"answer": row["answer"], "supporting_facts": row["supporting_facts"]}))
+            stack.enter_context(patch.object(ScriptedModel, "generate", perfect))
+            summary = run_benchmark(path, report_holdouts=True)
+            entry = summary["tasks"][0]
+            self.assertEqual(entry["rounds"][0]["candidates"], [])
+            self.assertEqual(entry["initial_version_id"], entry["final_stable_version_id"])
+            report = entry["holdout_reporting"]
+            self.assertEqual(len(report["observations"]), 4)
+            self.assertTrue(all(not row["initial"]["cache_hit"] and row["final"]["cache_hit"] for row in report["observations"]))
+            self.assertGreater(report["usage"]["total_tokens"], 0)
+            self.assertEqual(summary["aggregate"]["current_task_initial_vs_final"]["transitions"]["both_success"], 1)
+
+    def test_missing_holdout_observations_are_not_silently_excluded(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, manifest = config_file(Path(directory), tasks=1)
+            self.model_patches(stack, rows)
+            by_id = {row["_id"]: row for row in rows}
+            def fail_holdouts(model, request, run_ctx):
+                row = by_id[json.loads(request.messages[-1].content)["task_id"]]
+                if row["_id"] not in manifest.validation_sets:
+                    raise RuntimeError("holdout execution unavailable")
+                return response(json.dumps({"answer": row["answer"], "supporting_facts": row["supporting_facts"]}))
+            stack.enter_context(patch.object(ScriptedModel, "generate", fail_holdouts))
+            summary = run_benchmark(path, report_holdouts=True)
+            self.assertEqual(summary["status"], "completed_with_errors")
+            self.assertTrue(summary["tasks"][0]["final_evaluation"]["success"])
+            regression = summary["aggregate"]["holdouts_initial_vs_final"]["regression"]
+            self.assertEqual(regression["missing_final_count"], 2)
+            self.assertEqual(regression["final_success_rate_all"], 0)
+            self.assertIsNone(regression["final_mean_score_evaluated"])
+
 
 class GenericBatchTests(unittest.TestCase):
     def test_existing_toy_benchmark_works_without_native_protocols(self):

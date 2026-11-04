@@ -107,10 +107,13 @@ class HotpotQABenchmark:
                 sources.append((str(source_path), source.sha256, source.source_split,
                                 stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
             records = _selected_records(tuple(sources), frozenset(manifest.roles))
+            selected_rows = {key: json.loads(serialized) for key, serialized, _ in records}
+            from .hotpotqa_selection import validate_selected_rows
+            validate_selected_rows(selected_rows, manifest)
             self._tasks, self._specs = {}, {}
             self._splits = {"dev": [], "validation": [], "test": []}
             for key, serialized, source_split in records:
-                row = json.loads(serialized)
+                row = selected_rows[key]
                 validate_row(row)
                 role = manifest.roles[key]
                 split = "validation" if role in {"similar", "regression"} else role
@@ -132,10 +135,13 @@ class HotpotQABenchmark:
                     private_parameters={"answer": row["answer"], "supporting_facts": row["supporting_facts"]})
             # Explicit manifest order is the reproducible episode order.
             self._splits = {split: tuple(self._tasks[key] for key in manifest.roles
-                if self._tasks[key] in tasks) for split, tasks in self._splits.items()}
+                if self._tasks[key].metadata["split"] == split) for split in self._splits}
             self._validation_sets = manifest.validation_sets
+            # Preserve the identity of manifests written before the optional
+            # exclusivity field existed, so legacy experiment caches stay valid.
+            identity_exclusions = {"holdout_reuse"} if "holdout_reuse" not in manifest.model_fields_set else None
             self.dataset_version = "hotpotqa.distractor." + sha256(
-                manifest.model_dump_json().encode()).hexdigest()[:20]
+                manifest.model_dump_json(exclude=identity_exclusions).encode()).hexdigest()[:20]
             self.source_paths = (path, *paths)
         except (OSError, ValueError, KeyError, TypeError) as error:
             raise BenchmarkError(f"Cannot load HotpotQA: {error}", stage="setup", plugin_id="hotpotqa_adapter") from error
