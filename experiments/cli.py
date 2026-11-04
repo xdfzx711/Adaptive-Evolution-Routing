@@ -75,6 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     batch.add_argument("config", type=Path)
     batch.add_argument("--run-id")
     batch.add_argument("--limit", type=int)
+    batch.add_argument("--workers", type=int, default=1,
+                       help="concurrent independent tasks in isolated processes (default: 1)")
     batch.add_argument("--output", type=Path)
     batch.add_argument("--quiet", action="store_true")
     batch.add_argument("--report-holdouts", action="store_true",

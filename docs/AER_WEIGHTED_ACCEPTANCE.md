@@ -1,5 +1,8 @@
 # 加权候选接受策略
 
+HotpotQA 三轮 baseline 的 `0.04` 收益阈值与 `0.10` 回归容忍度见
+[g004-r010 实验协议](AER_WEIGHTED_ACCEPTANCE_G004_R010.md)。下文保留通用插件定义及历史配置示例。
+
 `weighted_improvement` 是独立的 AcceptancePolicy 插件。它使用已有配对验证结果，不增加 Agent 执行，不修改 Evaluator 的评分公式。
 
 ```yaml
@@ -37,7 +40,8 @@ validation:
 - `delta_current_task_score` 表示当前任务分数变化。
 - `reward` 在新策略下表示综合收益 `U`。
 - `weighted_gain` 保存实际权重、三项贡献和总收益。
-- 历史经验、Router/Evolver 输入、每轮 `record.json` 以及 `evolution.txt` 均保留这些指标。没有额外日志文件。
+- 历史经验、Router/Evolver 输入、每轮 `record.json` 以及 `evolution.txt` 均保留这些指标。
+  新版 `run-benchmark` 另保存 `baseline_protocol.json`，记录本次运行实际使用的策略参数、轮数与并发数。
 
 旧策略 `improvement_with_regression_guard` 仍可通过配置选择，沿用独立验证收益和回归硬限制；旧经验记录仍可读取。
 

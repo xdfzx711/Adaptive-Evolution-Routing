@@ -1,5 +1,7 @@
 # HotpotQA：300 个独立任务的 Fixed-GEPA baseline
 
+> 三轮外层进化与三任务并行的新版运行方法见 [三轮 baseline](AER_HOTPOTQA_300_R3_BASELINE.md)。本文保留原一轮实验协议。
+
 本批使用 HotpotQA distractor。配置为
 `experiments/configs/v0_1_codex_hotpotqa_gepa_300.yaml`，数据清单为
 `experiments/data/hotpotqa_300_manifest.json`。

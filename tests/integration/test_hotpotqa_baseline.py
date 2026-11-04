@@ -10,6 +10,7 @@ import yaml
 
 from aer_core.errors import ContractError
 from experiments.batch import aggregate, run_benchmark
+from experiments.configuration import load_experiment_config
 from experiments.bootstrap import create_registry
 from experiments.execution import prepare_execution
 from experiments.optimization import ConfiguredModelFactory, IsolatedCandidateTrials
@@ -21,6 +22,65 @@ from tests.execution.helpers import RecordingModel, context, response
 
 @unittest.skipUnless(importlib.util.find_spec("gepa"), "install [gepa]")
 class HotpotGEPATests(unittest.TestCase):
+    def three_round_config(self, path):
+        return load_experiment_config(path, overrides=[
+            "limits.max_evolution_rounds=3", "evolution.stop_on_success=true",
+            "validation.min_improvement=0.04", "validation.max_regression_drop=0.10"])
+
+    def test_three_round_budget_stops_on_first_accepted_success(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, _ = config_file(Path(directory), tasks=1)
+            self.model_patches(stack, rows)
+            result = run_benchmark(self.three_round_config(path))
+            entry = result["tasks"][0]
+            self.assertEqual(len(entry["rounds"]), 1)
+            self.assertEqual(entry["stop_reason"], "task_succeeded")
+            self.assertTrue(entry["final_evaluation"]["success"])
+            self.assertTrue(entry["rounds"][0]["candidates"][0]["committed"])
+
+    def test_three_rejected_gepa_rounds_keep_initial_stable_version(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, manifest = config_file(Path(directory), tasks=1)
+            reflection = self.model_patches(stack, rows, regression_ids=next(iter(manifest.validation_sets.values())).regression)
+            attempts = iter(range(1, 4))
+            reflection.make_response = lambda *_: response(f"```\nIMPROVED reusable instructions {next(attempts)}\n```")
+            result = run_benchmark(self.three_round_config(path), report_holdouts=True)
+            entry = result["tasks"][0]
+            self.assertEqual(len(entry["rounds"]), 3)
+            self.assertEqual(entry["stop_reason"], "max_evolution_rounds_reached")
+            self.assertEqual(entry["final_stable_version_id"], entry["initial_version_id"])
+            for row in entry["rounds"]:
+                self.assertEqual(row["candidates"][0]["acceptance"]["reason"], "regression_guard")
+                self.assertFalse(row["candidates"][0]["committed"])
+            self.assertTrue(entry["holdout_reporting"]["unchanged_version"])
+
+    def test_partial_commit_survives_later_rounds_without_improvement(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, manifest = config_file(Path(directory), tasks=1)
+            self.model_patches(stack, rows)
+            generate = ScriptedModel.generate
+            current_id = next(iter(manifest.validation_sets))
+
+            def partial(model, request, run_ctx):
+                result = generate(model, request, run_ctx)
+                if (request.messages[0].content.startswith("IMPROVED") and
+                        json.loads(request.messages[-1].content)["task_id"] == current_id):
+                    payload = json.loads(result.content)
+                    payload["answer"] += " extra"
+                    return result.replace(content=json.dumps(payload))
+                return result
+
+            stack.enter_context(patch.object(ScriptedModel, "generate", partial))
+            result = run_benchmark(self.three_round_config(path), report_holdouts=True)
+            entry = result["tasks"][0]
+            self.assertEqual(len(entry["rounds"]), 3)
+            self.assertFalse(entry["final_evaluation"]["success"])
+            self.assertGreater(entry["final_evaluation"]["score"], 0)
+            self.assertTrue(entry["rounds"][0]["candidates"][0]["committed"])
+            self.assertEqual([row["candidates"] for row in entry["rounds"][1:]], [[], []])
+            self.assertIn("IMPROVED", entry["final_prompt"])
+            self.assertNotEqual(entry["final_stable_version_id"], entry["initial_version_id"])
+
     def model_patches(self, stack, rows, *, regression_ids=()):
         by_id = {row["_id"]: row for row in rows}
         reflection = RecordingModel(lambda *_: response("```\nIMPROVED reusable instructions\n```"))

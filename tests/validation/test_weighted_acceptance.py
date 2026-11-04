@@ -25,6 +25,23 @@ def scored_report(local_before, local_after, similar_before=0, similar_after=0, 
 
 
 class WeightedAcceptanceTests(unittest.TestCase):
+    def test_baseline_004_threshold_and_010_guard_inclusive_boundaries(self):
+        policy = WeightedImprovement(settings(acceptance_policy="weighted_improvement",
+                                              min_improvement=0.04, max_regression_drop=0.10))
+        cases = [
+            (scored_report(0, 0.08), True, "improved"),
+            (scored_report(0, 0.079), False, "insufficient_improvement"),
+            # .5 * .13 + .25 * (-.1) = .04: both equality boundaries pass.
+            (scored_report(0, 0.13, regression_after=0.9), True, "improved"),
+            (scored_report(0, 1, regression_after=0.899), False, "regression_guard"),
+            # Current task need not succeed to commit a transferable improvement.
+            (scored_report(0, 0, similar_after=0.2), True, "improved"),
+        ]
+        for report, accepted, reason in cases:
+            with self.subTest(report=report):
+                decision = policy.evaluate(report)
+                self.assertEqual((decision.accepted, decision.reason), (accepted, reason))
+
     def test_observed_requests_and_pylint_tradeoffs(self):
         policy = WeightedImprovement(weighted_settings())
         cases = [
