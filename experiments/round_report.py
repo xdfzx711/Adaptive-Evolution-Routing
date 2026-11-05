@@ -33,7 +33,7 @@ def error_view(error):
 
 def diagnosis_view(value):
     return fields(value, "source", "reason_code", "explanation", "observations", "hypotheses",
-                  "evidence_step_ids", "confidence", "usage")
+                  "evidence_step_ids", "confidence", "usage", "unknowns", "diagnosis_version")
 
 
 def execution_view(value):

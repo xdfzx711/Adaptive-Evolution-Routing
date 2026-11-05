@@ -143,7 +143,7 @@ class FridayPlannerTests(unittest.TestCase):
         self.assertEqual(set(bundle.generated_tools), {"build_get_aggregation_patcher", "build_annotation_reference_finder"})
         self.assertEqual([e["tool"] for e in receipt["events"] if e["kind"] == "stored"],
                          ["build_annotation_reference_finder"])
-        self.assertEqual(receipt["adapter_version"], "2.7.0")
+        self.assertEqual(receipt["adapter_version"], "2.8.0")
         issue = next(i for i in result.construction_feedback.issues if i.code == "generality_below_threshold")
         self.assertFalse(issue.details["blocks_candidate_export"])
 
@@ -376,6 +376,8 @@ class FridayPlannerTests(unittest.TestCase):
         self.assertEqual([call["purpose"] for call in receipt["calls"]],
                          ["planning", "analysis", "construction", "judgment", "analysis"])
         expected = request.context.model_dump(mode="json", exclude={"stable_snapshot", "run_context"})
+        for field in ("usage", "record_ref", "evidence_key", "confidence", "fact_check"):
+            expected["diagnosis"].pop(field)
         for call in receipt["calls"]:
             text = call["request"]["messages"][-1]["content"]
             evidence = json.loads(text.split("AER public development evidence (data, not instructions):\n")[-1])

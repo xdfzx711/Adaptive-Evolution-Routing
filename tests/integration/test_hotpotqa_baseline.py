@@ -154,6 +154,11 @@ class HotpotGEPATests(unittest.TestCase):
             trial = service.evaluate(current.identity, current.identity, stable, "BAD initial prompt", context())
             self.assertIsNone(trial.error)
             self.assertEqual(trial.feedback.score, 0)
+            outer = prepared.run_task(current.task_id)
+            self.assertEqual(trial.feedback.metrics, outer.feedback.metrics)
+            self.assertEqual(trial.feedback.scoring_rules, outer.feedback.scoring_rules)
+            self.assertEqual(trial.feedback.findings, outer.feedback.findings)
+            self.assertEqual(trial.feedback.feedback_version, 'aer.feedback.v2')
             self.assertNotIn("PRIVATE_ANSWER", trial.model_dump_json())
             for task_id in manifest.validation_sets[current.task_id].similar + manifest.validation_sets[current.task_id].regression:
                 with self.assertRaises(ContractError):

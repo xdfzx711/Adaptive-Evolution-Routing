@@ -109,7 +109,9 @@ class IsolatedCandidateTrials:
             capabilities = agent.capabilities()
             tools = built.instances.get("tools")
             specs = tools.specifications() if tools is not None else ()
+            from aer_core.scoring_feedback import scorer_feedback_policy
             policy = ContextPolicy(task=task, output_fields=declaration.output_fields,
+                **scorer_feedback_policy(evaluator, self.evaluator_settings.plugin if self.evaluator_settings else config.assessment.evaluator),
                 metadata_fields=declaration.metadata_fields, allow_evolution=True,
                 reason_messages={**declaration.reason_messages, **getattr(evaluator, "public_reason_messages", {})},
                 state_fields=capabilities.feedback_state_fields,

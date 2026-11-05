@@ -221,7 +221,12 @@ class FeedbackContractTests(unittest.TestCase):
             self.assertEqual(first_input["execution"]["trajectory"][1]["payload"]["output"], {"upper": "ALPHA"})
             self.assertEqual(record.feedback.reason_code, "needs_revision")
             scored = prepared.benchmark.score(record.execution, operation_id="offline-native")
-            self.assertEqual(prepared.benchmark.public_feedback(scored), record.feedback)
+            rescored_feedback = prepared.benchmark.public_feedback(scored)
+            identities = {"evaluation_id", "execution_operation_id"}
+            self.assertEqual(rescored_feedback.model_dump(exclude=identities), record.feedback.model_dump(exclude=identities))
+            self.assertEqual(rescored_feedback.evaluation_id, scored.evaluation_id)
+            self.assertEqual(rescored_feedback.execution_operation_id, scored.execution_operation_id)
+            self.assertNotEqual(rescored_feedback.evaluation_id, record.feedback.evaluation_id)
             self.assertEqual(prepared.benchmark.as_dict()["score_policy"], "exact normalized text")
             startup = prepare_orchestrator(path, run_id="controller")
             result = startup.run_task("dev")
@@ -229,7 +234,8 @@ class FeedbackContractTests(unittest.TestCase):
             self.assertEqual(result.final_execution.output["normalized"], "ALPHA")
             self.assertEqual(startup.execution.storage.version_store.load(result.initial_version_id).config, {"strategy": "uppercase"})
             second_input = json.loads(model.requests[-2][0].messages[-1].content)
-            self.assertEqual(second_input["feedback"], first_input["feedback"])
+            self.assertEqual({k: v for k, v in second_input["feedback"].items() if k not in identities},
+                             {k: v for k, v in first_input["feedback"].items() if k not in identities})
             self.assertEqual(second_input["execution"]["output"], first_input["execution"]["output"])
             evolution_input = json.loads(model.requests[-1][0].messages[-1].content)
             self.assertEqual(evolution_input["stable_snapshot"]["config"], {"strategy": "uppercase"})

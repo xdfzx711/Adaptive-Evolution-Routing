@@ -15,7 +15,7 @@ class ToolConstructionRecord(DomainModel):
     task_id: Identifier
     parent_version_id: Identifier
     upstream_revision: Identifier
-    adapter_version: Identifier = "2.7.0"
+    adapter_version: Identifier = "2.8.0"
     retrieval: Literal["lexical_description"] = "lexical_description"
     started_at: UtcTimestamp
     finished_at: UtcTimestamp

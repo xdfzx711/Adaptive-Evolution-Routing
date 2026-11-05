@@ -120,7 +120,9 @@ class EvolutionContext(DomainModel):
     @model_validator(mode="after")
     def state_matches_execution(self):
         if self.evaluation_signal is not None and any(
-                getattr(self.evaluation_signal, name) != getattr(self.feedback, name) for name in FeedbackView.model_fields):
+                getattr(self.evaluation_signal, name) != getattr(self.feedback, name) for name in FeedbackView.model_fields
+                if name not in {"evaluation_id", "execution_operation_id", "evaluator_id"}
+                or getattr(self.feedback, name) is not None):
             raise ValueError("Evaluation signal must match public evaluator feedback")
         if self.execution.task_id != self.task.task_id:
             raise ValueError("execution must belong to the current task")

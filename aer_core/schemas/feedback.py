@@ -4,6 +4,7 @@ from pydantic import Field
 
 from .base import DomainModel, Identifier, Items, NonNegativeInt, PositiveInt, ReadOnlyMap
 from .task import TaskIdentity
+from .scoring import ScoringRules
 
 
 class TaskFeedbackPolicy(DomainModel):
@@ -30,3 +31,8 @@ class ContextPolicy(DomainModel):
     history_max_text_chars: PositiveInt = 320
     history_max_change_chars: PositiveInt = 4000
     history_max_construction_chars: PositiveInt = 16000
+    feedback_version: Identifier = "aer.feedback.v1"
+    include_metrics: bool = False
+    metric_fields: Items[Identifier] = ()
+    scoring_rules: ScoringRules | None = None
+    verbatim_evaluator_feedback: bool = False

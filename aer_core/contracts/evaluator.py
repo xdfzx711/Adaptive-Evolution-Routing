@@ -3,6 +3,14 @@ from typing import Protocol, runtime_checkable
 from aer_core.schemas.execution import EvaluationResult, ExecutionResult
 from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.task import EvaluationSpec, Task
+from aer_core.schemas.scoring import ScoringRules
+
+
+@runtime_checkable
+class ScoringRulesProvider(Protocol):
+    """Optional public description of the actual scorer; never includes private labels."""
+
+    def public_scoring_rules(self) -> ScoringRules: ...
 
 
 @runtime_checkable

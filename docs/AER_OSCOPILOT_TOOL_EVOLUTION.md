@@ -1,8 +1,10 @@
 # OS-Copilot 工具演化插件
 
-`oscopilot_tool_evolver` 通过现有插件注册接口接入 AER，适配器版本为 `2.7.0`。工作区、模型、工件存储和进度报告通过依赖注入提供；AER 核心不依赖 OS-Copilot 的内部工具格式。
+`oscopilot_tool_evolver` 通过现有插件注册接口接入 AER，适配器版本为 `2.8.0`。工作区、模型、工件存储和进度报告通过依赖注入提供；AER 核心不依赖 OS-Copilot 的内部工具格式。
 
 ## 工具集与提交边界
+
+诊断和进化使用共享的 [公开评分与诊断协议 v2](AER_DOMAIN_CONTRACTS.md#公开评分与诊断协议-v2)。OS-Copilot 的规划、构造与判断均收到原生指标、评分说明和程序生成的确定性解释；模型诊断中的假设需要验证，不能当作隐藏参考答案。更换 benchmark 时由评估器声明评分语义，通用诊断/工具提示无需逐题改写。没有详细规则的评估器会明确标记为摘要模式。
 
 | 对象 | 内容与用途 | 生效规则 |
 | --- | --- | --- |
@@ -78,6 +80,12 @@ AER：当前、相似、回归任务验证 → 接受策略 → 提交新生效�
 上游位于 submodule `third_party/OS-Copilot`，固定提交 `f720af8807e49a92dda64572d2c6bc6c0ac7ee7e`。启动检查版本及工作树，保留上游源码和许可证。source.py 显式列出依赖注入；FridayPlanner、FridayExecutor、FridayRetriever 与 ToolManager 方法直接从固定源码加载。
 
 插件临时工具库使用确定性词项描述索引，记录 retrieval=lexical_description；独立 baseline 保留 Chroma/embedding，二者不是相同检索配置。
+
+2.8.0 将 AER 追加的规划、构造、交付和导出提示改为任务通用描述：从已有公开任务及外层 Agent prompt
+读取输入和操作限制，不假设代码仓库、Shell、网络或预配置应用存在。JSON 数据工具直接接收调用参数；
+文件工具仍支持工作区路径绑定。保留上游规划、执行、评判、修复及 AER 接受策略。
+Codex 工具描述改用当前任务输入示例，执行条件中的 generated-tool adapter 版本升为 3.1.0，避免旧描述的缓存混用。
+HotpotQA 的配置覆盖、预算和运行说明见 [300 题实验](AER_HOTPOTQA_300_R3_BASELINE.md#fixed-tool--os-copilot)。
 
 ```powershell
 git submodule update --init third_party/OS-Copilot

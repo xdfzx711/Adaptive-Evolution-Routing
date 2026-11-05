@@ -170,6 +170,13 @@ class EvolutionTextReport:
             lines.extend(f"  {item.text}；证据事件={list(item.evidence_step_ids)}" for item in items)
             if not items:
                 lines.append("  未记录")
+        for item in (*value.observations, *value.hypotheses):
+            if item.evidence_refs:
+                lines.append("  公开证据引用：" + ", ".join(ref.source + ref.path for ref in item.evidence_refs))
+            if item.verification:
+                lines.append("  验证方法：" + item.verification)
+        if value.unknowns:
+            lines.append("尚不确定：" + "; ".join(value.unknowns))
         if value.fact_check:
             lines.append("源码核对（静态推断，未执行项目测试）；证据版本：" + str(value.fact_check.get("evidence_version", "未完成")))
             claims = {claim["id"]: claim["statement"] for claim in value.fact_check.get("draft", {}).get("claims", ())}

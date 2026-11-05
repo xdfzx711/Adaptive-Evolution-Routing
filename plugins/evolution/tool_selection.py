@@ -1,6 +1,7 @@
 """Select a versioned set of task tools without depending on a specific Agent."""
 
 import json
+from aer_core.diagnostic_evidence import evolution_context_payload
 from time import monotonic
 
 from aer_core.config.models import PositiveInt, Settings
@@ -55,7 +56,7 @@ class ToolSelectionEvolver:
                 "current_selection": {"enabled_tools": list(current.enabled_tools)},
                 "tool_catalog": {name: tool.model_dump(mode="json") for name, tool in catalog.items()},
                 "routing_decision": {"target": request.decision.target, "rationale": request.decision.rationale},
-                "context": request.context.model_dump(mode="json", exclude={"stable_snapshot", "run_context"})}
+                "context": evolution_context_payload(request.context)}
             model_request = ModelRequest(messages=[ModelMessage(role="system", content=(
                 "Choose the complete set of additional tools available to the task execution Agent. "
                 "Use only identifiers in tool_catalog. Add, remove or replace tools based on public failure evidence, "

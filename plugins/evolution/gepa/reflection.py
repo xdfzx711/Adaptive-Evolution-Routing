@@ -1,4 +1,5 @@
 from dataclasses import replace
+from aer_core.diagnostic_evidence import FEEDBACK_GUIDANCE
 from time import monotonic
 
 from aer_core.errors import AERError, ContractError, EvolutionError, OperationTimeout
@@ -24,7 +25,7 @@ class ProviderReflection:
             "Command quoting or permission errors do not justify switching to another operating system or assuming "
             "that a shell is unavailable. Do not embed task-specific answers, patches, private labels "
             "or validation/test examples in the new instructions. Do not repeat earlier prompt candidates. "
-            "Follow the requested response format."))]
+            "Follow the requested response format." + FEEDBACK_GUIDANCE))]
         if isinstance(prompt, str):
             messages.append(ModelMessage(role="user", content=prompt))
         else:

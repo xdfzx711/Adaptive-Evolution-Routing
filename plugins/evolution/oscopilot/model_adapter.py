@@ -41,7 +41,7 @@ class ModelAdapter:
     def scoped(self, purpose, *, evidence=None, include_evidence=True):
         """Share provider, accounting and limits while labelling the native stage."""
         return ModelAdapter(self.provider, self.context, self.config, self.record, self.calls, self.deadline,
-            purpose=purpose, evidence=(self.evidence if evidence is None else json.dumps(evidence, ensure_ascii=False))
+            purpose=purpose, evidence=(self.evidence if evidence is None else json.dumps(evidence, ensure_ascii=False, separators=(",", ":")))
             if include_evidence else None,
             progress=self.progress, allowance=self.allowance)
 

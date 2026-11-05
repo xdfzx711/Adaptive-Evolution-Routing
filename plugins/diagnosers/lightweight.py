@@ -1,5 +1,5 @@
 from aer_core.errors import ContractError
-from aer_core.schemas.execution import Diagnosis, ExecutionView, FeedbackView
+from aer_core.schemas.execution import Diagnosis, DiagnosisStatement, ExecutionView, FeedbackView
 from aer_core.schemas.runtime import RunContext
 from aer_core.schemas.task import TaskView
 
@@ -15,6 +15,13 @@ class LightweightDiagnoser:
             return tuple(event.seq for event in result.trajectory if event.kind in kinds)
 
         def diagnosis(code, explanation, steps=()):
+            if feedback.feedback_version == "aer.feedback.v2":
+                return Diagnosis(reason_code=code,
+                    explanation=explanation, evidence_step_ids=steps,
+                    observations=[DiagnosisStatement(text=item.text, evidence_refs=item.evidence_refs)
+                                  for item in feedback.findings],
+                    unknowns=() if feedback.success else ("The failure's causal mechanism is not established by evaluator metrics alone.",),
+                    diagnosis_version="aer.diagnosis.v2")
             return Diagnosis(reason_code=code, explanation=explanation, evidence_step_ids=steps, confidence=None)
 
         if feedback.success:

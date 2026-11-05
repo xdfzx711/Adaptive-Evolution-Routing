@@ -1,10 +1,11 @@
-"""Shared public-feedback construction; private scorer prose is never forwarded."""
+"""Shared public feedback; raw evaluator prose requires an explicit public-text contract."""
 
 from aer_core.errors import ContractError, DiagnosisError
-from aer_core.schemas.execution import Diagnosis, ExecutionView, FeedbackView, TraceEvent
+from aer_core.schemas.execution import Diagnosis, DiagnosisStatement, ExecutionView, FeedbackView, TraceEvent
 from aer_core.schemas.feedback import ContextPolicy
 from aer_core.schemas.task import TaskIdentity, TaskView
 from aer_core.schemas.validation import evaluations_match
+from aer_core.scoring_feedback import scoring_findings
 
 
 PUBLIC_REASONS = {
@@ -26,23 +27,44 @@ class PublicFeedbackBuilder:
     def feedback(self, evaluation):
         code = "correct" if evaluation.success else evaluation.reason_code
         code = code if code in self.messages else "unknown_failure"
+        extra = {}
+        if self.policy.feedback_version != "aer.feedback.v1":
+            rules = self.policy.scoring_rules
+            if rules is not None and evaluation.assessment_version not in {None, rules.scorer_version}:
+                raise ContractError("Evaluation and scoring rules versions differ", stage="evaluation")
+            metrics = {name: value for name, value in evaluation.metrics.items()
+                       if name in self.policy.metric_fields} if self.policy.include_metrics else {}
+            extra = dict(feedback_version=self.policy.feedback_version, metrics=metrics, scoring_rules=rules,
+                findings=scoring_findings(metrics, rules), evaluator_reason_code=evaluation.reason_code,
+                evaluator_feedback=evaluation.feedback if self.policy.verbatim_evaluator_feedback else None,
+                evaluation_id=evaluation.evaluation_id, execution_operation_id=evaluation.execution_operation_id,
+                evaluator_id=self.policy.evaluator_id, task_id=evaluation.task_id, agent_version_id=evaluation.agent_version_id)
         return FeedbackView(score=evaluation.score, success=evaluation.success,
-                            reason_code=code, public_feedback=self.messages[code], assessment_version=evaluation.assessment_version)
+                            reason_code=code, public_feedback=self.messages[code], assessment_version=evaluation.assessment_version,
+                            **extra)
 
-    def diagnosis_view(self, diagnosis: Diagnosis | None, visible_steps) -> Diagnosis | None:
+    def diagnosis_view(self, diagnosis: Diagnosis | None, visible_steps, *, historical=False, feedback=None) -> Diagnosis | None:
         if diagnosis is None:
             return None
         code = diagnosis.reason_code if diagnosis.reason_code in self.messages else "unknown_failure"
         steps = set(visible_steps)
         model = diagnosis.source == "model"
+        rule_facts = [DiagnosisStatement(text=item.text, evidence_refs=item.evidence_refs)
+                      for item in feedback.findings] if feedback is not None and not historical else []
         return Diagnosis(reason_code=code, explanation=diagnosis.explanation if model else self.messages[code],
             confidence=diagnosis.confidence, source=diagnosis.source,
             evidence_step_ids=[step for step in diagnosis.evidence_step_ids if step in steps],
-            observations=[item.replace(evidence_step_ids=[step for step in item.evidence_step_ids if step in steps])
-                          for item in diagnosis.observations] if model else [],
-            hypotheses=[item.replace(evidence_step_ids=[step for step in item.evidence_step_ids if step in steps])
+            observations=[item.replace(evidence_step_ids=[step for step in item.evidence_step_ids if step in steps],
+                                      evidence_refs=() if historical else item.evidence_refs)
+                          for item in diagnosis.observations] if model else rule_facts,
+            hypotheses=[item.replace(evidence_step_ids=[step for step in item.evidence_step_ids if step in steps],
+                                    evidence_refs=() if historical else item.evidence_refs)
                         for item in diagnosis.hypotheses] if model else [],
-            fact_check=diagnosis.model_dump(mode="json")["fact_check"] if model else None, evidence_key=diagnosis.evidence_key)
+            fact_check=diagnosis.model_dump(mode="json")["fact_check"] if model else None, evidence_key=diagnosis.evidence_key,
+            unknowns=diagnosis.unknowns if model else (
+                ("The failure's causal mechanism is not established by evaluator metrics alone.",)
+                if feedback is not None and not feedback.success and diagnosis.diagnosis_version == "aer.diagnosis.v2" else ()),
+            diagnosis_version=diagnosis.diagnosis_version)
 
     def public_views(self, task, execution, evaluation):
         """Shared filtering for standalone diagnosis and evolution contexts."""
@@ -105,7 +127,7 @@ class PublicFeedbackBuilder:
         return tuple(visible)
 
 
-def validate_diagnosis(value, execution, feedback=None):
+def validate_diagnosis(value, execution, feedback=None, task=None):
     if not isinstance(value, Diagnosis):
         raise DiagnosisError("Diagnoser must return Diagnosis", stage="diagnosis")
     if not value.all_evidence_step_ids <= {event.seq for event in execution.trajectory}:
@@ -114,4 +136,11 @@ def validate_diagnosis(value, execution, feedback=None):
     if feedback is not None and not feedback.success and value.reason_code == "no_failure":
         raise DiagnosisError("A failed evaluation cannot be diagnosed as no_failure", stage="diagnosis",
                              usage=value.usage, evidence_ref=value.record_ref)
+    if feedback is not None and task is not None:
+        from aer_core.diagnostic_evidence import validate_references
+        try:
+            validate_references(value, task, execution, feedback)
+        except DiagnosisError as failure:
+            raise DiagnosisError(str(failure), stage="diagnosis", usage=value.usage,
+                                 evidence_ref=value.record_ref) from failure
     return value

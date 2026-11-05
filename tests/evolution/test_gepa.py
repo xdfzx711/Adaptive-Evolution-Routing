@@ -49,6 +49,23 @@ def setup(**changes):
 
 @unittest.skipUnless(importlib.util.find_spec("gepa"), "install the [gepa] extra")
 class GEPATests(unittest.TestCase):
+    def test_reflection_separates_outer_diagnosis_evidence_from_internal_trial(self):
+        from aer_core.schemas.execution import Diagnosis
+        request, _, trials, _, config = setup()
+        outer = request.context.feedback.replace(feedback_version="aer.feedback.v2", metrics={"f1": 0.2})
+        diagnosis = Diagnosis(reason_code=outer.reason_code, explanation="Outer baseline failed.", source="model",
+            observations=[{"text": "Outer answer F1 is partial.",
+                           "evidence_refs": [{"source": "evaluation", "path": "/metrics/f1"}]}])
+        request = replace(request, context=request.context.replace(feedback=outer, diagnosis=diagnosis))
+        adapter = AERGEPAAdapter(trials, request, SearchRecord("seed", config))
+        batch = adapter.evaluate([adapter.current_task], {"prompt": "IMPROVED"}, capture_traces=True)
+        rows = adapter.make_reflective_dataset({"prompt": "IMPROVED"}, batch, ["prompt"])["prompt"]
+        for row in rows:
+            self.assertEqual(row["Feedback"]["score"], 1)
+            self.assertEqual(row["Outer Baseline Evidence"]["evaluation"]["metrics"], {"f1": 0.2})
+            self.assertEqual(row["Outer Baseline Diagnosis"]["observations"][0]["evidence_refs"][0]["path"], "/metrics/f1")
+            self.assertNotIn("usage", row["Outer Baseline Diagnosis"])
+
     def test_three_samples_are_reused_for_reflection_and_selection(self):
         request, _, trials, _, config = setup()
         record = SearchRecord("seed", config)

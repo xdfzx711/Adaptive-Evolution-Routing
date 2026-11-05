@@ -117,7 +117,7 @@ class LLMDiagnoserTests(unittest.TestCase):
             self.assertEqual(len(proposals), 2)
             self.assertEqual(proposals[0]["context"]["diagnosis"]["explanation"], json.loads(analysis_text())["explanation"])
             self.assertEqual(len(proposals[0]["context"]["diagnosis"]["hypotheses"]), 1)
-            self.assertIsNone(proposals[0]["context"]["diagnosis"]["record_ref"])
+            self.assertNotIn("record_ref", proposals[0]["context"]["diagnosis"])
             self.assertEqual(result.usage.model_calls, 4)
             self.assertEqual(result.usage.total_tokens, sum(value.input_tokens + value.output_tokens for value in costs))
             text = (startup.execution.storage.run_root / "evolution.txt").read_text(encoding="utf-8")

@@ -4,6 +4,38 @@
 
 ## 1. 模型位置与数据边界
 
+### 公开评分与诊断协议 v2
+
+实验装配入口使用 `aer.feedback.v2`。Benchmark 原生评估器继续计算分数、指标与成功条件；AER 不重算或替换原生评分，只构建供诊断和进化共同使用的公开反馈。
+
+| 字段 | 来源和用途 |
+| --- | --- |
+| `score / success / assessment_version` | 原始评估结果；保持数值和判定不变 |
+| `metrics` | 评估器在指标定义或 `public_metric_fields` 中声明公开的全部数值指标；未声明指标继续过滤，缺失保持缺失，不补零 |
+| `reason_code / public_feedback` | 现有公开原因映射，保留兼容性 |
+| `evaluator_reason_code` | 评估器原始原因分类，避免公开映射丢失信息 |
+| `evaluator_feedback` | 仅在评估器声明 `public_feedback_text=True` 时原样公开文本；其他评估器继续过滤自由文本 |
+| `scoring_rules` | 版本、实际 scorer 版本、主要指标、指标定义、评分规则、确定性解释条件和完整性声明 |
+| `findings` | 程序根据已有指标及已声明条件生成的解释，并附公开证据引用 |
+| `evaluation_id / execution_operation_id / evaluator_id / task_id / agent_version_id` | 反馈对应的评估、执行、插件、任务及版本身份 |
+
+评估器可选实现 `ScoringRulesProvider.public_scoring_rules()`，不改变原有 `EvaluatorPlugin` 必需接口。未实现者使用现有 `score_policy/scorer_version`，标记 `summary_only`，不得推断未声明的规则；需要公开指标时声明 `public_metric_fields`。规则和评估结果若均提供 scorer 版本，必须一致。独立结果展示入口仍允许传入其他评估器产生的记录，此时退回未知规则摘要并保留实际 assessment 版本，不套用当前配置评估器的指标公开声明和规则。规则中不得放参考答案、私有评分参数或私有文件路径。HotpotQA 的固定上游评分代码未改动；这里只声明归一化、yes/no 特例、证据集合和 joint 指标的实际语义。静态补丁评分明确是相似度代理，不能推断测试是否通过。
+
+诊断模型只生成 `explanation / observations / hypotheses / unknowns`。观察必须带 `evidence_refs`；假设必须说明 `verification`。引用来源限于 `task / execution / evaluation / scoring_rules`，路径是公开对象内的 JSON Pointer（轨迹按数组位置寻址，区别于事件 `seq`）。程序校验引用是否存在；这不等于证明自然语言解释或因果关系正确。失败分类由公开反馈决定，模型不再生成 `reason_code` 或数值置信度。
+
+两条消费路径共享评分事实：
+
+既有规则诊断继续保留 `step_limit` 等可由执行轨迹直接确定的分类；公开视图不转发规则诊断器的自由文本，确定性观察从同一反馈的 `findings` 重新构建。
+
+1. 原生评估结果 → 公开反馈与评分说明 → 诊断模型 → 带证据及不确定性的诊断。
+2. 同一公开反馈 + 任务/执行 + 诊断 + 历史 → 路由/进化方法 → 候选 → AER 原有验证及接受流程。
+
+OS-Copilot、GEPA、Jev、ReasoningBank、SkillClaw 及基础进化器使用这些字段。GEPA 内部试评也调用相同反馈构造器；外层诊断单独携带外层证据，不能视为内部候选执行的诊断。历史诊断不沿用指向当前任务的证据路径。Jev/SkillClaw 保留既有上下文预算，明确说明其任务/轨迹视图可能截断；完整输入仍在 AER 工件中。
+
+模型可见诊断移除计费、工件路径、缓存键和数值置信度；非空的既有源码核验结果仍保留。完整诊断回执和实际调用成本继续落盘。缓存键包含任务、公开执行、公开反馈/规则及诊断提示版本；同证据可复用，变更指标或规则会失效。
+
+旧 `FeedbackView/Diagnosis` JSON 缺省为 v1，原有低层 `ContextPolicy` 默认行为不变，旧格式诊断响应仍可解析。升级后新实验的反馈协议与历史实验不同：比较 GEPA、OS-Copilot、Jev 时应统一代码与协议版本，保留旧运行目录，使用新 run_id。无需新增 fixed-tool YAML，继续复用已有配置与运行覆盖参数。
+
 | 模块 | 主要类型 |
 | --- | --- |
 | `aer_core/schemas/task.py` | Task、TaskIdentity、TaskView、EvaluationSpec |

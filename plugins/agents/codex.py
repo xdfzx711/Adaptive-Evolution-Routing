@@ -294,7 +294,7 @@ class CodexCliAgent:
                 "seed_supported": False, "model_calls_reported": False, "tool_calls_scope": "visible_cli_items",
                 **({"generated_tool_runtime": runtime_identity(self.settings.tooling.generated_tools.python_executable)}
                    if self.settings.tooling and self.settings.tooling.generated_tools else {}),
-                **({"tool_adapter_version": "3.0.0" if self.settings.tooling.generated_tools else "1.0.0",
+                **({"tool_adapter_version": "3.1.0" if self.settings.tooling.generated_tools else "1.0.0",
                     "tool_catalog": self.settings.tooling.public_catalog()}
                    if self.settings.tooling is not None else {})}
 

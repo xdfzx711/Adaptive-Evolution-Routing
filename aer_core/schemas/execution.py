@@ -1,7 +1,7 @@
 """Execution facts, external evaluations and public feedback views."""
 
 from typing import Literal
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from .base import (
     DomainModel, FiniteFloat, Identifier, Items, JsonObject,
@@ -10,6 +10,7 @@ from .base import (
 from .references import ArtifactRef
 from .states import ExecutionStatus, ExecutionStatusValue, StageValue
 from .usage import ResourceUsage
+from .scoring import EvidenceReference, ScoringFinding, ScoringRules
 
 
 class ErrorInfo(DomainModel):
@@ -82,6 +83,17 @@ class FeedbackView(DomainModel):
     public_feedback: str
     evidence_step_ids: Items[NonNegativeInt] = ()
     assessment_version: Identifier | None = None
+    feedback_version: Identifier = "aer.feedback.v1"
+    metrics: ReadOnlyMap[FiniteFloat] = Field(default_factory=dict)
+    scoring_rules: ScoringRules | None = None
+    findings: Items[ScoringFinding] = ()
+    evaluator_feedback: str | None = None
+    evaluator_reason_code: Identifier | None = None
+    evaluation_id: Identifier | None = None
+    execution_operation_id: Identifier | None = None
+    evaluator_id: Identifier | None = None
+    task_id: Identifier | None = None
+    agent_version_id: Identifier | None = None
 
 
 class EvaluationSignal(FeedbackView):
@@ -95,6 +107,8 @@ class EvaluationSignal(FeedbackView):
 class DiagnosisStatement(DomainModel):
     text: Identifier
     evidence_step_ids: Items[NonNegativeInt] = ()
+    evidence_refs: Items[EvidenceReference] = ()
+    verification: str | None = None
 
 
 class Diagnosis(DomainModel):
@@ -109,6 +123,8 @@ class Diagnosis(DomainModel):
     record_ref: ArtifactRef | None = None
     fact_check: JsonObject | None = None
     evidence_key: Identifier | None = None
+    unknowns: Items[str] = ()
+    diagnosis_version: Identifier = "aer.diagnosis.v1"
 
     @property
     def all_evidence_step_ids(self):

@@ -52,6 +52,11 @@ def score_prediction(output, answer, supporting_facts):
 
 class HotpotQAEvaluator:
     plugin_id = "hotpotqa_evaluator"
+    public_feedback_text = True
+
+    def public_scoring_rules(self):
+        from .scoring_rules import hotpotqa_rules
+        return hotpotqa_rules(self)
 
     def __init__(self, settings):
         self.settings = settings

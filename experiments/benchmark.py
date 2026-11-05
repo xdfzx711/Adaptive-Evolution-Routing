@@ -96,6 +96,7 @@ class PreparedBenchmark:
         return evaluation
 
     def public_feedback(self, evaluation):
+        from aer_core.scoring_feedback import scorer_feedback_policy
         task = next((task for task in self.execution_tasks if task.task_id == evaluation.task_id), None)
         if task is None:
             raise EvaluationError("Evaluation task is outside the configured selection", stage="evaluation")
@@ -103,7 +104,10 @@ class PreparedBenchmark:
         if not isinstance(declaration, TaskFeedbackPolicy) or declaration.task != task.identity:
             raise ContractError("Feedback declaration must match the task", stage="evaluation")
         return PublicFeedbackBuilder(ContextPolicy(output_fields=declaration.output_fields,
-            reason_messages=declaration.reason_messages)).feedback(evaluation)
+            **scorer_feedback_policy(self.evaluator, self.loaded_config.config.assessment.evaluator,
+                                     assessment_version=evaluation.assessment_version),
+            reason_messages={**declaration.reason_messages, **(getattr(self.evaluator, "public_reason_messages", {})
+                if evaluation.assessment_version in {None, self.evaluator.scorer_version} else {})})).feedback(evaluation)
 
 
 def load_execution(path: Path) -> ExecutionResult:

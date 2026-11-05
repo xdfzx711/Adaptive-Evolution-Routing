@@ -49,8 +49,8 @@ def fixture(success=False):
     snapshot = state.stable_snapshot.replace(artifacts={**state.stable_snapshot.artifacts, "memory": store.put(b"", "memory")},
         config={**state.stable_snapshot.config, "memory": memory_config().controlled()})
     feedback = state.feedback.replace(success=success, score=1.0 if success else 0.0)
-    signal = EvaluationSignal(**feedback.model_dump(mode="json"), evaluation_id="evaluation-1",
-        execution_operation_id="exec-test", evaluator_id="benchmark-evaluator")
+    signal = EvaluationSignal(**{**feedback.model_dump(mode="json"), "evaluation_id": "evaluation-1",
+        "execution_operation_id": "exec-test", "evaluator_id": "benchmark-evaluator"})
     state = state.replace(stable_snapshot=snapshot, feedback=feedback, evaluation_signal=signal, feasible_targets=["memory"])
     return store, EvolutionRequest(attempt_id="memory-attempt", round_id=1, context=state,
         decision=EvolutionDecision(target="memory", rationale="fixed"), operator_id="reasoningbank_memory_evolver",

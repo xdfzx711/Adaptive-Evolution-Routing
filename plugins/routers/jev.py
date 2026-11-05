@@ -1,6 +1,7 @@
 """TypeSafe Jev Choice router over the public evolution context."""
 
 import json
+from aer_core.diagnostic_evidence import diagnosis_payload, FEEDBACK_GUIDANCE
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -172,8 +173,9 @@ class JevRouter:
                     "state_summary": _compact(dict(context.execution.state_summary), limit),
                     "recent_trace": [_compact(event.model_dump(mode="json"), limit) for event in trace]},
                 "feedback": context.feedback.model_dump(mode="json"),
-                "diagnosis": context.diagnosis.model_dump(mode="json", exclude={"usage", "record_ref"})
-                    if context.diagnosis else None,
+                "diagnosis": diagnosis_payload(context.diagnosis),
+                "feedback_guidance": FEEDBACK_GUIDANCE,
+                "diagnosis_reference_scope": "References address the original public task/execution/feedback; task and execution excerpts here may be truncated.",
                 # ContextBuilder already bounds history; avoid silently truncating actual edits again.
                 "history": history,
                 "feasible_targets": list(context.feasible_targets)}
