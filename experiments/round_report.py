@@ -33,7 +33,7 @@ def error_view(error):
 
 def diagnosis_view(value):
     return fields(value, "source", "reason_code", "explanation", "observations", "hypotheses",
-                  "evidence_step_ids", "confidence", "usage")
+                  "evidence_step_ids", "confidence", "usage", "checks", "consistency_status", "evidence_key")
 
 
 def execution_view(value):
@@ -68,13 +68,14 @@ def execution_view(value):
 
 def scored_view(value):
     return {"execution": execution_view(value.execution),
-            "evaluation": fields(value.evaluation, "score", "success", "metrics", "reason_code", "feedback"),
+            "evaluation": fields(value.evaluation, "score", "success", "metrics", "reason_code", "feedback",
+                                 "score_details", "assessment_version", "public_checks"),
             "usage": plain(value.usage), "new_usage": plain(value.charged_usage), "reused": value.cache_hit,
             "error": error_view(value.error)}
 
 
 def condition_view(value):
-    result = fields(value, "dataset_version", "scorer_version", "model_runtime", "model_endpoint",
+    result = fields(value, "dataset_version", "scorer_version", "scoring", "model_runtime", "model_endpoint",
                     "model_timeout_seconds", "tool_timeout_seconds", "max_output_tokens")
     result["plugins"] = []
     for name in ("execution_plugins", "benchmark_plugins"):
@@ -119,6 +120,8 @@ class RoundReport:
                      "execution_before_evolution": self.latest_execution,
                      "diagnosis": self.latest_diagnosis, "candidates": []}
         if self.config is not None:
+            if self.config.assessment.scoring is not None:
+                self.data["scoring_configuration"] = self.config.assessment.scoring.model_dump(mode="json")
             self.data["acceptance_policy"] = fields(self.config.validation, "acceptance_policy", "policy_version",
                                                    "min_improvement", "max_regression_drop", "weights")
 
@@ -296,7 +299,8 @@ class RoundReport:
         elif kind == "run_result" and self.data is not None:
             self.data["run_result"] = {**fields(value, "status", "stop_reason", "stop_stage", "final_evaluation_status", "usage"),
                 "error": error_view(value.error), "final_output": plain(value.final_execution)["output"] if value.final_execution else None,
-                "final_evaluation": fields(value.final_evaluation, "score", "success", "reason_code", "metrics")}
+                "final_evaluation": fields(value.final_evaluation, "score", "success", "reason_code", "metrics",
+                                           "score_details", "assessment_version")}
             self.data["finished_at"] = datetime.now().astimezone().isoformat()
             if value.error:
                 self.data["status"] = value.stop_reason.value

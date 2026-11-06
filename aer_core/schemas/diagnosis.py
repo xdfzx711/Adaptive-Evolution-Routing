@@ -1,10 +1,16 @@
 """Public-input model diagnosis evidence and actual call usage."""
 
-from .base import DomainModel, Identifier, JsonObject, UtcTimestamp
+from .base import DomainModel, Identifier, Items, JsonObject, UtcTimestamp
 from .execution import Diagnosis, ErrorInfo, ExecutionView, FeedbackView
-from .providers import ModelResponse
+from .providers import ModelRequest, ModelResponse
 from .task import TaskView
 from .usage import ResourceUsage
+
+
+class DiagnosisAttempt(DomainModel):
+    request: ModelRequest
+    response: ModelResponse | None
+    conflicts: Items[str] = ()
 
 
 class DiagnosisRecord(DomainModel):
@@ -22,3 +28,4 @@ class DiagnosisRecord(DomainModel):
     usage: ResourceUsage
     error: ErrorInfo | None
     fact_check: JsonObject | None = None
+    attempts: Items[DiagnosisAttempt] = ()

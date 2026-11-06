@@ -22,6 +22,32 @@ from tests.execution.helpers import RecordingModel, context, response
 
 @unittest.skipUnless(importlib.util.find_spec("gepa"), "install [gepa]")
 class HotpotGEPATests(unittest.TestCase):
+    def test_explicit_scoring_flows_through_real_gepa_protocol_and_round_logs(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            path, rows, _ = config_file(Path(directory), tasks=1)
+            self.model_patches(stack, rows)
+            loaded = load_experiment_config(path, overrides=["assessment.scoring.metric=joint_em"])
+            summary = run_benchmark(loaded, report_holdouts=True)
+            self.assertEqual(summary["status"], "completed")
+            entry = summary["tasks"][0]
+            self.assertEqual(entry["final_evaluation"]["score_details"]["metric"], "joint_em")
+            self.assertIn(".projection.v1.", entry["final_evaluation"]["assessment_version"])
+            root = Path(summary["run_root"])
+            protocol = json.loads((root / "baseline_protocol.json").read_text(encoding="utf-8"))
+            self.assertEqual(protocol["scoring"]["metric"]["name"], "joint_em")
+            record = json.loads((root / entry["rounds"][0]["record"]).read_text(encoding="utf-8"))
+            self.assertEqual(record["evaluation_before_evolution"]["score_details"]["metric"], "joint_em")
+            trials = record["generation"]["internal_optimization"]["trials"]
+            self.assertTrue(trials)
+            # Inner trials rebuild their own plugin graph; the projection must be
+            # applied there as well, with exactly the same scorer identity.
+            for trial in trials:
+                feedback = trial["evaluation"]
+                self.assertIsNotNone(feedback)
+                self.assertEqual(feedback["assessment_version"], summary["scorer_version"])
+                self.assertEqual(trial["score_details"]["metric"], "joint_em")
+            self.assertEqual(summary["aggregate"]["official_native_metrics_evaluated"]["joint_em"], 1)
+
     def three_round_config(self, path):
         return load_experiment_config(path, overrides=[
             "limits.max_evolution_rounds=3", "evolution.stop_on_success=true",

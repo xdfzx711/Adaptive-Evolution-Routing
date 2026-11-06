@@ -88,7 +88,7 @@ def paired_metrics(pairs, *, expected):
         "rate_note": "All-count rates count missing observations as unsuccessful; score means exclude missing and report their counts."}
 
 
-def aggregate_holdouts(entries):
+def aggregate_holdouts(entries, evaluator=None):
     result = {}
     for group in ("similar", "regression"):
         pairs = []
@@ -99,4 +99,8 @@ def aggregate_holdouts(entries):
                     pairs.append(tuple(row[name]["evaluation"] if row[name]["error"] is None else None
                                        for name in ("initial", "final")))
         result[group] = paired_metrics(pairs, expected=expected)
+        if evaluator is not None:
+            from .scoring import aggregate_declared_metrics
+            result[group]["official_native_metrics"] = {name: aggregate_declared_metrics(
+                [pair[index] for pair in pairs], evaluator) for index, name in enumerate(("initial", "final"))}
     return result

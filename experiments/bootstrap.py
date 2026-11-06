@@ -38,6 +38,8 @@ def create_registry() -> PluginRegistry:
     register_swebench(registry)
     from plugins.benchmarks.hotpotqa import register_hotpotqa
     register_hotpotqa(registry)
+    from plugins.benchmarks.ifbench import register_ifbench
+    register_ifbench(registry)
     from plugins.evaluators.registration import register_evaluator_plugins
     register_evaluator_plugins(registry)
     return registry

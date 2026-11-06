@@ -1,0 +1,127 @@
+# 80 independent IFBench episodes, each with one exclusive similar and regression task.
+# At most 3 outer rounds; early stop on stable success. Official prompt-level loose score.
+# Use --workers 3 for three concurrent tasks. Acceptance: weighted gain >= 0.04, regression drop <= 0.10.
+# Run with --report-holdouts to cover unchanged/rejected episodes too.
+schema_version: aer.v0.1
+experiment:
+  id: ifbench-fixed-gepa-80-r3
+  seed: 42
+  runner: aer
+benchmark:
+  plugin: ifbench_adapter
+  execution_split: dev
+  task_ids: null
+  config:
+    manifest_path: ../data/ifbench_80_manifest.json
+state:
+  task_mode: independent
+agent:
+  plugin: codex_cli_agent
+  initial_prompt: >-
+    Respond to the request in input.prompt, following every stated constraint.
+    Return only the requested answer as raw text, preserving the requested format.
+    Do not wrap your answer in JSON or add commentary unless the request asks for it.
+    Work from the supplied request; do not browse, run commands, or read other files.
+  initial_snapshot_ref: null
+  config:
+    windows_sandbox: mxc
+    initial_model: gpt-6.1-sol
+    allowed_models: [gpt-6.1-sol]
+    timeout_seconds: 180.0
+    skills: null
+    memory: null
+    workspace:
+      plugin: empty_workspace
+    collector:
+      plugin: raw_text_result_collector
+providers:
+  model:
+    plugin: qwen_model
+    model_id: ${QWEN_MODEL}
+    config:
+      dotenv_path: ../../.env
+      api_key_env: QWEN_API_KEY
+      base_url_env: QWEN_BASE_URL
+      temperature: 0.0
+      enable_thinking: false
+      send_seed: false
+      response_format: null
+  tools:
+    plugin: deterministic_tools
+    enabled: []
+assessment:
+  evaluator: ifbench_evaluator
+  evaluator_config:
+    nltk_data_path: ../../.aer-cache/ifbench/nltk_data
+  scoring:
+    metric: prompt_level_loose
+    transform:
+      type: identity
+  diagnoser: llm_diagnoser
+evolution:
+  mode: fixed
+  max_candidates_per_round: 1
+  stop_on_success: true
+routing:
+  plugin: fixed_router
+  fixed_target: prompt
+  manual_decisions: []
+targets:
+  allowed: [prompt]
+  default_operators:
+    prompt: gepa_prompt_evolver
+  operator_configs:
+    prompt:
+      max_metric_calls: 9
+      samples_per_evaluation: 3
+      max_iterations: 2
+      reflection_minibatch_size: 1
+      use_merge: false
+      deduplicate_prompts: true
+      skip_perfect_score: false
+      timeout_seconds: 900.0
+      reflection_timeout_seconds: 90.0
+      trial_timeout_seconds: 180.0
+      trial_evaluator: null
+      reflection_model:
+        plugin: qwen_model
+        model_id: ${QWEN_MODEL}
+        config:
+          dotenv_path: ../../.env
+          api_key_env: QWEN_API_KEY
+          base_url_env: QWEN_BASE_URL
+          temperature: 0.0
+          enable_thinking: false
+          send_seed: false
+          response_format: null
+validation:
+  plugin: paired_validation
+  split: validation
+  group_field: validation_group
+  similar_group: similar
+  regression_group: regression
+  acceptance_policy: weighted_improvement
+  policy_version: v0.1
+  weights:
+    current_task: 0.5
+    similar: 0.25
+    regression: 0.25
+  min_improvement: 0.04
+  max_regression_drop: 0.10
+feedback:
+  policy: dev_feedback_and_validation_summary
+limits:
+  max_evolution_rounds: 3
+  # Global cumulative budgets remain unenforced; inner GEPA call/time limits apply.
+  max_tokens: 120000
+  max_tool_calls: 100
+  max_elapsed_seconds: 1800.0
+  model_call_timeout_seconds: 90.0
+  tool_call_timeout_seconds: 5.0
+  max_output_tokens_per_call: 4096
+  max_consecutive_no_commit_rounds: null
+storage:
+  root: ../../runs
+  experience: jsonl
+  artifacts: local_files
+  versions: local_manifest

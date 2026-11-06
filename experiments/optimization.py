@@ -103,6 +103,8 @@ class IsolatedCandidateTrials:
             agent, benchmark, evaluator = (built.instances[name] for name in ("agent", "benchmark", "evaluator"))
             from .native_scoring import validate_native_scoring
             validate_native_scoring(benchmark, config, self.registry, self.evaluator_settings)
+            from aer_core.scoring import configure_scoring
+            evaluator = configure_scoring(evaluator, config.assessment.scoring)
             declaration = benchmark.feedback_policy(source)
             if not isinstance(declaration, TaskFeedbackPolicy) or declaration.task != task or not declaration.allow_evolution:
                 raise ContractError("Optimizer task does not permit public evolution feedback", stage="evolution")
@@ -110,6 +112,7 @@ class IsolatedCandidateTrials:
             tools = built.instances.get("tools")
             specs = tools.specifications() if tools is not None else ()
             policy = ContextPolicy(task=task, output_fields=declaration.output_fields,
+                public_check_ids=declaration.public_check_ids,
                 metadata_fields=declaration.metadata_fields, allow_evolution=True,
                 reason_messages={**declaration.reason_messages, **getattr(evaluator, "public_reason_messages", {})},
                 state_fields=capabilities.feedback_state_fields,
@@ -128,4 +131,5 @@ class IsolatedCandidateTrials:
                 return TrialObservation(task=public, execution=None, feedback=None, usage=result.usage,
                     error=error.replace(message="Internal task execution or scoring failed; code=" + error.code, evidence_ref=None))
             public, execution, feedback = PublicFeedbackBuilder(policy).public_views(public, result.execution, result.evaluation)
-            return TrialObservation(task=public, execution=execution, feedback=feedback, usage=result.usage)
+            return TrialObservation(task=public, execution=execution, feedback=feedback, usage=result.usage,
+                                    score_details=result.evaluation.score_details)

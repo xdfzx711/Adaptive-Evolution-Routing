@@ -222,6 +222,20 @@ class ParallelBatchTests(unittest.TestCase):
                 self.assertTrue(entry["rounds"][0]["candidates"][0]["committed"])
                 self.assertEqual(entry["holdout_reporting"]["status"], "complete")
 
+    @unittest.skipUnless(importlib.util.find_spec("gepa"), "install [gepa]")
+    def test_explicit_scoring_is_preserved_across_spawn_workers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, _, _ = config_file(Path(directory), tasks=3)
+            loaded = load_experiment_config(path, overrides=["assessment.scoring.metric=joint_em"])
+            with patch("experiments.parallel_batch._run_child", local_gepa_child):
+                result = run_benchmark(loaded, workers=3, report_holdouts=True)
+            self.assertEqual(result["status"], "completed")
+            for entry in result["tasks"]:
+                self.assertEqual(entry["final_evaluation"]["score_details"]["metric"], "joint_em")
+                self.assertEqual(entry["final_evaluation"]["assessment_version"], result["scorer_version"])
+            protocol = json.loads((Path(result["run_root"]) / "baseline_protocol.json").read_text(encoding="utf-8"))
+            self.assertEqual(protocol["scoring"]["metric"]["name"], "joint_em")
+
 
 if __name__ == "__main__":
     unittest.main()

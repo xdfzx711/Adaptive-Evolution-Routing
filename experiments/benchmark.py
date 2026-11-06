@@ -52,7 +52,10 @@ class PreparedBenchmark:
     def as_dict(self) -> dict:
         config = self.loaded_config.config
         index = self.benchmark.index()
+        from .scoring import scoring_protocol
+        scoring = scoring_protocol(self)
         return {
+            **({"scoring": scoring} if scoring is not None else {}),
             "status": "benchmark_ready", "source_path": str(self.loaded_config.source_path),
             "benchmark_id": index.benchmark_id, "dataset_version": self.benchmark.dataset_version,
             "scorer_version": self.evaluator.scorer_version,
@@ -103,7 +106,7 @@ class PreparedBenchmark:
         if not isinstance(declaration, TaskFeedbackPolicy) or declaration.task != task.identity:
             raise ContractError("Feedback declaration must match the task", stage="evaluation")
         return PublicFeedbackBuilder(ContextPolicy(output_fields=declaration.output_fields,
-            reason_messages=declaration.reason_messages)).feedback(evaluation)
+            reason_messages=declaration.reason_messages, public_check_ids=declaration.public_check_ids)).feedback(evaluation)
 
 
 def load_execution(path: Path) -> ExecutionResult:
@@ -134,6 +137,8 @@ def prepare_benchmark(path: str | Path) -> PreparedBenchmark:
     built = PluginManager(registry).build(bindings, dependencies=provider_dependencies(loaded, bindings))
     benchmark = built.instances["benchmark"]
     evaluator = built.instances["evaluator"]
+    from aer_core.scoring import configure_scoring
+    evaluator = configure_scoring(evaluator, config.assessment.scoring)
     from .native_scoring import validate_native_scoring
     validate_native_scoring(benchmark, config, registry)
     benchmark_id = registry.get("benchmark", config.benchmark.plugin).metadata.capabilities.benchmark_id

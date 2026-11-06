@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/allenai/IFBench",
+  "commit": "cd189a9c2889526d8af901d2103fd3e1ffcea6df",
+  "files": {
+    "evaluation_lib.py": "e681a4b03a6a9dfb540fbd9ef6b963de503a5ffac557ed611c326ee385850cf6",
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "modifications": []
+}

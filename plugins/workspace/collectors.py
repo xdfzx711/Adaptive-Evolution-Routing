@@ -31,6 +31,18 @@ class JsonResultCollector:
         return CollectedResult(output=self.adapter.parse(final_text))
 
 
+class RawTextResultCollector:
+    """Preserve the final answer exactly, including whitespace and code fences."""
+
+    def schema(self, task):
+        return None
+
+    def collect(self, task, workspace, final_text, run_ctx):
+        if not isinstance(final_text, str):
+            raise ExecutionError("Raw text collector requires a final answer string", stage=run_ctx.stage)
+        return CollectedResult(output={"response": final_text})
+
+
 class GitPatchCollector:
     def __init__(self, settings, artifacts):
         self.settings, self.artifacts = settings, artifacts

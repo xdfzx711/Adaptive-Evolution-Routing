@@ -5,7 +5,7 @@ from aer_core.contracts.storage import ArtifactStore
 from aer_core.plugin_registry import API_VERSION
 from aer_core.schemas.plugins import PluginMetadata
 from .local import EmptyWorkspace, LocalRepoWorkspace, LocalRepoSettings
-from .collectors import JsonResultCollector, GitPatchCollector, PatchCollectorSettings
+from .collectors import JsonResultCollector, RawTextResultCollector, GitPatchCollector, PatchCollectorSettings
 
 
 class EmptySettings(Settings):
@@ -24,6 +24,10 @@ def build_json(*, config, dependencies):
     return JsonResultCollector()
 
 
+def build_raw_text(*, config, dependencies):
+    return RawTextResultCollector()
+
+
 def build_patch(*, config, dependencies):
     return GitPatchCollector(config, dependencies.get("artifact_store"))
 
@@ -33,6 +37,7 @@ def register_workspace_plugins(registry):
         ("empty_workspace", "workspace_provider", build_empty, EmptySettings, {}),
         ("local_repo_workspace", "workspace_provider", build_repo, LocalRepoSettings, {"config_root": Path}),
         ("json_result_collector", "result_collector", build_json, EmptySettings, {}),
+        ("raw_text_result_collector", "result_collector", build_raw_text, EmptySettings, {}),
         ("git_patch_collector", "result_collector", build_patch, PatchCollectorSettings, {"artifact_store": ArtifactStore}),
     ):
         registry.register(PluginMetadata(id=name, category=category, api_version=API_VERSION,

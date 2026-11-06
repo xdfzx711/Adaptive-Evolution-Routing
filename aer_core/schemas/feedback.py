@@ -12,6 +12,7 @@ class TaskFeedbackPolicy(DomainModel):
     metadata_fields: Items[Identifier] = ()
     allow_evolution: bool = False
     reason_messages: ReadOnlyMap[str] = Field(default_factory=dict)
+    public_check_ids: Items[Identifier] = ()
 
 
 class ContextPolicy(DomainModel):
@@ -26,6 +27,7 @@ class ContextPolicy(DomainModel):
     snapshot_config_fields: Items[Identifier] = ("max_steps",)
     allow_evolution: bool = False
     reason_messages: ReadOnlyMap[str] = Field(default_factory=dict)
+    public_check_ids: Items[Identifier] = ()
     history_max_attempts: NonNegativeInt = 5
     history_max_text_chars: PositiveInt = 320
     history_max_change_chars: PositiveInt = 4000

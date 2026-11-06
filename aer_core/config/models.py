@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from aer_core.schemas.acceptance import AcceptanceWeights
+from aer_core.schemas.scoring import ScoringSettings
 
 
 def _not_blank(value: str) -> str:
@@ -81,6 +82,7 @@ class AssessmentSettings(Settings):
     evaluator: NonBlank
     diagnoser: NonBlank
     evaluator_config: dict[str, JsonValue] = Field(default_factory=dict)
+    scoring: ScoringSettings | None = None
 
 
 class EvolutionSettings(Settings):

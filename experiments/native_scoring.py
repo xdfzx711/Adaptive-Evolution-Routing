@@ -5,9 +5,10 @@ from aer_core.errors import ContractError
 
 
 def validate_native_scoring(benchmark, config, registry, trial_override=None):
-    if not isinstance(benchmark, NativeEvaluationProvider):
+    native = isinstance(benchmark, NativeEvaluationProvider)
+    if not native and config.assessment.scoring is None:
         return
-    expected = benchmark.native_evaluator_id()
+    expected = benchmark.native_evaluator_id() if native else config.assessment.evaluator
     if config.assessment.evaluator != expected:
         raise ContractError(f"Benchmark requires native evaluator {expected}", stage="setup")
     model = registry.get("evaluator", expected).config_model
@@ -20,4 +21,4 @@ def validate_native_scoring(benchmark, config, registry, trial_override=None):
         plugin = override.plugin if hasattr(override, "plugin") else override["plugin"]
         settings = override.config if hasattr(override, "config") else override.get("config", {})
         if plugin != expected or model.model_validate(settings) != baseline:
-            raise ContractError("Native benchmark requires identical inner and outer evaluator settings", stage="setup")
+            raise ContractError("Native benchmark or explicit scoring requires identical inner and outer evaluator settings", stage="setup")

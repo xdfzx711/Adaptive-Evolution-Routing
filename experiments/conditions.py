@@ -7,7 +7,11 @@ def validation_conditions(execution):
     config, benchmark = execution.benchmark.loaded_config.config, execution.benchmark
     model = execution.built_plugins.instances.get("model")
     tasks = (*benchmark.execution_tasks, *benchmark.similar_tasks, *benchmark.regression_tasks)
-    return {"schema_version": "aer.validation.conditions.v0.1", "dataset_version": benchmark.benchmark.dataset_version,
+    # Only the scoring identity belongs in evaluation cache conditions; acceptance
+    # thresholds and GEPA sampling budgets do not change a single execution score.
+    scoring = getattr(benchmark.evaluator, "protocol", None)
+    return {**({"scoring": scoring} if scoring is not None else {}),
+        "schema_version": "aer.validation.conditions.v0.1", "dataset_version": benchmark.benchmark.dataset_version,
         "scorer_version": benchmark.evaluator.scorer_version,
         "execution_plugins": {"plugins": compact_plugins(execution.built_plugins.manifest)},
         "benchmark_plugins": {"plugins": compact_plugins(benchmark.built_plugins.manifest)},

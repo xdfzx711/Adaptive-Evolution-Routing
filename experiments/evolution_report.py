@@ -130,6 +130,10 @@ class EvolutionTextReport:
             "本报告展示进化决策与评测汇总；执行轨迹、输出和原始模型响应见对应详细记录。",
             "公开任务输入（完整，仅在此展示一次）：", json.dumps(task.model_dump(mode="json"), ensure_ascii=False, indent=2)])
         self.block("初始稳定版本 V0", ["初始组件内容（原始记录路径就地列出）："])
+        if config.assessment.scoring is not None:
+            self.block("优化评分配置", [compact(config.assessment.scoring.model_dump(mode="json")),
+                "score 用于搜索与接收；原始官方指标保留在 metrics；success 使用官方成功判定。",
+                "GEPA 内部可对多次采样取均值；外层按当前版本执行评分，二者共享单次评分规则。"])
         for name, ref in snapshot.artifacts.items():
             self.component("V0", name, ref)
 
@@ -176,6 +180,9 @@ class EvolutionTextReport:
             labels = {"supported": "源码支持", "refuted": "已反驳", "uncertain": "待核验"}
             for finding in value.fact_check.get("review", {}).get("findings", ()):
                 lines.append(f"  {labels[finding['status']]}：{claims.get(finding['id'], finding['id'])}；{finding['reasoning']}")
+        if value.consistency_status:
+            lines.append("逐项判定一致性：" + value.consistency_status)
+            lines.extend(f"  {item.check_id}: {item.status}" for item in value.checks)
         if value.usage:
             self.costs["诊断"].append(value.usage)
             lines.append(self.usage_line(value.usage))

@@ -27,7 +27,8 @@ class PublicFeedbackBuilder:
         code = "correct" if evaluation.success else evaluation.reason_code
         code = code if code in self.messages else "unknown_failure"
         return FeedbackView(score=evaluation.score, success=evaluation.success,
-                            reason_code=code, public_feedback=self.messages[code], assessment_version=evaluation.assessment_version)
+                            reason_code=code, public_feedback=self.messages[code], assessment_version=evaluation.assessment_version,
+                            checks=[item for item in evaluation.public_checks if item.check_id in self.policy.public_check_ids])
 
     def diagnosis_view(self, diagnosis: Diagnosis | None, visible_steps) -> Diagnosis | None:
         if diagnosis is None:
@@ -42,7 +43,11 @@ class PublicFeedbackBuilder:
                           for item in diagnosis.observations] if model else [],
             hypotheses=[item.replace(evidence_step_ids=[step for step in item.evidence_step_ids if step in steps])
                         for item in diagnosis.hypotheses] if model else [],
-            fact_check=diagnosis.model_dump(mode="json")["fact_check"] if model else None, evidence_key=diagnosis.evidence_key)
+            fact_check=diagnosis.model_dump(mode="json")["fact_check"] if model else None, evidence_key=diagnosis.evidence_key,
+            checks=[item.replace(hypotheses=[hyp.replace(evidence_step_ids=[step for step in hyp.evidence_step_ids if step in steps])
+                                            for hyp in item.hypotheses])
+                    for item in diagnosis.checks if item.check_id in self.policy.public_check_ids],
+            consistency_status=diagnosis.consistency_status)
 
     def public_views(self, task, execution, evaluation):
         """Shared filtering for standalone diagnosis and evolution contexts."""
@@ -114,4 +119,32 @@ def validate_diagnosis(value, execution, feedback=None):
     if feedback is not None and not feedback.success and value.reason_code == "no_failure":
         raise DiagnosisError("A failed evaluation cannot be diagnosed as no_failure", stage="diagnosis",
                              usage=value.usage, evidence_ref=value.record_ref)
+    if feedback is not None and value.consistency_status is not None:
+        issues = check_diagnosis_conflicts(value.checks, feedback, execution)
+        if issues:
+            raise DiagnosisError("Diagnosis conflicts with official check results: " + "; ".join(issues),
+                                 stage="diagnosis", usage=value.usage, evidence_ref=value.record_ref)
     return value
+
+
+def check_diagnosis_conflicts(checks, feedback, execution):
+    """Validate declared verdicts and references, not arbitrary natural-language truth."""
+    expected = {item.check_id: item.status for item in feedback.checks}
+    ids = [item.check_id for item in checks]
+    issues = []
+    if len(set(ids)) != len(ids) or set(ids) != set(expected):
+        issues.append("Return each supplied check_id exactly once; no missing, duplicate or invented checks")
+    steps = {event.seq for event in execution.trajectory}
+    for item in checks:
+        if item.check_id not in expected:
+            continue
+        if item.status != expected[item.check_id]:
+            issues.append(f"{item.check_id}: official status is {expected[item.check_id]}, not {item.status}")
+        if expected[item.check_id] != "failed" and item.hypotheses:
+            issues.append(f"{item.check_id}: passed/unknown checks must not receive failure hypotheses")
+        for hypothesis in item.hypotheses:
+            if not set(hypothesis.evidence_step_ids) <= steps:
+                issues.append(f"{item.check_id}: hypothesis cites an unavailable trajectory event")
+            if set(hypothesis.check_ids) - {item.check_id}:
+                issues.append(f"{item.check_id}: hypothesis may only refer to its own failed check")
+    return issues

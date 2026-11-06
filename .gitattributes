@@ -1,2 +1,4 @@
 # Preserve the pinned upstream scorer's bytes for provenance verification.
 plugins/evaluators/hotpotqa_official/evaluate.py text eol=lf
+plugins/evaluators/ifbench_official/evaluation_lib.py text eol=lf
+plugins/evaluators/ifbench_official/LICENSE text eol=lf

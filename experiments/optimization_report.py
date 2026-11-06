@@ -17,7 +17,8 @@ def optimization_view(record):
     result["decisions"] = plain(record)["decisions"]
     result["trials"] = [{**fields(item, "trial", "candidate", "started_at", "finished_at"),
         "task": plain(item.observation.task), "execution": execution_view(item.observation.execution),
-        "evaluation": plain(item.observation.feedback), "usage": plain(item.observation.usage),
+        "evaluation": plain(item.observation.feedback), "score_details": plain(item.observation.score_details),
+        "usage": plain(item.observation.usage),
         "error": error_view(item.observation.error)} for item in record.trials]
     result["reflections"] = [{**fields(item, "call", "started_at", "finished_at", "request", "usage"),
         "response": fields(item.response, "content", "finish_reason", "metadata"),

@@ -17,6 +17,7 @@ def context_builder(execution, task, *, history_max_attempts=5, history_max_text
         evaluator_id=execution.benchmark.loaded_config.config.assessment.evaluator,
         metadata_fields=declaration.metadata_fields, allow_evolution=declaration.allow_evolution,
         reason_messages=declaration.reason_messages, artifact_kinds=capabilities.supported_artifact_kinds,
+        public_check_ids=declaration.public_check_ids,
         state_fields=capabilities.feedback_state_fields, snapshot_config_fields=capabilities.feedback_config_fields,
         history_max_attempts=history_max_attempts, history_max_text_chars=history_max_text_chars,
         history_max_change_chars=history_max_change_chars,

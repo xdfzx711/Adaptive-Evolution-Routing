@@ -10,6 +10,7 @@ from .base import (
 from .references import ArtifactRef
 from .states import ExecutionStatus, ExecutionStatusValue, StageValue
 from .usage import ResourceUsage
+from .scoring import ScoreDetails
 
 
 class ErrorInfo(DomainModel):
@@ -59,6 +60,15 @@ class ExecutionResult(DomainModel):
         return self
 
 
+class PublicCheckResult(DomainModel):
+    """Evaluator-authored facts eligible for explicit benchmark disclosure."""
+
+    check_id: Identifier
+    status: Literal["passed", "failed", "unknown"]
+    requirement: str | None = None
+    explanation: str | None = None
+
+
 class EvaluationResult(DomainModel):
     evaluation_id: Identifier
     task_id: Identifier
@@ -73,6 +83,14 @@ class EvaluationResult(DomainModel):
     evidence_refs: Items[ArtifactRef] = ()
     usage: ResourceUsage | None = None
     assessment_version: Identifier | None = None
+    score_details: ScoreDetails | None = None
+    public_checks: Items[PublicCheckResult] = ()
+
+    @model_validator(mode="after")
+    def unique_public_checks(self):
+        if len({item.check_id for item in self.public_checks}) != len(self.public_checks):
+            raise ValueError("Public check IDs must be unique")
+        return self
 
 
 class FeedbackView(DomainModel):
@@ -82,6 +100,13 @@ class FeedbackView(DomainModel):
     public_feedback: str
     evidence_step_ids: Items[NonNegativeInt] = ()
     assessment_version: Identifier | None = None
+    checks: Items[PublicCheckResult] = ()
+
+    @model_validator(mode="after")
+    def unique_checks(self):
+        if len({item.check_id for item in self.checks}) != len(self.checks):
+            raise ValueError("Feedback check IDs must be unique")
+        return self
 
 
 class EvaluationSignal(FeedbackView):
@@ -95,6 +120,13 @@ class EvaluationSignal(FeedbackView):
 class DiagnosisStatement(DomainModel):
     text: Identifier
     evidence_step_ids: Items[NonNegativeInt] = ()
+    check_ids: Items[Identifier] = ()
+
+
+class CheckDiagnosis(DomainModel):
+    check_id: Identifier
+    status: Literal["passed", "failed", "unknown"]
+    hypotheses: Items[DiagnosisStatement] = ()
 
 
 class Diagnosis(DomainModel):
@@ -109,6 +141,8 @@ class Diagnosis(DomainModel):
     record_ref: ArtifactRef | None = None
     fact_check: JsonObject | None = None
     evidence_key: Identifier | None = None
+    checks: Items[CheckDiagnosis] = ()
+    consistency_status: Literal["verified", "corrected", "fallback"] | None = None
 
     @property
     def all_evidence_step_ids(self):

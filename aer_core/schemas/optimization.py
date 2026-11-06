@@ -7,6 +7,7 @@ from .execution import ErrorInfo, ExecutionView, FeedbackView
 from .providers import ModelRequest, ModelResponse
 from .task import TaskView
 from .usage import ResourceUsage
+from .scoring import ScoreDetails
 
 
 class TrialObservation(DomainModel):
@@ -15,6 +16,7 @@ class TrialObservation(DomainModel):
     feedback: FeedbackView | None
     usage: ResourceUsage
     error: ErrorInfo | None = None
+    score_details: ScoreDetails | None = None
 
 
 class OptimizationTrial(DomainModel):

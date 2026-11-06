@@ -10,6 +10,7 @@ from aer_core.errors import EvaluationError
 from aer_core.identifiers import timestamp_id
 from aer_core.schemas.execution import EvaluationResult
 from aer_core.schemas.usage import ResourceUsage
+from aer_core.schemas.scoring import MetricDefinition
 from .hotpotqa_official.evaluate import update_answer, update_sp
 
 
@@ -52,6 +53,12 @@ def score_prediction(output, answer, supporting_facts):
 
 class HotpotQAEvaluator:
     plugin_id = "hotpotqa_evaluator"
+    success_policy = "joint_em == 1"
+
+    def metric_definitions(self):
+        return tuple(MetricDefinition(name=name, direction="higher", minimum=0, maximum=1,
+            kind="binary" if name in {"em", "sp_em", "joint_em"} else "continuous",
+            aggregation="mean") for name in METRICS)
 
     def __init__(self, settings):
         self.settings = settings

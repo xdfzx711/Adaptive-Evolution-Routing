@@ -1,0 +1,3612 @@
+{
+  "schema_version": "aer.task_manifest.v1",
+  "benchmark_id": "ifbench",
+  "sources": [
+    {
+      "path": "../../.aer-cache/ifbench/IFBench_test.jsonl",
+      "sha256": "a2bf7b8e7ed11d39c65b4ec781da8b99663ed0121f97033d70fcecb61f8a9d85",
+      "source_split": "official_test"
+    }
+  ],
+  "roles": {
+    "78": "dev",
+    "77": "similar",
+    "162": "regression",
+    "118": "dev",
+    "122": "similar",
+    "14": "regression",
+    "88": "dev",
+    "89": "similar",
+    "24": "regression",
+    "103": "dev",
+    "101": "similar",
+    "234": "regression",
+    "207": "dev",
+    "211": "similar",
+    "112": "regression",
+    "17": "dev",
+    "21": "similar",
+    "169": "regression",
+    "28": "dev",
+    "27": "similar",
+    "90": "regression",
+    "149": "dev",
+    "152": "similar",
+    "262": "regression",
+    "91": "dev",
+    "92": "similar",
+    "273": "regression",
+    "68": "dev",
+    "69": "similar",
+    "286": "regression",
+    "117": "dev",
+    "116": "similar",
+    "182": "regression",
+    "250": "dev",
+    "247": "similar",
+    "41": "regression",
+    "84": "dev",
+    "83": "similar",
+    "170": "regression",
+    "258": "dev",
+    "257": "similar",
+    "297": "regression",
+    "72": "dev",
+    "71": "similar",
+    "271": "regression",
+    "131": "dev",
+    "126": "similar",
+    "174": "regression",
+    "16": "dev",
+    "15": "similar",
+    "53": "regression",
+    "10": "dev",
+    "11": "similar",
+    "19": "regression",
+    "292": "dev",
+    "295": "similar",
+    "253": "regression",
+    "147": "dev",
+    "146": "similar",
+    "284": "regression",
+    "255": "dev",
+    "256": "similar",
+    "97": "regression",
+    "66": "dev",
+    "70": "similar",
+    "276": "regression",
+    "127": "dev",
+    "132": "similar",
+    "240": "regression",
+    "57": "dev",
+    "54": "similar",
+    "144": "regression",
+    "168": "dev",
+    "167": "similar",
+    "67": "regression",
+    "137": "dev",
+    "134": "similar",
+    "198": "regression",
+    "108": "dev",
+    "106": "similar",
+    "208": "regression",
+    "81": "dev",
+    "80": "similar",
+    "215": "regression",
+    "261": "dev",
+    "259": "similar",
+    "43": "regression",
+    "220": "dev",
+    "219": "similar",
+    "109": "regression",
+    "2": "dev",
+    "1": "similar",
+    "128": "regression",
+    "187": "dev",
+    "185": "similar",
+    "110": "regression",
+    "197": "dev",
+    "199": "similar",
+    "135": "regression",
+    "32": "dev",
+    "34": "similar",
+    "265": "regression",
+    "193": "dev",
+    "194": "similar",
+    "245": "regression",
+    "5": "dev",
+    "7": "similar",
+    "246": "regression",
+    "264": "dev",
+    "266": "similar",
+    "111": "regression",
+    "285": "dev",
+    "287": "similar",
+    "249": "regression",
+    "296": "dev",
+    "298": "similar",
+    "277": "regression",
+    "237": "dev",
+    "238": "similar",
+    "275": "regression",
+    "243": "dev",
+    "241": "similar",
+    "86": "regression",
+    "12": "dev",
+    "13": "similar",
+    "55": "regression",
+    "22": "dev",
+    "23": "similar",
+    "205": "regression",
+    "232": "dev",
+    "230": "similar",
+    "26": "regression",
+    "291": "dev",
+    "289": "similar",
+    "48": "regression",
+    "288": "dev",
+    "290": "similar",
+    "6": "regression",
+    "158": "dev",
+    "159": "similar",
+    "46": "regression",
+    "206": "dev",
+    "209": "similar",
+    "129": "regression",
+    "29": "dev",
+    "25": "similar",
+    "177": "regression",
+    "59": "dev",
+    "52": "similar",
+    "267": "regression",
+    "8": "dev",
+    "9": "similar",
+    "222": "regression",
+    "181": "dev",
+    "179": "similar",
+    "104": "regression",
+    "3": "dev",
+    "4": "similar",
+    "210": "regression",
+    "51": "dev",
+    "49": "similar",
+    "201": "regression",
+    "221": "dev",
+    "223": "similar",
+    "85": "regression",
+    "202": "dev",
+    "204": "similar",
+    "115": "regression",
+    "47": "dev",
+    "50": "similar",
+    "148": "regression",
+    "171": "dev",
+    "173": "similar",
+    "191": "regression",
+    "31": "dev",
+    "30": "similar",
+    "195": "regression",
+    "120": "dev",
+    "119": "similar",
+    "235": "regression",
+    "184": "dev",
+    "186": "similar",
+    "145": "regression",
+    "140": "dev",
+    "142": "similar",
+    "175": "regression",
+    "224": "dev",
+    "228": "similar",
+    "107": "regression",
+    "189": "dev",
+    "188": "similar",
+    "212": "regression",
+    "156": "dev",
+    "155": "similar",
+    "76": "regression",
+    "96": "dev",
+    "98": "similar",
+    "33": "regression",
+    "164": "dev",
+    "163": "similar",
+    "20": "regression",
+    "157": "dev",
+    "154": "similar",
+    "130": "regression",
+    "36": "dev",
+    "39": "similar",
+    "113": "regression",
+    "213": "dev",
+    "214": "similar",
+    "196": "regression",
+    "218": "dev",
+    "217": "similar",
+    "125": "regression",
+    "178": "dev",
+    "180": "similar",
+    "100": "regression",
+    "270": "dev",
+    "272": "similar",
+    "150": "regression",
+    "99": "dev",
+    "95": "similar",
+    "231": "regression",
+    "45": "dev",
+    "42": "similar",
+    "260": "regression",
+    "160": "dev",
+    "161": "similar",
+    "82": "regression",
+    "35": "dev",
+    "37": "similar",
+    "254": "regression",
+    "138": "dev",
+    "141": "similar",
+    "227": "regression",
+    "62": "dev",
+    "60": "similar",
+    "279": "regression",
+    "63": "dev",
+    "64": "similar",
+    "114": "regression"
+  },
+  "validation_sets": {
+    "78": {
+      "similar": [
+        "77"
+      ],
+      "regression": [
+        "162"
+      ]
+    },
+    "118": {
+      "similar": [
+        "122"
+      ],
+      "regression": [
+        "14"
+      ]
+    },
+    "88": {
+      "similar": [
+        "89"
+      ],
+      "regression": [
+        "24"
+      ]
+    },
+    "103": {
+      "similar": [
+        "101"
+      ],
+      "regression": [
+        "234"
+      ]
+    },
+    "207": {
+      "similar": [
+        "211"
+      ],
+      "regression": [
+        "112"
+      ]
+    },
+    "17": {
+      "similar": [
+        "21"
+      ],
+      "regression": [
+        "169"
+      ]
+    },
+    "28": {
+      "similar": [
+        "27"
+      ],
+      "regression": [
+        "90"
+      ]
+    },
+    "149": {
+      "similar": [
+        "152"
+      ],
+      "regression": [
+        "262"
+      ]
+    },
+    "91": {
+      "similar": [
+        "92"
+      ],
+      "regression": [
+        "273"
+      ]
+    },
+    "68": {
+      "similar": [
+        "69"
+      ],
+      "regression": [
+        "286"
+      ]
+    },
+    "117": {
+      "similar": [
+        "116"
+      ],
+      "regression": [
+        "182"
+      ]
+    },
+    "250": {
+      "similar": [
+        "247"
+      ],
+      "regression": [
+        "41"
+      ]
+    },
+    "84": {
+      "similar": [
+        "83"
+      ],
+      "regression": [
+        "170"
+      ]
+    },
+    "258": {
+      "similar": [
+        "257"
+      ],
+      "regression": [
+        "297"
+      ]
+    },
+    "72": {
+      "similar": [
+        "71"
+      ],
+      "regression": [
+        "271"
+      ]
+    },
+    "131": {
+      "similar": [
+        "126"
+      ],
+      "regression": [
+        "174"
+      ]
+    },
+    "16": {
+      "similar": [
+        "15"
+      ],
+      "regression": [
+        "53"
+      ]
+    },
+    "10": {
+      "similar": [
+        "11"
+      ],
+      "regression": [
+        "19"
+      ]
+    },
+    "292": {
+      "similar": [
+        "295"
+      ],
+      "regression": [
+        "253"
+      ]
+    },
+    "147": {
+      "similar": [
+        "146"
+      ],
+      "regression": [
+        "284"
+      ]
+    },
+    "255": {
+      "similar": [
+        "256"
+      ],
+      "regression": [
+        "97"
+      ]
+    },
+    "66": {
+      "similar": [
+        "70"
+      ],
+      "regression": [
+        "276"
+      ]
+    },
+    "127": {
+      "similar": [
+        "132"
+      ],
+      "regression": [
+        "240"
+      ]
+    },
+    "57": {
+      "similar": [
+        "54"
+      ],
+      "regression": [
+        "144"
+      ]
+    },
+    "168": {
+      "similar": [
+        "167"
+      ],
+      "regression": [
+        "67"
+      ]
+    },
+    "137": {
+      "similar": [
+        "134"
+      ],
+      "regression": [
+        "198"
+      ]
+    },
+    "108": {
+      "similar": [
+        "106"
+      ],
+      "regression": [
+        "208"
+      ]
+    },
+    "81": {
+      "similar": [
+        "80"
+      ],
+      "regression": [
+        "215"
+      ]
+    },
+    "261": {
+      "similar": [
+        "259"
+      ],
+      "regression": [
+        "43"
+      ]
+    },
+    "220": {
+      "similar": [
+        "219"
+      ],
+      "regression": [
+        "109"
+      ]
+    },
+    "2": {
+      "similar": [
+        "1"
+      ],
+      "regression": [
+        "128"
+      ]
+    },
+    "187": {
+      "similar": [
+        "185"
+      ],
+      "regression": [
+        "110"
+      ]
+    },
+    "197": {
+      "similar": [
+        "199"
+      ],
+      "regression": [
+        "135"
+      ]
+    },
+    "32": {
+      "similar": [
+        "34"
+      ],
+      "regression": [
+        "265"
+      ]
+    },
+    "193": {
+      "similar": [
+        "194"
+      ],
+      "regression": [
+        "245"
+      ]
+    },
+    "5": {
+      "similar": [
+        "7"
+      ],
+      "regression": [
+        "246"
+      ]
+    },
+    "264": {
+      "similar": [
+        "266"
+      ],
+      "regression": [
+        "111"
+      ]
+    },
+    "285": {
+      "similar": [
+        "287"
+      ],
+      "regression": [
+        "249"
+      ]
+    },
+    "296": {
+      "similar": [
+        "298"
+      ],
+      "regression": [
+        "277"
+      ]
+    },
+    "237": {
+      "similar": [
+        "238"
+      ],
+      "regression": [
+        "275"
+      ]
+    },
+    "243": {
+      "similar": [
+        "241"
+      ],
+      "regression": [
+        "86"
+      ]
+    },
+    "12": {
+      "similar": [
+        "13"
+      ],
+      "regression": [
+        "55"
+      ]
+    },
+    "22": {
+      "similar": [
+        "23"
+      ],
+      "regression": [
+        "205"
+      ]
+    },
+    "232": {
+      "similar": [
+        "230"
+      ],
+      "regression": [
+        "26"
+      ]
+    },
+    "291": {
+      "similar": [
+        "289"
+      ],
+      "regression": [
+        "48"
+      ]
+    },
+    "288": {
+      "similar": [
+        "290"
+      ],
+      "regression": [
+        "6"
+      ]
+    },
+    "158": {
+      "similar": [
+        "159"
+      ],
+      "regression": [
+        "46"
+      ]
+    },
+    "206": {
+      "similar": [
+        "209"
+      ],
+      "regression": [
+        "129"
+      ]
+    },
+    "29": {
+      "similar": [
+        "25"
+      ],
+      "regression": [
+        "177"
+      ]
+    },
+    "59": {
+      "similar": [
+        "52"
+      ],
+      "regression": [
+        "267"
+      ]
+    },
+    "8": {
+      "similar": [
+        "9"
+      ],
+      "regression": [
+        "222"
+      ]
+    },
+    "181": {
+      "similar": [
+        "179"
+      ],
+      "regression": [
+        "104"
+      ]
+    },
+    "3": {
+      "similar": [
+        "4"
+      ],
+      "regression": [
+        "210"
+      ]
+    },
+    "51": {
+      "similar": [
+        "49"
+      ],
+      "regression": [
+        "201"
+      ]
+    },
+    "221": {
+      "similar": [
+        "223"
+      ],
+      "regression": [
+        "85"
+      ]
+    },
+    "202": {
+      "similar": [
+        "204"
+      ],
+      "regression": [
+        "115"
+      ]
+    },
+    "47": {
+      "similar": [
+        "50"
+      ],
+      "regression": [
+        "148"
+      ]
+    },
+    "171": {
+      "similar": [
+        "173"
+      ],
+      "regression": [
+        "191"
+      ]
+    },
+    "31": {
+      "similar": [
+        "30"
+      ],
+      "regression": [
+        "195"
+      ]
+    },
+    "120": {
+      "similar": [
+        "119"
+      ],
+      "regression": [
+        "235"
+      ]
+    },
+    "184": {
+      "similar": [
+        "186"
+      ],
+      "regression": [
+        "145"
+      ]
+    },
+    "140": {
+      "similar": [
+        "142"
+      ],
+      "regression": [
+        "175"
+      ]
+    },
+    "224": {
+      "similar": [
+        "228"
+      ],
+      "regression": [
+        "107"
+      ]
+    },
+    "189": {
+      "similar": [
+        "188"
+      ],
+      "regression": [
+        "212"
+      ]
+    },
+    "156": {
+      "similar": [
+        "155"
+      ],
+      "regression": [
+        "76"
+      ]
+    },
+    "96": {
+      "similar": [
+        "98"
+      ],
+      "regression": [
+        "33"
+      ]
+    },
+    "164": {
+      "similar": [
+        "163"
+      ],
+      "regression": [
+        "20"
+      ]
+    },
+    "157": {
+      "similar": [
+        "154"
+      ],
+      "regression": [
+        "130"
+      ]
+    },
+    "36": {
+      "similar": [
+        "39"
+      ],
+      "regression": [
+        "113"
+      ]
+    },
+    "213": {
+      "similar": [
+        "214"
+      ],
+      "regression": [
+        "196"
+      ]
+    },
+    "218": {
+      "similar": [
+        "217"
+      ],
+      "regression": [
+        "125"
+      ]
+    },
+    "178": {
+      "similar": [
+        "180"
+      ],
+      "regression": [
+        "100"
+      ]
+    },
+    "270": {
+      "similar": [
+        "272"
+      ],
+      "regression": [
+        "150"
+      ]
+    },
+    "99": {
+      "similar": [
+        "95"
+      ],
+      "regression": [
+        "231"
+      ]
+    },
+    "45": {
+      "similar": [
+        "42"
+      ],
+      "regression": [
+        "260"
+      ]
+    },
+    "160": {
+      "similar": [
+        "161"
+      ],
+      "regression": [
+        "82"
+      ]
+    },
+    "35": {
+      "similar": [
+        "37"
+      ],
+      "regression": [
+        "254"
+      ]
+    },
+    "138": {
+      "similar": [
+        "141"
+      ],
+      "regression": [
+        "227"
+      ]
+    },
+    "62": {
+      "similar": [
+        "60"
+      ],
+      "regression": [
+        "279"
+      ]
+    },
+    "63": {
+      "similar": [
+        "64"
+      ],
+      "regression": [
+        "114"
+      ]
+    }
+  },
+  "holdout_reuse": "forbidden",
+  "selection_policy": {
+    "version": "ifbench.exclusive_constraints.v1",
+    "seed": 42,
+    "dev_count": 80,
+    "similar_per_task": 1,
+    "regression_per_task": 1,
+    "source_count": 300,
+    "unique_prompt_count": 300,
+    "duplicate_prompt_ids_excluded": [],
+    "constraint_count_quotas": {
+      "1": 68,
+      "2": 12
+    },
+    "ordering_attempt": 0,
+    "current_rule": "largest-remainder constraint-count quotas; round-robin exact signatures in seeded hash order; requires a distinct similar match",
+    "similar_rule": "identical sorted constraint IDs (including count); highest normalized prompt word-set Jaccard within remaining signature pool; no topic-similarity threshold",
+    "regression_rule": "same constraint count; disjoint constraint families (prefix before colon); exclusive bipartite matching",
+    "deduplication": "global source key and NFKC/casefold/whitespace-normalized prompt",
+    "tie_break": "sha256(seed:ordering_attempt:key); first feasible ordering, at most 256",
+    "selection_inputs": [
+      "key",
+      "prompt",
+      "instruction_id_list"
+    ],
+    "performance_filtering": false,
+    "assignments": {
+      "78": {
+        "current": {
+          "constraints": [
+            "format:line_indent"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "77",
+          "constraints": [
+            "format:line_indent"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.17073171
+        },
+        "regression": {
+          "task_id": "162",
+          "constraints": [
+            "ratio:sentence_type"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "118": {
+        "current": {
+          "constraints": [
+            "format:quotes"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "122",
+          "constraints": [
+            "format:quotes"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.36538462
+        },
+        "regression": {
+          "task_id": "14",
+          "constraints": [
+            "words:words_position"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "88": {
+        "current": {
+          "constraints": [
+            "format:list",
+            "words:no_consecutive"
+          ],
+          "families": [
+            "format",
+            "words"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "89",
+          "constraints": [
+            "format:list",
+            "words:no_consecutive"
+          ],
+          "families": [
+            "format",
+            "words"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.39622642
+        },
+        "regression": {
+          "task_id": "24",
+          "constraints": [
+            "count:numbers",
+            "count:unique_word_count"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 2
+        }
+      },
+      "103": {
+        "current": {
+          "constraints": [
+            "format:options"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "101",
+          "constraints": [
+            "format:options"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.26229508
+        },
+        "regression": {
+          "task_id": "234",
+          "constraints": [
+            "words:palindrome"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "207": {
+        "current": {
+          "constraints": [
+            "words:consonants"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "211",
+          "constraints": [
+            "words:consonants"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.37288136
+        },
+        "regression": {
+          "task_id": "112",
+          "constraints": [
+            "format:parentheses"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "17": {
+        "current": {
+          "constraints": [
+            "count:numbers"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "21",
+          "constraints": [
+            "count:numbers"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.23076923
+        },
+        "regression": {
+          "task_id": "169",
+          "constraints": [
+            "ratio:sentence_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "28": {
+        "current": {
+          "constraints": [
+            "count:person_names"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "27",
+          "constraints": [
+            "count:person_names"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.61904762
+        },
+        "regression": {
+          "task_id": "90",
+          "constraints": [
+            "format:newline"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "149": {
+        "current": {
+          "constraints": [
+            "ratio:overlap",
+            "sentence:keyword"
+          ],
+          "families": [
+            "ratio",
+            "sentence"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "152",
+          "constraints": [
+            "ratio:overlap",
+            "sentence:keyword"
+          ],
+          "families": [
+            "ratio",
+            "sentence"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.46153846
+        },
+        "regression": {
+          "task_id": "262",
+          "constraints": [
+            "count:person_names",
+            "words:start_verb"
+          ],
+          "families": [
+            "count",
+            "words"
+          ],
+          "count": 2
+        }
+      },
+      "91": {
+        "current": {
+          "constraints": [
+            "format:newline"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "92",
+          "constraints": [
+            "format:newline"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.18181818
+        },
+        "regression": {
+          "task_id": "273",
+          "constraints": [
+            "custom:character_reverse"
+          ],
+          "families": [
+            "custom"
+          ],
+          "count": 1
+        }
+      },
+      "68": {
+        "current": {
+          "constraints": [
+            "format:emoji"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "69",
+          "constraints": [
+            "format:emoji"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.18
+        },
+        "regression": {
+          "task_id": "286",
+          "constraints": [
+            "repeat:repeat_span"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1
+        }
+      },
+      "117": {
+        "current": {
+          "constraints": [
+            "format:quote_unquote"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "116",
+          "constraints": [
+            "format:quote_unquote"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.17204301
+        },
+        "regression": {
+          "task_id": "182",
+          "constraints": [
+            "sentence:alliteration_increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        }
+      },
+      "250": {
+        "current": {
+          "constraints": [
+            "words:prime_lengths"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "247",
+          "constraints": [
+            "words:prime_lengths"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.52941176
+        },
+        "regression": {
+          "task_id": "41",
+          "constraints": [
+            "count:word_count_range"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "84": {
+        "current": {
+          "constraints": [
+            "format:list"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "83",
+          "constraints": [
+            "format:list"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.30555556
+        },
+        "regression": {
+          "task_id": "170",
+          "constraints": [
+            "ratio:sentence_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "258": {
+        "current": {
+          "constraints": [
+            "words:start_verb"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "257",
+          "constraints": [
+            "words:start_verb"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.29166667
+        },
+        "regression": {
+          "task_id": "297",
+          "constraints": [
+            "format:no_whitespace"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "72": {
+        "current": {
+          "constraints": [
+            "format:emoji",
+            "sentence:keyword"
+          ],
+          "families": [
+            "format",
+            "sentence"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "71",
+          "constraints": [
+            "format:emoji",
+            "sentence:keyword"
+          ],
+          "families": [
+            "format",
+            "sentence"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.21978022
+        },
+        "regression": {
+          "task_id": "271",
+          "constraints": [
+            "count:pronouns",
+            "words:vowel"
+          ],
+          "families": [
+            "count",
+            "words"
+          ],
+          "count": 2
+        }
+      },
+      "131": {
+        "current": {
+          "constraints": [
+            "format:sub-bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "126",
+          "constraints": [
+            "format:sub-bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.24657534
+        },
+        "regression": {
+          "task_id": "174",
+          "constraints": [
+            "ratio:stop_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "16": {
+        "current": {
+          "constraints": [
+            "words:words_position"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "15",
+          "constraints": [
+            "words:words_position"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.20833333
+        },
+        "regression": {
+          "task_id": "53",
+          "constraints": [
+            "count:unique_word_count"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "10": {
+        "current": {
+          "constraints": [
+            "words:keywords_specific_position"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "11",
+          "constraints": [
+            "words:keywords_specific_position"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.25
+        },
+        "regression": {
+          "task_id": "19",
+          "constraints": [
+            "count:numbers"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "292": {
+        "current": {
+          "constraints": [
+            "format:output_template"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "295",
+          "constraints": [
+            "format:output_template"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.52173913
+        },
+        "regression": {
+          "task_id": "253",
+          "constraints": [
+            "words:repeats"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "147": {
+        "current": {
+          "constraints": [
+            "ratio:overlap"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "146",
+          "constraints": [
+            "ratio:overlap"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.18888889
+        },
+        "regression": {
+          "task_id": "284",
+          "constraints": [
+            "repeat:repeat_span"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1
+        }
+      },
+      "255": {
+        "current": {
+          "constraints": [
+            "words:repeats"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "256",
+          "constraints": [
+            "words:repeats"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.21666667
+        },
+        "regression": {
+          "task_id": "97",
+          "constraints": [
+            "format:no_bullets_bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "66": {
+        "current": {
+          "constraints": [
+            "format:emoji"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "70",
+          "constraints": [
+            "format:emoji"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.2
+        },
+        "regression": {
+          "task_id": "276",
+          "constraints": [
+            "custom:csv_special_character"
+          ],
+          "families": [
+            "custom"
+          ],
+          "count": 1
+        }
+      },
+      "127": {
+        "current": {
+          "constraints": [
+            "format:sub-bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "132",
+          "constraints": [
+            "format:sub-bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.38636364
+        },
+        "regression": {
+          "task_id": "240",
+          "constraints": [
+            "words:palindrome"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "57": {
+        "current": {
+          "constraints": [
+            "count:unique_word_count"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "54",
+          "constraints": [
+            "count:unique_word_count"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.34782609
+        },
+        "regression": {
+          "task_id": "144",
+          "constraints": [
+            "ratio:overlap"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "168": {
+        "current": {
+          "constraints": [
+            "ratio:sentence_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "167",
+          "constraints": [
+            "ratio:sentence_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.70909091
+        },
+        "regression": {
+          "task_id": "67",
+          "constraints": [
+            "format:emoji"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "137": {
+        "current": {
+          "constraints": [
+            "format:sub-bullets",
+            "ratio:stop_words"
+          ],
+          "families": [
+            "format",
+            "ratio"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "134",
+          "constraints": [
+            "format:sub-bullets",
+            "ratio:stop_words"
+          ],
+          "families": [
+            "format",
+            "ratio"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.71794872
+        },
+        "regression": {
+          "task_id": "198",
+          "constraints": [
+            "count:word_count_range",
+            "sentence:keyword"
+          ],
+          "families": [
+            "count",
+            "sentence"
+          ],
+          "count": 2
+        }
+      },
+      "108": {
+        "current": {
+          "constraints": [
+            "format:parentheses"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "106",
+          "constraints": [
+            "format:parentheses"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.32432432
+        },
+        "regression": {
+          "task_id": "208",
+          "constraints": [
+            "words:consonants"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "81": {
+        "current": {
+          "constraints": [
+            "format:line_indent",
+            "ratio:sentence_words"
+          ],
+          "families": [
+            "format",
+            "ratio"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "80",
+          "constraints": [
+            "format:line_indent",
+            "ratio:sentence_words"
+          ],
+          "families": [
+            "format",
+            "ratio"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.37704918
+        },
+        "regression": {
+          "task_id": "215",
+          "constraints": [
+            "words:consonants",
+            "words:odd_even_syllables"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 2
+        }
+      },
+      "261": {
+        "current": {
+          "constraints": [
+            "words:start_verb"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "259",
+          "constraints": [
+            "words:start_verb"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.12658228
+        },
+        "regression": {
+          "task_id": "43",
+          "constraints": [
+            "count:word_count_range"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "220": {
+        "current": {
+          "constraints": [
+            "words:last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "219",
+          "constraints": [
+            "words:last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.31707317
+        },
+        "regression": {
+          "task_id": "109",
+          "constraints": [
+            "format:parentheses"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "2": {
+        "current": {
+          "constraints": [
+            "count:keywords_multiple"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "1",
+          "constraints": [
+            "count:keywords_multiple"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.16304348
+        },
+        "regression": {
+          "task_id": "128",
+          "constraints": [
+            "format:sub-bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "187": {
+        "current": {
+          "constraints": [
+            "sentence:increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "185",
+          "constraints": [
+            "sentence:increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.35
+        },
+        "regression": {
+          "task_id": "110",
+          "constraints": [
+            "format:parentheses"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "197": {
+        "current": {
+          "constraints": [
+            "count:word_count_range",
+            "sentence:keyword"
+          ],
+          "families": [
+            "count",
+            "sentence"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "199",
+          "constraints": [
+            "count:word_count_range",
+            "sentence:keyword"
+          ],
+          "families": [
+            "count",
+            "sentence"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.31578947
+        },
+        "regression": {
+          "task_id": "135",
+          "constraints": [
+            "format:sub-bullets",
+            "ratio:stop_words"
+          ],
+          "families": [
+            "format",
+            "ratio"
+          ],
+          "count": 2
+        }
+      },
+      "32": {
+        "current": {
+          "constraints": [
+            "count:pronouns"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "34",
+          "constraints": [
+            "count:pronouns"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.1754386
+        },
+        "regression": {
+          "task_id": "265",
+          "constraints": [
+            "words:vowel"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "193": {
+        "current": {
+          "constraints": [
+            "sentence:keyword"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "194",
+          "constraints": [
+            "sentence:keyword"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.33333333
+        },
+        "regression": {
+          "task_id": "245",
+          "constraints": [
+            "words:paragraph_last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "5": {
+        "current": {
+          "constraints": [
+            "count:conjunctions"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "7",
+          "constraints": [
+            "count:conjunctions"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.13829787
+        },
+        "regression": {
+          "task_id": "246",
+          "constraints": [
+            "words:paragraph_last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "264": {
+        "current": {
+          "constraints": [
+            "words:vowel"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "266",
+          "constraints": [
+            "words:vowel"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.5
+        },
+        "regression": {
+          "task_id": "111",
+          "constraints": [
+            "format:parentheses"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "285": {
+        "current": {
+          "constraints": [
+            "repeat:repeat_span"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "287",
+          "constraints": [
+            "repeat:repeat_span"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.38
+        },
+        "regression": {
+          "task_id": "249",
+          "constraints": [
+            "words:prime_lengths"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "296": {
+        "current": {
+          "constraints": [
+            "format:no_whitespace"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "298",
+          "constraints": [
+            "format:no_whitespace"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.38888889
+        },
+        "regression": {
+          "task_id": "277",
+          "constraints": [
+            "custom:date_format_list"
+          ],
+          "families": [
+            "custom"
+          ],
+          "count": 1
+        }
+      },
+      "237": {
+        "current": {
+          "constraints": [
+            "words:palindrome"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "238",
+          "constraints": [
+            "words:palindrome"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.30952381
+        },
+        "regression": {
+          "task_id": "275",
+          "constraints": [
+            "custom:csv_quotes"
+          ],
+          "families": [
+            "custom"
+          ],
+          "count": 1
+        }
+      },
+      "243": {
+        "current": {
+          "constraints": [
+            "words:paragraph_last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "241",
+          "constraints": [
+            "words:paragraph_last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.29032258
+        },
+        "regression": {
+          "task_id": "86",
+          "constraints": [
+            "format:list"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "12": {
+        "current": {
+          "constraints": [
+            "words:keywords_specific_position"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "13",
+          "constraints": [
+            "words:keywords_specific_position"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.12931034
+        },
+        "regression": {
+          "task_id": "55",
+          "constraints": [
+            "count:unique_word_count"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "22": {
+        "current": {
+          "constraints": [
+            "count:conjunctions",
+            "count:numbers"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "23",
+          "constraints": [
+            "count:conjunctions",
+            "count:numbers"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.60869565
+        },
+        "regression": {
+          "task_id": "205",
+          "constraints": [
+            "format:parentheses",
+            "words:alphabet"
+          ],
+          "families": [
+            "format",
+            "words"
+          ],
+          "count": 2
+        }
+      },
+      "232": {
+        "current": {
+          "constraints": [
+            "words:odd_even_syllables"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "230",
+          "constraints": [
+            "words:odd_even_syllables"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.35897436
+        },
+        "regression": {
+          "task_id": "26",
+          "constraints": [
+            "count:person_names"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "291": {
+        "current": {
+          "constraints": [
+            "format:title_case"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "289",
+          "constraints": [
+            "format:title_case"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.36842105
+        },
+        "regression": {
+          "task_id": "48",
+          "constraints": [
+            "count:words_japanese"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "288": {
+        "current": {
+          "constraints": [
+            "format:title_case"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "290",
+          "constraints": [
+            "format:title_case"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.19736842
+        },
+        "regression": {
+          "task_id": "6",
+          "constraints": [
+            "count:conjunctions"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "158": {
+        "current": {
+          "constraints": [
+            "ratio:sentence_balance",
+            "words:consonants"
+          ],
+          "families": [
+            "ratio",
+            "words"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "159",
+          "constraints": [
+            "ratio:sentence_balance",
+            "words:consonants"
+          ],
+          "families": [
+            "ratio",
+            "words"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.37804878
+        },
+        "regression": {
+          "task_id": "46",
+          "constraints": [
+            "count:word_count_range",
+            "format:list"
+          ],
+          "families": [
+            "count",
+            "format"
+          ],
+          "count": 2
+        }
+      },
+      "206": {
+        "current": {
+          "constraints": [
+            "words:consonants"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "209",
+          "constraints": [
+            "words:consonants"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.23255814
+        },
+        "regression": {
+          "task_id": "129",
+          "constraints": [
+            "format:sub-bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "29": {
+        "current": {
+          "constraints": [
+            "count:person_names"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "25",
+          "constraints": [
+            "count:person_names"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.48905109
+        },
+        "regression": {
+          "task_id": "177",
+          "constraints": [
+            "ratio:stop_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "59": {
+        "current": {
+          "constraints": [
+            "count:unique_word_count"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "52",
+          "constraints": [
+            "count:unique_word_count"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.13114754
+        },
+        "regression": {
+          "task_id": "267",
+          "constraints": [
+            "words:vowel"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "8": {
+        "current": {
+          "constraints": [
+            "count:conjunctions"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "9",
+          "constraints": [
+            "count:conjunctions"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.14049587
+        },
+        "regression": {
+          "task_id": "222",
+          "constraints": [
+            "words:last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "181": {
+        "current": {
+          "constraints": [
+            "sentence:alliteration_increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "179",
+          "constraints": [
+            "sentence:alliteration_increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.25352113
+        },
+        "regression": {
+          "task_id": "104",
+          "constraints": [
+            "format:options"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "3": {
+        "current": {
+          "constraints": [
+            "count:keywords_multiple"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "4",
+          "constraints": [
+            "count:keywords_multiple"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.1328125
+        },
+        "regression": {
+          "task_id": "210",
+          "constraints": [
+            "words:consonants"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "51": {
+        "current": {
+          "constraints": [
+            "count:words_japanese"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "49",
+          "constraints": [
+            "count:words_japanese"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.23529412
+        },
+        "regression": {
+          "task_id": "201",
+          "constraints": [
+            "words:alphabet"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "221": {
+        "current": {
+          "constraints": [
+            "words:last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "223",
+          "constraints": [
+            "words:last_first"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.18987342
+        },
+        "regression": {
+          "task_id": "85",
+          "constraints": [
+            "format:list"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "202": {
+        "current": {
+          "constraints": [
+            "words:alphabet"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "204",
+          "constraints": [
+            "words:alphabet"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.29230769
+        },
+        "regression": {
+          "task_id": "115",
+          "constraints": [
+            "format:quote_unquote"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "47": {
+        "current": {
+          "constraints": [
+            "count:words_japanese"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "50",
+          "constraints": [
+            "count:words_japanese"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.26086957
+        },
+        "regression": {
+          "task_id": "148",
+          "constraints": [
+            "ratio:overlap"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "171": {
+        "current": {
+          "constraints": [
+            "ratio:stop_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "173",
+          "constraints": [
+            "ratio:stop_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.32692308
+        },
+        "regression": {
+          "task_id": "191",
+          "constraints": [
+            "sentence:keyword"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        }
+      },
+      "31": {
+        "current": {
+          "constraints": [
+            "count:pronouns"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "30",
+          "constraints": [
+            "count:pronouns"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.21212121
+        },
+        "regression": {
+          "task_id": "195",
+          "constraints": [
+            "sentence:keyword"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        }
+      },
+      "120": {
+        "current": {
+          "constraints": [
+            "format:quotes"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "119",
+          "constraints": [
+            "format:quotes"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.3255814
+        },
+        "regression": {
+          "task_id": "235",
+          "constraints": [
+            "words:palindrome"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "184": {
+        "current": {
+          "constraints": [
+            "sentence:increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "186",
+          "constraints": [
+            "sentence:increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.25714286
+        },
+        "regression": {
+          "task_id": "145",
+          "constraints": [
+            "ratio:overlap"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "140": {
+        "current": {
+          "constraints": [
+            "format:thesis"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "142",
+          "constraints": [
+            "format:thesis"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.44117647
+        },
+        "regression": {
+          "task_id": "175",
+          "constraints": [
+            "ratio:stop_words"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        }
+      },
+      "224": {
+        "current": {
+          "constraints": [
+            "words:no_consecutive"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "228",
+          "constraints": [
+            "words:no_consecutive"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.20547945
+        },
+        "regression": {
+          "task_id": "107",
+          "constraints": [
+            "format:parentheses"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "189": {
+        "current": {
+          "constraints": [
+            "format:thesis",
+            "sentence:increment"
+          ],
+          "families": [
+            "format",
+            "sentence"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "188",
+          "constraints": [
+            "format:thesis",
+            "sentence:increment"
+          ],
+          "families": [
+            "format",
+            "sentence"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.43859649
+        },
+        "regression": {
+          "task_id": "212",
+          "constraints": [
+            "ratio:overlap",
+            "words:consonants"
+          ],
+          "families": [
+            "ratio",
+            "words"
+          ],
+          "count": 2
+        }
+      },
+      "156": {
+        "current": {
+          "constraints": [
+            "ratio:sentence_balance"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "155",
+          "constraints": [
+            "ratio:sentence_balance"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.33333333
+        },
+        "regression": {
+          "task_id": "76",
+          "constraints": [
+            "format:line_indent"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "96": {
+        "current": {
+          "constraints": [
+            "format:no_bullets_bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "98",
+          "constraints": [
+            "format:no_bullets_bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.425
+        },
+        "regression": {
+          "task_id": "33",
+          "constraints": [
+            "count:pronouns"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "164": {
+        "current": {
+          "constraints": [
+            "ratio:sentence_type"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "163",
+          "constraints": [
+            "ratio:sentence_type"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.24528302
+        },
+        "regression": {
+          "task_id": "20",
+          "constraints": [
+            "count:numbers"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        }
+      },
+      "157": {
+        "current": {
+          "constraints": [
+            "ratio:sentence_balance"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "154",
+          "constraints": [
+            "ratio:sentence_balance"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.16964286
+        },
+        "regression": {
+          "task_id": "130",
+          "constraints": [
+            "format:sub-bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "36": {
+        "current": {
+          "constraints": [
+            "count:punctuation"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "39",
+          "constraints": [
+            "count:punctuation"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.2
+        },
+        "regression": {
+          "task_id": "113",
+          "constraints": [
+            "format:quote_unquote"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "213": {
+        "current": {
+          "constraints": [
+            "ratio:overlap",
+            "words:consonants"
+          ],
+          "families": [
+            "ratio",
+            "words"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "214",
+          "constraints": [
+            "ratio:overlap",
+            "words:consonants"
+          ],
+          "families": [
+            "ratio",
+            "words"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.49206349
+        },
+        "regression": {
+          "task_id": "196",
+          "constraints": [
+            "count:word_count_range",
+            "sentence:keyword"
+          ],
+          "families": [
+            "count",
+            "sentence"
+          ],
+          "count": 2
+        }
+      },
+      "218": {
+        "current": {
+          "constraints": [
+            "words:consonants",
+            "words:odd_even_syllables"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "217",
+          "constraints": [
+            "words:consonants",
+            "words:odd_even_syllables"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.39726027
+        },
+        "regression": {
+          "task_id": "125",
+          "constraints": [
+            "format:emoji",
+            "format:quotes"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 2
+        }
+      },
+      "178": {
+        "current": {
+          "constraints": [
+            "sentence:alliteration_increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "180",
+          "constraints": [
+            "sentence:alliteration_increment"
+          ],
+          "families": [
+            "sentence"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.17647059
+        },
+        "regression": {
+          "task_id": "100",
+          "constraints": [
+            "format:options"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "270": {
+        "current": {
+          "constraints": [
+            "count:pronouns",
+            "words:vowel"
+          ],
+          "families": [
+            "count",
+            "words"
+          ],
+          "count": 2
+        },
+        "similar": {
+          "task_id": "272",
+          "constraints": [
+            "count:pronouns",
+            "words:vowel"
+          ],
+          "families": [
+            "count",
+            "words"
+          ],
+          "count": 2,
+          "prompt_token_jaccard": 0.36206897
+        },
+        "regression": {
+          "task_id": "150",
+          "constraints": [
+            "ratio:overlap",
+            "sentence:keyword"
+          ],
+          "families": [
+            "ratio",
+            "sentence"
+          ],
+          "count": 2
+        }
+      },
+      "99": {
+        "current": {
+          "constraints": [
+            "format:no_bullets_bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "95",
+          "constraints": [
+            "format:no_bullets_bullets"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.26829268
+        },
+        "regression": {
+          "task_id": "231",
+          "constraints": [
+            "words:odd_even_syllables"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "45": {
+        "current": {
+          "constraints": [
+            "count:word_count_range"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "42",
+          "constraints": [
+            "count:word_count_range"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.175
+        },
+        "regression": {
+          "task_id": "260",
+          "constraints": [
+            "words:start_verb"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "160": {
+        "current": {
+          "constraints": [
+            "ratio:sentence_type"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "161",
+          "constraints": [
+            "ratio:sentence_type"
+          ],
+          "families": [
+            "ratio"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.16239316
+        },
+        "regression": {
+          "task_id": "82",
+          "constraints": [
+            "format:list"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      },
+      "35": {
+        "current": {
+          "constraints": [
+            "count:punctuation"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "37",
+          "constraints": [
+            "count:punctuation"
+          ],
+          "families": [
+            "count"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.17592593
+        },
+        "regression": {
+          "task_id": "254",
+          "constraints": [
+            "words:repeats"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "138": {
+        "current": {
+          "constraints": [
+            "format:thesis"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "141",
+          "constraints": [
+            "format:thesis"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.31372549
+        },
+        "regression": {
+          "task_id": "227",
+          "constraints": [
+            "words:no_consecutive"
+          ],
+          "families": [
+            "words"
+          ],
+          "count": 1
+        }
+      },
+      "62": {
+        "current": {
+          "constraints": [
+            "repeat:repeat_change"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "60",
+          "constraints": [
+            "repeat:repeat_change"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.35064935
+        },
+        "regression": {
+          "task_id": "279",
+          "constraints": [
+            "custom:mcq_count_length"
+          ],
+          "families": [
+            "custom"
+          ],
+          "count": 1
+        }
+      },
+      "63": {
+        "current": {
+          "constraints": [
+            "repeat:repeat_simple"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1
+        },
+        "similar": {
+          "task_id": "64",
+          "constraints": [
+            "repeat:repeat_simple"
+          ],
+          "families": [
+            "repeat"
+          ],
+          "count": 1,
+          "prompt_token_jaccard": 0.12941176
+        },
+        "regression": {
+          "task_id": "114",
+          "constraints": [
+            "format:quote_unquote"
+          ],
+          "families": [
+            "format"
+          ],
+          "count": 1
+        }
+      }
+    },
+    "unused_ids": [
+      "151",
+      "190",
+      "133",
+      "124",
+      "74",
+      "226",
+      "252",
+      "153",
+      "229",
+      "263",
+      "136",
+      "18",
+      "282",
+      "269",
+      "244",
+      "0",
+      "102",
+      "176",
+      "87",
+      "40",
+      "123",
+      "294",
+      "172",
+      "225",
+      "94",
+      "200",
+      "233",
+      "239",
+      "281",
+      "139",
+      "251",
+      "299",
+      "165",
+      "268",
+      "143",
+      "65",
+      "192",
+      "293",
+      "121",
+      "274",
+      "73",
+      "236",
+      "242",
+      "166",
+      "216",
+      "58",
+      "75",
+      "56",
+      "44",
+      "183",
+      "38",
+      "79",
+      "93",
+      "278",
+      "280",
+      "283",
+      "105",
+      "203",
+      "248",
+      "61"
+    ],
+    "note": "AER adaptation/validation subset of official test data; holdouts are acceptance data, not an independent final test. Regression tasks need not pass the initial prompt."
+  }
+}

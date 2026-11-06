@@ -1,6 +1,7 @@
 """Model diagnosis over public evidence, with structured hypotheses and call receipts."""
 
 import json
+from hashlib import sha256
 from datetime import datetime, timezone
 from time import monotonic
 
@@ -12,6 +13,7 @@ from aer_core.schemas.providers import ModelMessage, ModelRequest, ModelResponse
 from plugins.agents.execution import SessionRecord
 from plugins.json_output import parse_final
 from .lightweight import LightweightDiagnoser
+from .checked import CheckedDiagnosisMixin
 
 
 class DiagnosisAnalysis(DomainModel):
@@ -23,17 +25,26 @@ class DiagnosisAnalysis(DomainModel):
     confidence: Score | None = None
 
 
-class LLMDiagnoser:
+class LLMDiagnoser(CheckedDiagnosisMixin):
     plugin_id = "llm_diagnoser"
 
     def __init__(self, model, artifacts):
         self.model, self.artifacts = model, artifacts
 
+    def evidence_key(self, task, execution, feedback):
+        evidence = {"contract": "diagnosis.public_checks.v1", "task": task.model_dump(mode="json"),
+                    "execution": execution.model_dump(mode="json", exclude={"usage"}),
+                    "feedback": feedback.model_dump(mode="json")}
+        return sha256(json.dumps(evidence, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
     def diagnose(self, task, result, feedback, run_ctx) -> Diagnosis:
         if task.task_id != result.task_id:
             raise ContractError("Diagnosis task and execution must match", stage="diagnosis")
         if feedback.success:
-            return LightweightDiagnoser().diagnose(task, result, feedback, run_ctx)
+            return LightweightDiagnoser().diagnose(task, result, feedback, run_ctx).replace(
+                evidence_key=self.evidence_key(task, result, feedback))
+        if feedback.checks:
+            return self.diagnose_checks(task, result, feedback, run_ctx)
         started_at = datetime.now(timezone.utc)
         record = SessionRecord()
         allowed_reasons = {feedback.reason_code, "no_failure", "step_limit", "invalid_output_format",
@@ -93,7 +104,7 @@ class LLMDiagnoser:
                 plugin_id=self.plugin_id, usage=record.usage()).to_info()
         usage = record.usage()
         if diagnosis:
-            diagnosis = diagnosis.replace(usage=usage)
+            diagnosis = diagnosis.replace(usage=usage, evidence_key=self.evidence_key(task, result, feedback))
         receipt = DiagnosisRecord(run_id=run_ctx.run_id, episode_id=run_ctx.episode_id, task_id=task.task_id,
             operation_id=run_ctx.operation_id, started_at=started_at, finished_at=datetime.now(timezone.utc),
             task=task, execution=result, feedback=feedback, response=response, diagnosis=diagnosis, usage=usage, error=error)

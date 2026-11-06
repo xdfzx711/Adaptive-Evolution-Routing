@@ -25,6 +25,12 @@ class ProviderReflection:
             "that a shell is unavailable. Do not embed task-specific answers, patches, private labels "
             "or validation/test examples in the new instructions. Do not repeat earlier prompt candidates. "
             "Follow the requested response format."))]
+        if any(trial.observation.feedback and trial.observation.feedback.checks for trial in self.record.trials):
+            messages[0] = messages[0].replace(content=messages[0].content + (
+                " Feedback.checks gives authoritative check-level results for each sampled response. "
+                "Use failed checks to guide changes and preserve passed constraints. Never invent extra benchmark requirements. "
+                "Outer Baseline Diagnosis refers to the earlier stable response, not every trial; its causes are hypotheses. "
+                "Use the current trial's official checks when they differ from that earlier diagnosis."))
         if isinstance(prompt, str):
             messages.append(ModelMessage(role="user", content=prompt))
         else:

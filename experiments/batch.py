@@ -14,13 +14,16 @@ from experiments.orchestration import prepare_orchestrator
 from experiments.holdout_reporting import aggregate_holdouts, measure_holdouts, paired_metrics
 from plugins.storage._files import FileRoot, readable_json
 from plugins.storage.layout import episode_directory
+from .scoring import scoring_protocol, aggregate_declared_metrics
 
 
-def aggregate(entries):
+def aggregate(entries, evaluator=None):
     evaluated = [entry for entry in entries if entry.get("final_evaluation") is not None]
     paired = [entry for entry in evaluated if entry.get("initial_evaluation") is not None]
     metrics = set.intersection(*(set(entry["final_evaluation"]["metrics"]) for entry in evaluated)) if evaluated else set()
-    return {"finished_tasks": len(entries), "evaluated_tasks": len(evaluated),
+    declared = ({"official_native_metrics_evaluated": aggregate_declared_metrics(
+        [entry["final_evaluation"] for entry in evaluated], evaluator)} if evaluator is not None else {})
+    return {**declared, "finished_tasks": len(entries), "evaluated_tasks": len(evaluated),
         "error_tasks": sum(entry["status"] != "completed" for entry in entries),
         "mean_score_evaluated": fmean(entry["final_evaluation"]["score"] for entry in evaluated) if evaluated else None,
         "success_rate_evaluated": fmean(entry["final_evaluation"]["success"] for entry in evaluated) if evaluated else None,
@@ -141,16 +144,21 @@ def run_benchmark(path, *, run_id=None, limit=None, console=False, report_holdou
         "report_holdouts", "total_token_budget_enforced")}
     protocol.update(schema_version="aer.baseline_protocol.v1",
                     operator_configs=config.targets.model_dump(mode="json")["operator_configs"])
+    scoring = scoring_protocol(benchmark)
+    if scoring is not None:
+        summary["scoring"] = protocol["scoring"] = scoring
+        if console:
+            print("[scoring] " + json.dumps(scoring, ensure_ascii=False), flush=True)
     with files.locked():
         files.replace("baseline_protocol.json", readable_json(protocol))
 
     def save():
         summary["wall_elapsed_seconds"] = monotonic() - started
-        summary["aggregate"] = aggregate(entries)
+        summary["aggregate"] = aggregate(entries, benchmark.evaluator)
         summary["aggregate"]["requested_tasks"] = len(tasks)
         summary["aggregate"]["pending_tasks"] = len(tasks) - len(entries)
         if report_holdouts:
-            summary["aggregate"]["holdouts_initial_vs_final"] = aggregate_holdouts(entries)
+            summary["aggregate"]["holdouts_initial_vs_final"] = aggregate_holdouts(entries, benchmark.evaluator)
         summary["usage"] = sum_usage(usages).model_dump(mode="json")
         with files.locked():
             files.replace("baseline_summary.json", readable_json(summary))
