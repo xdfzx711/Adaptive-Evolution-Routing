@@ -65,7 +65,7 @@ class GeneratedTool(DomainModel):
         description = self.description
         if self.usage is not None:
             description += "\n" + "\n".join(f"{key}: {value}" for key, value in self.usage.model_dump().items())
-            description += "\nJSON example (adapt to this repository): " + json.dumps(self.model_dump(mode="json")["usage_example"], ensure_ascii=False)
+            description += "\nJSON example (adapt to the current task inputs): " + json.dumps(self.model_dump(mode="json")["usage_example"], ensure_ascii=False)
         return ToolDescriptor(description=description, version=self.version,
                               input_schema=self.model_dump(mode="json")["input_schema"])
 

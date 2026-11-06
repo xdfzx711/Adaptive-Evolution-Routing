@@ -87,10 +87,34 @@ class CheckedDiagnosisTests(unittest.TestCase):
 
     def test_evidence_or_check_reference_errors_are_corrected(self):
         for hypo in ({'text': 'cause', 'evidence_step_ids': [99]},
-                     {'text': 'cause', 'check_ids': ['keyword']}):
+                     {'text': 'cause', 'check_ids': ['keyword']},
+                     {'text': 'cause', 'evidence_refs': [{'source': 'evaluation', 'path': '/private_answer'}]}):
             values = iter([response(checked_text(hypotheses=[hypo])), response(checked_text())])
             d, _, _, t, e, f, c = self.fixture(lambda *_: next(values))
             self.assertEqual(d.diagnose(t, e, f, c).consistency_status, 'corrected')
+
+    def test_nested_public_references_are_checked_and_history_does_not_rebind_them(self):
+        hypothesis = {'text': 'Possible mismatch', 'check_ids': ['overlap'],
+                      'evidence_refs': [{'source': 'evaluation', 'path': '/checks/0/status'}]}
+        d, _, _, t, e, f, c = self.fixture(lambda *_: response(checked_text(hypotheses=[hypothesis])))
+        got = validate_diagnosis(d.diagnose(t, e, f, c), e, f, t)
+        builder = PublicFeedbackBuilder(ContextPolicy(output_fields=['response'], public_check_ids=['overlap', 'keyword']))
+        historical = builder.diagnosis_view(got, (), historical=True)
+        self.assertFalse(historical.hypotheses[0].evidence_refs)
+        self.assertFalse(historical.checks[0].hypotheses[0].evidence_refs)
+        bad = got.replace(checks=[got.checks[0].replace(hypotheses=[got.checks[0].hypotheses[0].replace(
+            evidence_refs=[{'source': 'evaluation', 'path': '/private_answer'}])]), got.checks[1]])
+        with self.assertRaises(DiagnosisError):
+            validate_diagnosis(bad, e, f, t)
+
+    def test_fallback_official_observations_survive_public_context_filtering(self):
+        d, _, _, t, e, f, c = self.fixture(lambda *_: response(checked_text(status='failed')))
+        got = d.diagnose(t, e, f, c)
+        builder = PublicFeedbackBuilder(ContextPolicy(output_fields=['response'], public_check_ids=['overlap', 'keyword']))
+        public = builder.diagnosis_view(got, [1], feedback=f)
+        self.assertEqual(public.checks, got.checks)
+        self.assertEqual(public.observations, got.observations)
+        self.assertEqual(public.consistency_status, 'fallback')
 
     def test_provider_error_remains_error_not_causal_fallback(self):
         def fail(*_): raise OperationTimeout('provider timeout', stage='diagnosis')

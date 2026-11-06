@@ -1,7 +1,7 @@
 """Execution facts, external evaluations and public feedback views."""
 
 from typing import Literal
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from .base import (
     DomainModel, FiniteFloat, Identifier, Items, JsonObject,
@@ -10,7 +10,7 @@ from .base import (
 from .references import ArtifactRef
 from .states import ExecutionStatus, ExecutionStatusValue, StageValue
 from .usage import ResourceUsage
-from .scoring import ScoreDetails
+from .scoring import EvidenceReference, ScoreDetails, ScoringFinding, ScoringRules
 
 
 class ErrorInfo(DomainModel):
@@ -101,6 +101,17 @@ class FeedbackView(DomainModel):
     evidence_step_ids: Items[NonNegativeInt] = ()
     assessment_version: Identifier | None = None
     checks: Items[PublicCheckResult] = ()
+    feedback_version: Identifier = "aer.feedback.v1"
+    metrics: ReadOnlyMap[FiniteFloat] = Field(default_factory=dict)
+    scoring_rules: ScoringRules | None = None
+    findings: Items[ScoringFinding] = ()
+    evaluator_feedback: str | None = None
+    evaluator_reason_code: Identifier | None = None
+    evaluation_id: Identifier | None = None
+    execution_operation_id: Identifier | None = None
+    evaluator_id: Identifier | None = None
+    task_id: Identifier | None = None
+    agent_version_id: Identifier | None = None
 
     @model_validator(mode="after")
     def unique_checks(self):
@@ -121,6 +132,8 @@ class DiagnosisStatement(DomainModel):
     text: Identifier
     evidence_step_ids: Items[NonNegativeInt] = ()
     check_ids: Items[Identifier] = ()
+    evidence_refs: Items[EvidenceReference] = ()
+    verification: str | None = None
 
 
 class CheckDiagnosis(DomainModel):
@@ -143,6 +156,8 @@ class Diagnosis(DomainModel):
     evidence_key: Identifier | None = None
     checks: Items[CheckDiagnosis] = ()
     consistency_status: Literal["verified", "corrected", "fallback"] | None = None
+    unknowns: Items[str] = ()
+    diagnosis_version: Identifier = "aer.diagnosis.v1"
 
     @property
     def all_evidence_step_ids(self):

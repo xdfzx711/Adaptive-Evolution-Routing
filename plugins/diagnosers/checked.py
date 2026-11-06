@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from time import monotonic
 
 from aer_core.errors import AERError, DiagnosisError
+from aer_core.diagnostic_evidence import validate_references
 from aer_core.feedback import check_diagnosis_conflicts
 from aer_core.schemas.base import DomainModel, Items, Score
 from aer_core.schemas.diagnosis import DiagnosisAttempt, DiagnosisRecord
@@ -70,6 +71,9 @@ class CheckedDiagnosisMixin:
                         raise ValueError("Output was truncated")
                     parsed = CheckedAnalysis.model_validate(parse_final(response.content))
                     conflicts = check_diagnosis_conflicts(parsed.checks, feedback, execution)
+                    if not conflicts:
+                        validate_references(self._checked_result(feedback, parsed.checks, parsed.confidence,
+                                                                "verified"), task, execution, feedback)
                 except Exception:
                     parsed = None
                     conflicts = ["Response must match diagnosis_schema and include all supplied checks with valid references"]

@@ -1,4 +1,5 @@
 from copy import deepcopy
+from aer_core.diagnostic_evidence import diagnosis_payload, history_payload
 from dataclasses import replace
 from statistics import fmean, pstdev
 
@@ -123,9 +124,14 @@ class AERGEPAAdapter:
             "Feedback": item["feedback"], "Execution Evidence": item["execution"]["trajectory"],
             "Execution Environment": {key: value for key, value in item["execution"]["state_summary"].items()
                                       if key in {"execution_platform", "execution_shell"}},
-            "Outer Baseline Diagnosis": self.request.context.diagnosis.model_dump(mode="json") if self.request.context.diagnosis
+            "Outer Baseline Diagnosis": diagnosis_payload(self.request.context.diagnosis) if self.request.context.diagnosis
                 and item["task"]["task_id"] == self.current_task.task_id else None,
-            "Previous Evolution Attempts": [history.model_dump(mode="json") for history in self.request.context.history],
+            "Outer Baseline Evidence": {"task": self.request.context.task.model_dump(mode="json"),
+                "execution": self.request.context.execution.model_dump(mode="json"),
+                "evaluation": self.request.context.feedback.model_dump(mode="json"),
+                "reference_scope": "Outer Baseline Diagnosis references this evidence, not the internal trial."}
+                if self.request.context.diagnosis and item["task"]["task_id"] == self.current_task.task_id else None,
+            "Previous Evolution Attempts": history_payload(self.request.context.history),
             "Repeated Evaluation": {"sample": index + 1, "sample_count": len(group["samples"]),
                 "seed": group["sample_seeds"][index], "mean_score": group["mean_score"],
                 "score_stddev": group["score_stddev"]}}

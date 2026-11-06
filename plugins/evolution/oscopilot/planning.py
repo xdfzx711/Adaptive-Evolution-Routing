@@ -1,6 +1,7 @@
 """Boundary validation and dependency injection for the upstream FridayPlanner."""
 
 from contextlib import redirect_stdout
+from aer_core.diagnostic_evidence import FEEDBACK_GUIDANCE
 import copy
 import io
 import json
@@ -24,22 +25,23 @@ Missing export hints never block native construction; completed unmarked tools m
 An optional interface may describe JSON inputs/outputs; publication metadata is completed AFTER native construction.
 Do not put publication-format instructions into task descriptions. Internal helpers need no tool_spec,
 MCP schema or acceptance metadata. Execute them using their native code and invocation.
-Final tools will be called by Codex with JSON arguments in a fresh repository workspace. Prefer paths,
-source text and structured data; a repository path alone does not provide a concrete runtime Query.
+Final tools will be called by Codex with JSON arguments in a fresh task workspace. Use caller-supplied
+text and structured data, or paths when the public task supplies files and permits their use.
+Task input in public evidence is available to the model; it is not automatically a file or Python global.
 Plan final nodes as directly invocable, self-contained tools. Writing another tool file alone does not
 exercise that tool and does not package it for export; plan an actual callable and representative execution.
 Internal helper nodes may create files. A final node's description and completion criteria must instead
 require the callable's behavior, not writing its definition to a .py file. Include any constructed helper
 logic in the exported source; do not make final tools import temporary modules from construction paths.
-Use repository-relative paths, cwd or a workspace call parameter; avoid temporary roots in source/defaults.
-Each invocation has a fresh Python namespace, with globals workspace (repository root string).
-There is no preconfigured Django application/database. Do not install packages or execute project tests
-when forbidden by the task. Source inspection and local Python objects are allowed.
+When file access is appropriate, use workspace-relative paths, cwd or a workspace call parameter;
+avoid temporary roots in source/defaults. Each invocation has a fresh Python namespace, with a global
+workspace string. Do not assume a repository, application or database exists. Do not install packages,
+access external sources or execute project tests when forbidden by the task.
 Read the full task, trajectory, results, diagnosis and construction_feedback in the public evidence.
 Diagnosis hypotheses and model_assessment remain hypotheses, not confirmed defects. Investigate them.
 Historical failures and paths are evidence, not current bindings. Preserve the original repair objective.
 AER converts selected completed tools into a candidate bundle; only outer validation can make it active.
-""" + DELIVERY_GUIDANCE
+""" + DELIVERY_GUIDANCE + FEEDBACK_GUIDANCE
 
 
 class NativePlanFields(DomainModel):

@@ -49,6 +49,9 @@ class OSCopilotIntegrationTests(unittest.TestCase):
             path = configured(Path(directory))
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
             data["limits"]["max_evolution_rounds"] = 2
+            # Exercise history/delivery recovery, not the token-budget boundary:
+            # the second round carries public scoring rules and construction history.
+            data["targets"]["operator_configs"]["tool"]["max_tokens"] = 30000
             path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
             startup = prepare_orchestrator(path, run_id="oscopilot-history", console=False)
             task = startup.prepare_task("dev-001")

@@ -10,6 +10,7 @@ from aer_core.schemas.assessment import TaskExecutionRecord
 from aer_core.schemas.evolution import CandidateSummary, EvolutionContext, EvolutionDecision, ExperienceSummary
 from aer_core.schemas.feedback import ContextPolicy
 from aer_core.feedback import PUBLIC_REASONS, PublicFeedbackBuilder
+from aer_core.diagnostic_evidence import validate_references
 from aer_core.schemas.experience import AttemptFinishedEvent, CandidateEvaluatedEvent, ExperienceQuery, TaskFinishedEvent, VersionCommittedEvent
 from aer_core.schemas.references import AgentSnapshot
 from aer_core.schemas.runtime import RunContext
@@ -35,8 +36,8 @@ class ContextBuilder:
     def feedback(self, evaluation):
         return self.feedback_builder.feedback(evaluation)
 
-    def _diagnosis(self, diagnosis, visible_steps):
-        return self.feedback_builder.diagnosis_view(diagnosis, visible_steps)
+    def _diagnosis(self, diagnosis, visible_steps, feedback=None):
+        return self.feedback_builder.diagnosis_view(diagnosis, visible_steps, feedback=feedback)
 
     def _history(self, record, round_id, task_mode, as_of, allowed_task_ids):
         events = self.experience.query(ExperienceQuery(run_id=record.run_id,
@@ -115,7 +116,8 @@ class ContextBuilder:
                 rationale=attempt.decision.rationale[:self.policy.history_max_text_chars]) if attempt.decision else None
             summaries.append(ExperienceSummary(attempt_id=attempt.attempt_id, run_id=attempt.run_id,
                 episode_id=attempt.episode_id, task_id=attempt.task_id, round_id=attempt.round_id,
-                stable_version_id=attempt.stable_version_id, decision=decision, diagnosis=self._diagnosis(attempt.diagnosis, ()),
+                stable_version_id=attempt.stable_version_id, decision=decision,
+                diagnosis=self.feedback_builder.diagnosis_view(attempt.diagnosis, (), historical=True),
                 candidate_summaries=candidates, completed_at=attempt.finished_at,
                 stable_version_after=stable_after, attempt_status=attempt.status,
                 error_code=attempt.error.code if attempt.error else None,
@@ -147,17 +149,20 @@ class ContextBuilder:
         task_view, view, feedback = self.public_views(task, record.execution, record.evaluation)
         trace = view.trajectory
         steps = {event.seq for event in trace}
+        diagnosis = self._diagnosis(record.diagnosis, steps, feedback)
+        if diagnosis is not None:
+            validate_references(diagnosis, task_view, view, feedback)
         controlled = stable.model_dump(mode="json")["config"]
         snapshot = AgentSnapshot(version_id=stable.version_id, agent_plugin_id=stable.agent_plugin_id,
             parent_version_id=stable.parent_version_id,
             config={key: controlled[key] for key in self.policy.snapshot_config_fields if key in controlled},
             artifacts={key: ref for key, ref in stable.artifacts.items() if ref.kind in self.policy.artifact_kinds})
         return EvolutionContext(round_id=round_id, task=task_view, stable_snapshot=snapshot,
-            evaluation_signal=EvaluationSignal(**feedback.model_dump(mode="json"),
-                evaluation_id=record.evaluation.evaluation_id,
-                execution_operation_id=record.evaluation.execution_operation_id, evaluator_id=self.policy.evaluator_id)
+            evaluation_signal=EvaluationSignal(**{**feedback.model_dump(mode="json"),
+                "evaluation_id": record.evaluation.evaluation_id,
+                "execution_operation_id": record.evaluation.execution_operation_id, "evaluator_id": self.policy.evaluator_id})
                 if "memory" in feasible_targets else None,
-            execution=view, feedback=feedback, diagnosis=self._diagnosis(record.diagnosis, steps),
+            execution=view, feedback=feedback, diagnosis=diagnosis,
             history=self._history(record, round_id, task_mode, cutoff, set(allowed_history_task_ids) | {task.task_id}),
             feasible_targets=feasible_targets, remaining_budget=run_ctx.budget.remaining() if run_ctx.budget else None,
             as_of=cutoff, run_context=run_ctx.to_record())

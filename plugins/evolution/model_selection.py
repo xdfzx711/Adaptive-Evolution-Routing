@@ -1,6 +1,7 @@
 """Use the injected framework model to propose an execution-model artifact."""
 
 import json
+from aer_core.diagnostic_evidence import evolution_context_payload
 from time import monotonic
 
 from aer_core.config.models import PositiveInt, Settings
@@ -58,7 +59,7 @@ class ModelSelectionEvolver:
                 "allowed_models": list(dict.fromkeys(choice.model_id for choice in choices)),
                 "allowed_selections": [choice.model_dump(mode="json") for choice in choices],
                 "routing_decision": {"target": request.decision.target, "rationale": request.decision.rationale},
-                "context": request.context.model_dump(mode="json", exclude={"stable_snapshot", "run_context"})}
+                "context": evolution_context_payload(request.context)}
             model_request = ModelRequest(messages=[
                 ModelMessage(role="system", content=("Select a task execution model and reasoning effort using only public evidence. "
                     "Consider prior candidate changes and validation outcomes before proposing a model already tried in a similar state. "

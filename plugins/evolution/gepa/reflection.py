@@ -1,4 +1,5 @@
 from dataclasses import replace
+from aer_core.diagnostic_evidence import FEEDBACK_GUIDANCE
 from time import monotonic
 
 from aer_core.errors import AERError, ContractError, EvolutionError, OperationTimeout
@@ -24,7 +25,7 @@ class ProviderReflection:
             "Command quoting or permission errors do not justify switching to another operating system or assuming "
             "that a shell is unavailable. Do not embed task-specific answers, patches, private labels "
             "or validation/test examples in the new instructions. Do not repeat earlier prompt candidates. "
-            "Follow the requested response format."))]
+            "Follow the requested response format." + FEEDBACK_GUIDANCE))]
         if any(trial.observation.feedback and trial.observation.feedback.checks for trial in self.record.trials):
             messages[0] = messages[0].replace(content=messages[0].content + (
                 " Feedback.checks gives authoritative check-level results for each sampled response. "

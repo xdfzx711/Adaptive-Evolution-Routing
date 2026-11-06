@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from aer_core.diagnostic_evidence import diagnosis_payload, history_payload
 from pathlib import Path
 
 from aer_core.errors import AERError, BudgetExceeded, EvolutionError
@@ -108,10 +109,11 @@ class SkillClawSkillEvolver:
                 raise ValueError("SkillClaw v1 supports observed on-demand reads, not preloaded sessions")
             session = export_session(evidence, self.config)
             feedback = {"feedback": evidence.feedback.model_dump(mode="json"),
+                        "diagnosis": diagnosis_payload(evidence.diagnosis),
+                        "diagnosis_reference_scope": "References address the original public task/execution/feedback; exported session events may be transformed or truncated.",
                         "execution_output": evidence.model_dump(mode="json")["output"],
                         "execution_usage": evidence.usage.model_dump(mode="json"),
-                        "diagnosis": evidence.diagnosis.model_dump(mode="json") if evidence.diagnosis else None,
-                        "history": [item.model_dump(mode="json") for item in request.context.history],
+                        "history": history_payload(request.context.history),
                         "provenance": session["aer_provenance"]}
             adapter = ModelAdapter(self.model, request.run_context, self.config, record, calls, feedback)
             upstream = load_upstream(self.source)

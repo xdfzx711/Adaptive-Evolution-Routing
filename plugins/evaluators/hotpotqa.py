@@ -59,6 +59,11 @@ class HotpotQAEvaluator:
         return tuple(MetricDefinition(name=name, direction="higher", minimum=0, maximum=1,
             kind="binary" if name in {"em", "sp_em", "joint_em"} else "continuous",
             aggregation="mean") for name in METRICS)
+    public_feedback_text = True
+
+    def public_scoring_rules(self):
+        from .scoring_rules import hotpotqa_rules
+        return hotpotqa_rules(self)
 
     def __init__(self, settings):
         self.settings = settings

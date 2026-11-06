@@ -66,7 +66,7 @@ class PreparedExecution:
                 builder = context_builder(self, task)
                 public_task, execution_view, feedback = builder.public_views(task_view, result, evaluation)
                 if config.benchmark.execution_split == "dev" and error is None:
-                    diagnosis = validate_diagnosis(self.diagnoser.diagnose(public_task, execution_view, feedback, assessment_context), execution_view, feedback)
+                    diagnosis = validate_diagnosis(self.diagnoser.diagnose(public_task, execution_view, feedback, assessment_context), execution_view, feedback, public_task)
                     assessment_usage = diagnosis.usage or ResourceUsage.zero()
             except AERError as failure:
                 error = failure.to_info()

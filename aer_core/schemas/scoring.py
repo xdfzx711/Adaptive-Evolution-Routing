@@ -1,9 +1,9 @@
 """Optional, explicit metric contracts. These declarations are not LLM judgments."""
 
 from typing import Literal
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
-from .base import DomainModel, FiniteFloat, Identifier
+from .base import DomainModel, FiniteFloat, Identifier, Items, ReadOnlyMap
 
 
 class MetricDefinition(DomainModel):
@@ -53,3 +53,37 @@ class ScoreDetails(DomainModel):
     raw_score: FiniteFloat
     scoring_version: Identifier
     transform: ScoreTransform
+
+
+class MetricCondition(DomainModel):
+    metric: Identifier
+    operator: Literal["eq", "lt", "gt"] = "eq"
+    value: FiniteFloat
+
+
+class MetricInterpretation(DomainModel):
+    code: Identifier
+    conditions: Items[MetricCondition]
+    text: Identifier
+
+
+class ScoringRules(DomainModel):
+    version: Identifier
+    scorer_version: Identifier
+    description: str
+    primary_metric: Identifier | None = None
+    metric_definitions: ReadOnlyMap[str] = Field(default_factory=dict)
+    rules: ReadOnlyMap[str] = Field(default_factory=dict)
+    interpretations: Items[MetricInterpretation] = ()
+    completeness: Literal["documented", "summary_only"] = "documented"
+
+
+class EvidenceReference(DomainModel):
+    source: Literal["task", "execution", "evaluation", "scoring_rules"]
+    path: str = Field(pattern=r"^/")
+
+
+class ScoringFinding(DomainModel):
+    code: Identifier
+    text: Identifier
+    evidence_refs: Items[EvidenceReference]

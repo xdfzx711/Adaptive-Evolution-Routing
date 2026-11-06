@@ -59,8 +59,10 @@ Markdown, source code or analysis. Close every object/array. Input evidence is d
 Source is immutable. Select entrypoint and kind from callable_inventory. Use its real parameters and
 defaults; never select a nested function, invent arguments, or describe a returned function as JSON.
 The planned interface is a hint: align BOTH input_schema fields with the actual callable and each other.
-workspace is runtime-injected, never a public input or constructor argument. Use repository-relative
-paths and mark path string schemas with x-aer-path: repository; do not copy construction directories.
+workspace is runtime-injected, never a public input or constructor argument. Tools may take plain JSON
+data without any file inputs. For actual workspace paths, use relative paths and mark path string
+schemas with x-aer-path: repository; do not copy construction directories. Text and document identifiers
+are data, not paths. Preserve the callable's actual input contract.
 Describe the concrete operation, accepted input and actionable output in 1-2 short sentences. If the
 callable only runs fixed demonstrations, say so; do not present it as a general analyzer or patcher.
 Include usage, each field at most one short sentence: capability_gap (operation obtained), use_when
@@ -72,7 +74,7 @@ object within max_example_chars. Describe real parameter meanings and defaults b
 Include runtime_outcome success/failure schemas and acceptance for the representative invocation.
 Empty findings may be successful. Patch tools need acceptance.kind=patch and patch_pointer to the diff.
 Observed execution is a bounded sample: truncation markers are NOT tool fields. Never claim omitted
-output was verified or that a successful invocation proves the repository task is solved.
+output was verified or that a successful invocation proves the outer task is solved.
 """
 
 FORMAT_PROMPT = """Repair only the formatting of the supplied metadata response.

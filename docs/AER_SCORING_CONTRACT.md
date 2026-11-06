@@ -144,8 +144,30 @@ structured consistency, not semantic proof that a free-text causal hypothesis is
 Diagnosis reuse includes public task input, execution version/output/trajectory,
 assessment version and check results in its evidence fingerprint. Identical
 evidence can reuse a diagnosis; changed evidence invalidates it. Benchmarks without
-checks retain the existing diagnosis flow. GEPA reflections receive current trial
+checks use the evidence-reference diagnosis flow described in
+[AER_DOMAIN_CONTRACTS.md](AER_DOMAIN_CONTRACTS.md). GEPA reflections receive current trial
 checks and distinguish them from the earlier stable-version diagnosis.
+
+## Public rules and projected scores
+
+Metric declarations (`MetricDefinitionProvider`) and public scorer explanations
+(`ScoringRulesProvider`) are independent optional capabilities. Feedback can carry
+native metrics, deterministic interpretations, and explicitly disclosed per-check
+results together. Evaluation remains authoritative; a diagnostic hypothesis does
+not change a score or success flag.
+
+When explicit score projection is enabled, `ConfiguredScoringEvaluator` publishes
+rules with its active projected scorer version and selected primary metric. It
+preserves the native metric descriptions, interpretations and success rule, and
+adds the optimization-score formula. This applies equally to outer evaluation and
+GEPA trials. A native scorer without detailed public rules remains `summary_only`;
+the wrapper describes the projection without inventing benchmark semantics.
+
+The diagnosis evidence key includes the diagnosis prompt/version as well as the
+public evidence. Check-level hypotheses also validate public JSON-pointer
+references; historical diagnoses remove those references to avoid rebinding them
+to the current task. A check-diagnosis fallback retains official check observations
+in the public evolution context.
 
 ## IFBench dependency setup
 

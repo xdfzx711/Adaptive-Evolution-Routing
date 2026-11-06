@@ -25,6 +25,10 @@ class StaticPatchEvaluator:
     def __init__(self, settings):
         self.settings = settings
 
+    def public_scoring_rules(self):
+        from .scoring_rules import static_patch_rules
+        return static_patch_rules(self)
+
     def evaluate(self, task, result, spec, run_ctx):
         begin = monotonic()
         if (spec.task != task.identity or result.task_id != task.task_id or spec.scoring_method != self.scorer_version

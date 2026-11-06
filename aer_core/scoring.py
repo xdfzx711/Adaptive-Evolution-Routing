@@ -6,7 +6,7 @@ from math import isfinite
 
 from aer_core.contracts.evaluator import MetricDefinitionProvider
 from aer_core.errors import ContractError, EvaluationError
-from aer_core.schemas.scoring import ScoreDetails, ScoreTransform
+from aer_core.schemas.scoring import ScoreDetails, ScoreTransform, ScoringRules
 
 
 class ConfiguredScoringEvaluator:
@@ -49,6 +49,30 @@ class ConfiguredScoringEvaluator:
     def metric_definitions(self):
         # Protocol runtime checks use static attribute lookup on Python >= 3.12.
         return self.evaluator.metric_definitions()
+
+    def public_scoring_rules(self):
+        """Keep native scoring facts while describing the active score projection."""
+        describe = getattr(self.evaluator, "public_scoring_rules", None)
+        native = describe() if callable(describe) else ScoringRules(
+            version="aer.scoring-summary.v1", scorer_version=self.evaluator.scorer_version,
+            description=self.evaluator.score_policy, completeness="summary_only")
+        if not isinstance(native, ScoringRules) or native.scorer_version != self.evaluator.scorer_version:
+            raise ContractError("Scoring rules must describe the native scorer version", stage="setup")
+        transform = self.transform
+        formula = self.metric.name
+        if transform.type == "fixed_range":
+            formula = f"({self.metric.name} - {transform.minimum}) / ({transform.maximum} - {transform.minimum})"
+            if self.metric.direction == "lower":
+                formula = f"1 - ({formula})"
+        definitions = dict(native.metric_definitions)
+        definitions.setdefault(self.metric.name,
+            f"Native {self.metric.kind} metric; direction={self.metric.direction}; "
+            f"declared range [{self.metric.minimum}, {self.metric.maximum}].")
+        return native.replace(version=native.version + ".projection.v1", scorer_version=self.scorer_version,
+            description=self.score_policy, primary_metric=self.metric.name, metric_definitions=definitions,
+            rules={**native.rules, "optimization_score":
+                f"AER score = {formula}. Native metrics and success are unchanged; "
+                "this projection does not redefine the native scoring rules. No clipping is applied."})
 
     def evaluate(self, task, result, spec, run_ctx):
         evaluation = self.evaluator.evaluate(task, result, spec, run_ctx)

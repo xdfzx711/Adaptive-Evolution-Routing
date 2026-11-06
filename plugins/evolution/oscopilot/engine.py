@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import Field
 
 from aer_core.errors import BudgetExceeded
+from aer_core.diagnostic_evidence import evolution_context_payload, FEEDBACK_GUIDANCE
 from aer_core.progress import report_progress
 from aer_core.schemas.base import DomainModel
 from aer_core.schemas.usage import UsageReport
@@ -32,7 +33,7 @@ class Judgment(DomainModel):
 
 
 CONSTRUCTION_GUIDANCE = """
-Run in the provided repository using native Python code and one <invoke> expression.
+Run in the provided task workspace using native Python code and one <invoke> expression.
 Return one closed ```python code block, followed by a standalone <invoke>call(...)</invoke> block.
 Keep explanations outside both blocks. Do not include invocation tags inside Python source.
 A global workspace string is available to the invocation; use cwd or a workspace call parameter.
@@ -40,7 +41,7 @@ Do not install dependencies or run project tests when prohibited by the public t
 Keep examples short and avoid embedding complete predecessor answers in code/invocations.
 No tool_spec or MCP publication metadata is required during construction. Publication is a separate step.
 Final callable source must be self-contained; temporary helper files will not accompany exports.
-""" + DELIVERY_GUIDANCE
+""" + DELIVERY_GUIDANCE + FEEDBACK_GUIDANCE
 
 
 def workspace_changes(path):
@@ -62,11 +63,13 @@ class ConstructionEngine:
     def run(self, request, current, workspace):
         tools = dict(generated_tools(current))
         selected = set(current.enabled_tools)
-        evidence = {"context": request.context.model_dump(mode="json", exclude={"stable_snapshot", "run_context"}),
+        evidence = {"context": evolution_context_payload(request.context),
             "routing_rationale": request.decision.rationale,
             "outer_agent_prompt": self.public_prompt,
             "existing_tools": {name: tool.model_dump(mode="json") for name, tool in tools.items()},
-            "outer_agent_capabilities": {"builtins": "Shell commands to read, search and edit repository files",
+            "outer_agent_capabilities": {"constraints": "Use the public task instructions and outer_agent_prompt; "
+                "do not assume shell, file or network operations are permitted. Tools receive caller-supplied "
+                "JSON arguments in a fresh task workspace.",
                 "selected_tools": sorted(selected), "configured_static_tools": sorted(workspace.tooling.catalog)},
             "construction_limits": {"max_plan_nodes": self.config.max_plan_nodes,
                 "max_exported_tools": self.config.max_generated_tools, "supported_node_types": ["Python", "QA"]}}
@@ -81,7 +84,7 @@ class ConstructionEngine:
             executor.prompt[key] += CONSTRUCTION_GUIDANCE
         executor.prompt["_SYSTEM_TASK_JUDGE_PROMPT"] = executor.prompt["_SYSTEM_TASK_JUDGE_PROMPT"].replace(
             "You need to aware that the code I provided does not generate errors, I am just uncertain whether it effectively accomplishes the intended task.",
-            "Use the actual Code Error and Code Output; the execution may have failed.")
+            "Use the actual Code Error and Code Output; the execution may have failed.") + FEEDBACK_GUIDANCE
         executor.environment = NativeEnvironment(workspace.path, workspace.tooling.tool_timeout_seconds,
             workspace.tooling.generated_tools.python_executable)
         executor.system_version = platform.platform()

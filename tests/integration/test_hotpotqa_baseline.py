@@ -168,11 +168,18 @@ class HotpotGEPATests(unittest.TestCase):
             self.assertEqual(acceptance["reason"], "regression_guard")
 
     def test_trials_cannot_read_holdouts_and_share_outer_metric(self):
+        self.check_trial_feedback()
+
+    def test_projected_trials_share_outer_public_rules_and_metrics(self):
+        self.check_trial_feedback(projected=True)
+
+    def check_trial_feedback(self, projected=False):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
             root = Path(directory)
             path, rows, manifest = config_file(root, tasks=1)
             self.model_patches(stack, rows)
-            prepared = prepare_execution(path)
+            prepared = prepare_execution(load_experiment_config(path, overrides=["assessment.scoring.metric=joint_f1"])
+                                         if projected else path)
             current = prepared.benchmark.execution_tasks[0]
             service = IsolatedCandidateTrials(prepared.benchmark.loaded_config, create_registry(),
                 prepared.storage.artifact_store, prepared.benchmark.execution_tasks)
@@ -180,6 +187,11 @@ class HotpotGEPATests(unittest.TestCase):
             trial = service.evaluate(current.identity, current.identity, stable, "BAD initial prompt", context())
             self.assertIsNone(trial.error)
             self.assertEqual(trial.feedback.score, 0)
+            outer = prepared.run_task(current.task_id)
+            self.assertEqual(trial.feedback.metrics, outer.feedback.metrics)
+            self.assertEqual(trial.feedback.scoring_rules, outer.feedback.scoring_rules)
+            self.assertEqual(trial.feedback.findings, outer.feedback.findings)
+            self.assertEqual(trial.feedback.feedback_version, 'aer.feedback.v2')
             self.assertNotIn("PRIVATE_ANSWER", trial.model_dump_json())
             for task_id in manifest.validation_sets[current.task_id].similar + manifest.validation_sets[current.task_id].regression:
                 with self.assertRaises(ContractError):

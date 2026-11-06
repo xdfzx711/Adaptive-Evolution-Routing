@@ -9,8 +9,11 @@ import unittest
 from unittest.mock import patch
 
 from aer_core.errors import ContractError, EvaluationError
+from aer_core.feedback import PublicFeedbackBuilder
 from aer_core.scoring import configure_scoring
+from aer_core.schemas.feedback import ContextPolicy
 from aer_core.schemas.scoring import MetricDefinition, ScoringSettings, ScoreTransform
+from aer_core.scoring_feedback import scorer_feedback_policy
 from experiments.benchmark import prepare_benchmark
 from experiments.configuration import load_experiment_config
 from experiments.conditions import validation_conditions
@@ -36,6 +39,37 @@ class DeclaredEvaluator:
 
 
 class ScoringTests(unittest.TestCase):
+    def test_projected_public_rules_keep_native_findings_and_active_version(self):
+        native = HotpotQAEvaluator(HotpotQAEvaluatorSettings())
+        scorer = configure_scoring(native, ScoringSettings(metric="em"))
+        rules = scorer.public_scoring_rules()
+        self.assertEqual(rules.scorer_version, scorer.scorer_version)
+        self.assertEqual(rules.primary_metric, "em")
+        self.assertEqual(rules.interpretations, native.public_scoring_rules().interpretations)
+        self.assertEqual(rules.rules["success"], native.public_scoring_rules().rules["success"])
+        builder = PublicFeedbackBuilder(ContextPolicy(output_fields=["answer"], **scorer_feedback_policy(scorer)))
+        metrics = {"em": 1, "sp_prec": 1, "sp_recall": .5}
+        feedback = builder.feedback(evaluation(score=1, success=False).replace(
+            metrics=metrics, assessment_version=scorer.scorer_version))
+        self.assertFalse(feedback.success)
+        self.assertEqual(set(f.code for f in feedback.findings), {"answer_exact", "supporting_facts_incomplete"})
+        self.assertEqual(dict(feedback.metrics), metrics)
+        with patch.object(native, "public_scoring_rules", return_value=rules):
+            with self.assertRaises(ContractError):
+                scorer_feedback_policy(scorer)
+
+    def test_projected_rules_without_native_description_explain_lower_score(self):
+        native = DeclaredEvaluator(MetricDefinition(name="cost", direction="lower",
+            minimum=0, maximum=100, kind="continuous"), 25)
+        scorer = configure_scoring(native, ScoringSettings(metric="cost", transform=ScoreTransform(type="fixed_range")))
+        policy = ContextPolicy(output_fields=[], **scorer_feedback_policy(scorer))
+        feedback = PublicFeedbackBuilder(policy).feedback(scorer.evaluate(None, execution(), None, run_context()))
+        self.assertEqual(feedback.score, .75)
+        self.assertTrue(feedback.success)
+        self.assertEqual(feedback.metrics["cost"], 25)
+        self.assertEqual(feedback.scoring_rules.completeness, "summary_only")
+        self.assertIn("1 - (", feedback.scoring_rules.rules["optimization_score"])
+
     def test_fixed_ranges_directions_and_raw_metrics_preserve_success(self):
         for direction, value, expected in [("higher", 75, .75), ("lower", 75, .25)]:
             native = DeclaredEvaluator(MetricDefinition(name="points", direction=direction,
@@ -111,6 +145,9 @@ class ScoringTests(unittest.TestCase):
             self.assertNotEqual(before.evaluator.scorer_version, after.evaluator.scorer_version)
             self.assertEqual(after.as_dict()["scoring"]["metric"]["name"], "joint_f1")
             self.assertIsNotNone(b.score_details)
+            public = after.public_feedback(b)
+            self.assertEqual(public.scoring_rules.scorer_version, after.evaluator.scorer_version)
+            self.assertEqual(dict(public.metrics), dict(b.metrics))
 
     def test_binary_protocol_does_not_change_thresholds_or_confuse_inner_sampling(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,6 +1,7 @@
 """Route using public evidence through any ModelProvider, including Qwen."""
 
 import json
+from aer_core.diagnostic_evidence import evolution_context_payload
 from dataclasses import replace
 from datetime import datetime, timezone
 from time import monotonic
@@ -50,7 +51,7 @@ class LLMRouter:
                           operation_id=context.run_context.operation_id + "/routing")
         components = {kind: self.artifacts.get(ref).decode("utf-8")
                       for kind, ref in context.stable_snapshot.artifacts.items()}
-        public = context.model_dump(mode="json", exclude={"stable_snapshot", "run_context"})
+        public = evolution_context_payload(context)
         payload = {"operation": "evolution_routing", "context": public, "stable_components": components}
         system = SYSTEM_PROMPT + (SKILL_ROUTING_GUIDANCE if "skill" in context.feasible_targets else "")
         request = ModelRequest(messages=[ModelMessage(role="system", content=system),

@@ -3,6 +3,7 @@
 from aer_core.context import ContextBuilder
 from aer_core.errors import ContractError
 from aer_core.schemas.feedback import ContextPolicy, TaskFeedbackPolicy
+from aer_core.scoring_feedback import scorer_feedback_policy
 
 
 def context_builder(execution, task, *, history_max_attempts=5, history_max_text_chars=320, history_max_change_chars=4000,
@@ -14,10 +15,12 @@ def context_builder(execution, task, *, history_max_attempts=5, history_max_text
     tools = execution.built_plugins.instances.get("tools")
     specs = tools.specifications() if tools is not None else ()
     policy = ContextPolicy(task=task.identity, output_fields=declaration.output_fields,
-        evaluator_id=execution.benchmark.loaded_config.config.assessment.evaluator,
+        **scorer_feedback_policy(execution.benchmark.evaluator,
+            execution.benchmark.loaded_config.config.assessment.evaluator),
         metadata_fields=declaration.metadata_fields, allow_evolution=declaration.allow_evolution,
-        reason_messages=declaration.reason_messages, artifact_kinds=capabilities.supported_artifact_kinds,
         public_check_ids=declaration.public_check_ids,
+        reason_messages={**declaration.reason_messages, **getattr(execution.benchmark.evaluator, "public_reason_messages", {})},
+        artifact_kinds=capabilities.supported_artifact_kinds,
         state_fields=capabilities.feedback_state_fields, snapshot_config_fields=capabilities.feedback_config_fields,
         history_max_attempts=history_max_attempts, history_max_text_chars=history_max_text_chars,
         history_max_change_chars=history_max_change_chars,

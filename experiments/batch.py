@@ -12,6 +12,9 @@ from aer_core.schemas.usage import ResourceUsage
 from experiments.configuration import load_experiment_config
 from experiments.orchestration import prepare_orchestrator
 from experiments.holdout_reporting import aggregate_holdouts, measure_holdouts, paired_metrics
+from experiments.tool_construction_report import (
+    aggregate_construction, construction_summary, tool_library, validation_tool_summary,
+)
 from plugins.storage._files import FileRoot, readable_json
 from plugins.storage.layout import episode_directory
 from .scoring import scoring_protocol, aggregate_declared_metrics
@@ -51,6 +54,8 @@ def _run_task(startup, task, *, console, report_holdouts):
         initial = episode.execution.storage.version_store.stable()
         artifacts = episode.execution.storage.artifact_store
         entry["initial_prompt"] = artifacts.get(initial.artifacts["prompt"]).decode("utf-8")
+        if "tool" in initial.artifacts:
+            entry["initial_tool_library"] = tool_library(initial, artifacts)
         result = episode.run()
         saved = startup.save_record(result)
         usages.append(result.usage)
@@ -69,8 +74,12 @@ def _run_task(startup, task, *, console, report_holdouts):
                 "candidates": [{key: candidate.get(key) for key in
                     ("candidate", "target", "status", "committed", "acceptance", "components")}
                     | {"validation": {key: (candidate.get("validation") or {}).get(key) for key in
-                        ("status", "baseline_metrics", "candidate_metrics", "current_task_metrics", "usage")}}
+                        ("status", "baseline_metrics", "candidate_metrics", "current_task_metrics", "usage")}
+                        | {"tool_usage_analysis": validation_tool_summary(candidate.get("validation") or {})}}
                     for candidate in record.get("candidates", [])]})
+            construction = construction_summary(record)
+            if construction is not None:
+                rounds[-1]["tool_construction"] = construction
         final = episode.execution.storage.version_store.stable()
         entry.update(status=result.status.value, stop_reason=result.stop_reason.value,
             initial_version_id=result.initial_version_id, final_stable_version_id=result.final_stable_version_id,
@@ -79,6 +88,11 @@ def _run_task(startup, task, *, console, report_holdouts):
             final_output=result.final_execution.model_dump(mode="json")["output"] if result.final_execution else None,
             error=result.error.model_dump(mode="json") if result.error else None,
             rounds=rounds, usage=result.usage.model_dump(mode="json"), result_ref=saved["record_ref"])
+        if "tool" in final.artifacts:
+            from aer_core.tool_usage import tool_usage_summary
+            entry["final_tool_library"] = tool_library(final, artifacts)
+            entry["final_tool_usage"] = (tool_usage_summary(result.final_execution.model_dump(mode="json")["state_summary"])
+                                         if result.final_execution else None)
         if result.evolution_rounds_used == 0:
             entry["initial_evaluation"] = entry["final_evaluation"]
         if report_holdouts:
@@ -157,6 +171,9 @@ def run_benchmark(path, *, run_id=None, limit=None, console=False, report_holdou
         summary["aggregate"] = aggregate(entries, benchmark.evaluator)
         summary["aggregate"]["requested_tasks"] = len(tasks)
         summary["aggregate"]["pending_tasks"] = len(tasks) - len(entries)
+        construction = aggregate_construction(entries)
+        if construction is not None:
+            summary["aggregate"]["tool_construction"] = construction
         if report_holdouts:
             summary["aggregate"]["holdouts_initial_vs_final"] = aggregate_holdouts(entries, benchmark.evaluator)
         summary["usage"] = sum_usage(usages).model_dump(mode="json")

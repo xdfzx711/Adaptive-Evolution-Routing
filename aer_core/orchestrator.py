@@ -216,7 +216,7 @@ class Orchestrator:
                     view = self.contexts.build(public_task, state.record, state.stable, diagnostic_ctx,
                         round_id=round_id, feasible_targets=feasible, task_mode=self.config.state.task_mode,
                         allowed_history_task_ids=allowed_history_task_ids)
-                    diagnosis = validate_diagnosis(self.diagnoser.diagnose(view.task, view.execution, view.feedback, diagnostic_ctx), view.execution, view.feedback)
+                    diagnosis = validate_diagnosis(self.diagnoser.diagnose(view.task, view.execution, view.feedback, diagnostic_ctx), view.execution, view.feedback, view.task)
                     state.costs.append(diagnosis.usage or ResourceUsage.zero())
                     state.charged = True
                     state.record = state.record.replace(diagnosis=diagnosis)

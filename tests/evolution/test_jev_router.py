@@ -20,6 +20,21 @@ from tests.evolution.helpers import evolution_context
 
 
 class JevRouterTests(unittest.TestCase):
+    def test_state_preserves_scoring_facts_and_compacts_diagnosis(self):
+        from aer_core.schemas.execution import Diagnosis
+        from plugins.evaluators.hotpotqa import HotpotQAEvaluator, HotpotQAEvaluatorSettings
+        state, artifacts = self.two_targets()
+        rules = HotpotQAEvaluator(HotpotQAEvaluatorSettings()).public_scoring_rules()
+        state = state.replace(feedback=state.feedback.replace(feedback_version="aer.feedback.v2",
+            metrics={"sp_em": 1.0}, scoring_rules=rules), diagnosis=Diagnosis(reason_code="incorrect_answer",
+            explanation="Evidence is correct; answer needs checking.", unknowns=["Cause is unknown."]))
+        router = JevRouter(self.config(), artifacts, self.credentials())
+        payload = router._state(state)
+        self.assertEqual(payload["feedback"], state.feedback.model_dump(mode="json"))
+        self.assertEqual(payload["diagnosis"]["unknowns"], ["Cause is unknown."])
+        self.assertNotIn("usage", payload["diagnosis"])
+        self.assertIn("may be truncated", payload["diagnosis_reference_scope"])
+
     def test_skill_competition_receives_operator_boundaries_and_prior_skip_reason(self):
         from aer_core.schemas.construction import ConstructionFeedback, ConstructionIssue
         from plugins.routers.skill_guidance import SKILL_ROUTING_GUIDANCE

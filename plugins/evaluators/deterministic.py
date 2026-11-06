@@ -16,6 +16,10 @@ class DeterministicEvaluator:
     scorer_version = "toy.scoring.v1"
     score_policy = "binary: declared output format and answer must both pass"
 
+    def public_scoring_rules(self):
+        from .scoring_rules import deterministic_rules
+        return deterministic_rules(self)
+
     def evaluate(self, task: Task, result: ExecutionResult, spec: EvaluationSpec,
                  run_ctx: RunContext) -> EvaluationResult:
         return self.evaluate_record(task, result, spec, operation_id=run_ctx.operation_id)
